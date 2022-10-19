@@ -12,7 +12,7 @@
 #include "dp_pll.h"
 
 #define DP_CLIENT_NAME_SIZE	20
-#define XO_CLK_KHZ	19200
+#define XO_CLK_HZ	19200000
 
 struct dp_power_private {
 	struct dp_parser *parser;
@@ -341,7 +341,7 @@ static int dp_power_park_module(struct dp_power_private *power, enum dp_pm_type 
 		goto exit;
 	}
 
-	mp->clk_config->rate = XO_CLK_KHZ;
+	mp->clk_config->rate = XO_CLK_HZ;
 	rc = msm_dss_clk_set_rate(mp->clk_config, mp->num_clk);
 	if (rc) {
 		DP_ERR("failed to set clk rate.\n");
