@@ -8,7 +8,8 @@
 
 #if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
 #include <linux/soc/qcom/fsa4480-i2c.h>
-#elif IS_ENABLED(CONFIG_QCOM_WCD939X_I2C)
+#endif
+#if IS_ENABLED(CONFIG_QCOM_WCD939X_I2C)
 #include <linux/soc/qcom/wcd939x-i2c.h>
 #endif
 
@@ -863,7 +864,7 @@ end:
 
 struct dp_aux *dp_aux_get(struct device *dev, struct dp_catalog_aux *catalog,
 		struct dp_parser *parser, struct device_node *aux_switch,
-		struct dp_aux_bridge *aux_bridge)
+		struct dp_aux_bridge *aux_bridge, enum dp_aux_switch_type switch_type)
 {
 	int rc = 0;
 	struct dp_aux_private *aux;
@@ -902,15 +903,23 @@ struct dp_aux *dp_aux_get(struct device *dev, struct dp_catalog_aux *catalog,
 	dp_aux->abort = dp_aux_abort_transaction;
 	dp_aux->set_sim_mode = dp_aux_set_sim_mode;
 
+	/*Condition to avoid allocating function pointers for aux bypass mode*/
+	if (switch_type != DP_AUX_SWITCH_BYPASS) {
 #if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
-	dp_aux->switch_configure = dp_aux_configure_fsa_switch;
-	dp_aux->switch_register_notifier = fsa4480_reg_notifier;
-	dp_aux->switch_unregister_notifier = fsa4480_unreg_notifier;
-#elif IS_ENABLED(CONFIG_QCOM_WCD939X_I2C)
-	dp_aux->switch_configure = dp_aux_configure_wcd_switch;
-	dp_aux->switch_register_notifier = wcd_usbss_reg_notifier;
-	dp_aux->switch_unregister_notifier = wcd_usbss_unreg_notifier;
+		if (switch_type == DP_AUX_SWITCH_FSA4480) {
+			dp_aux->switch_configure = dp_aux_configure_fsa_switch;
+			dp_aux->switch_register_notifier = fsa4480_reg_notifier;
+			dp_aux->switch_unregister_notifier = fsa4480_unreg_notifier;
+		}
 #endif
+#if IS_ENABLED(CONFIG_QCOM_WCD939X_I2C)
+		if (switch_type == DP_AUX_SWITCH_WCD939x) {
+			dp_aux->switch_configure = dp_aux_configure_wcd_switch;
+			dp_aux->switch_register_notifier = wcd_usbss_reg_notifier;
+			dp_aux->switch_unregister_notifier = wcd_usbss_unreg_notifier;
+		}
+#endif
+	}
 
 	return dp_aux;
 error:

@@ -168,6 +168,7 @@ struct dp_display_private {
 
 	enum drm_connector_status cached_connector_status;
 	enum dp_display_states state;
+	enum dp_aux_switch_type switch_type;
 
 	struct platform_device *pdev;
 	struct device_node *aux_switch_node;
@@ -2161,8 +2162,15 @@ static int dp_init_sub_modules(struct dp_display_private *dp)
 		dp->no_aux_switch = true;
 	}
 
+	if (!strcmp(dp->aux_switch_node->name, "fsa4480"))
+		dp->switch_type = DP_AUX_SWITCH_FSA4480;
+	else if (!strcmp(dp->aux_switch_node->name, "wcd939x_i2c"))
+		dp->switch_type = DP_AUX_SWITCH_WCD939x;
+	else
+		dp->switch_type = DP_AUX_SWITCH_BYPASS;
+
 	dp->aux = dp_aux_get(dev, &dp->catalog->aux, dp->parser,
-			dp->aux_switch_node, dp->aux_bridge);
+			dp->aux_switch_node, dp->aux_bridge, dp->switch_type);
 	if (IS_ERR(dp->aux)) {
 		rc = PTR_ERR(dp->aux);
 		DP_ERR("failed to initialize aux, rc = %d\n", rc);
