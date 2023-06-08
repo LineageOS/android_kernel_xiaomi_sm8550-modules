@@ -501,6 +501,9 @@ static void _sde_plane_set_qos_remap(struct drm_plane *plane)
 		return;
 	}
 
+	if (psde->is_virtual)
+		return;
+
 	memset(&qos_params, 0, sizeof(qos_params));
 	qos_params.vbif_idx = VBIF_RT;
 	qos_params.clk_ctrl = psde->pipe_hw->cap->clk_ctrl;
