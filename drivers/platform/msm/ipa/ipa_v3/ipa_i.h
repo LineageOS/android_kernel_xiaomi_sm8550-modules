@@ -1220,6 +1220,7 @@ struct ipa3_sys_context {
 	struct list_head pending_pkts[GSI_VEID_MAX];
 	atomic_t xmit_eot_cnt;
 	struct tasklet_struct tasklet;
+	struct work_struct tasklet_work;
 	bool skip_eot;
 	u32 eob_drop_cnt;
 	struct napi_struct napi_tx;
@@ -1253,6 +1254,7 @@ struct ipa3_sys_context {
 	struct workqueue_struct *freepage_wq;
 	struct delayed_work freepage_work;
 	struct tasklet_struct tasklet_find_freepage;
+	struct workqueue_struct *tasklet_wq;
 	/* ordering is important - other immutable fields go below */
 };
 
