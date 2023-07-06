@@ -11,7 +11,6 @@
 #include <linux/component.h>
 #include <linux/of_irq.h>
 #include <linux/delay.h>
-#include <linux/soc/qcom/fsa4480-i2c.h>
 #include <linux/usb/phy.h>
 #include <linux/jiffies.h>
 #include <linux/pm_qos.h>
@@ -169,6 +168,7 @@ struct dp_display_private {
 
 	enum drm_connector_status cached_connector_status;
 	enum dp_display_states state;
+	enum dp_aux_switch_type switch_type;
 
 	struct platform_device *pdev;
 	struct device_node *aux_switch_node;
@@ -1221,8 +1221,8 @@ static int dp_display_process_hpd_high(struct dp_display_private *dp)
 					dp->debug->max_pclk_khz);
 
 	if (!dp->debug->sim_mode && !dp->no_aux_switch && !dp->parser->gpio_aux_switch
-			&& dp->aux_switch_node) {
-		rc = dp->aux->aux_switch(dp->aux, true, dp->hpd->orientation);
+			&& dp->aux_switch_node && dp->aux->switch_configure) {
+		rc = dp->aux->switch_configure(dp->aux, true, dp->hpd->orientation);
 		if (rc) {
 			mutex_unlock(&dp->session_lock);
 			return rc;
@@ -1400,7 +1400,7 @@ static int dp_display_process_hpd_low(struct dp_display_private *dp, bool skip_w
 	return rc;
 }
 
-static int dp_display_fsa4480_callback(struct notifier_block *self,
+static int dp_display_aux_switch_callback(struct notifier_block *self,
 		unsigned long event, void *data)
 {
 	return 0;
@@ -1416,9 +1416,12 @@ static int dp_display_init_aux_switch(struct dp_display_private *dp)
 	if (dp->aux_switch_ready)
 	       return rc;
 
+	if (!dp->aux->switch_register_notifier)
+		return rc;
+
 	SDE_EVT32_EXTERNAL(SDE_EVTLOG_FUNC_ENTRY);
 
-	nb.notifier_call = dp_display_fsa4480_callback;
+	nb.notifier_call = dp_display_aux_switch_callback;
 	nb.priority = 0;
 
 	/*
@@ -1426,7 +1429,7 @@ static int dp_display_init_aux_switch(struct dp_display_private *dp)
 	 * Bootup DP with cable connected usecase can hit this scenario.
 	 */
 	for (retry = 0; retry < max_retries; retry++) {
-		rc = fsa4480_reg_notifier(&nb, dp->aux_switch_node);
+		rc = dp->aux->switch_register_notifier(&nb, dp->aux_switch_node);
 		if (rc == 0) {
 			DP_DEBUG("registered notifier successfully\n");
 			dp->aux_switch_ready = true;
@@ -1443,7 +1446,8 @@ static int dp_display_init_aux_switch(struct dp_display_private *dp)
 		return rc;
 	}
 
-	fsa4480_unreg_notifier(&nb, dp->aux_switch_node);
+	if (dp->aux->switch_unregister_notifier)
+		dp->aux->switch_unregister_notifier(&nb, dp->aux_switch_node);
 
 	SDE_EVT32_EXTERNAL(SDE_EVTLOG_FUNC_EXIT, rc);
 	return rc;
@@ -1466,12 +1470,12 @@ static int dp_display_usbpd_configure_cb(struct device *dev)
 	}
 
 	if (!dp->debug->sim_mode && !dp->no_aux_switch
-	    && !dp->parser->gpio_aux_switch && dp->aux_switch_node) {
+	    && !dp->parser->gpio_aux_switch && dp->aux_switch_node && dp->aux->switch_configure) {
 		rc = dp_display_init_aux_switch(dp);
 		if (rc)
 			return rc;
 
-		rc = dp->aux->aux_switch(dp->aux, true, dp->hpd->orientation);
+		rc = dp->aux->switch_configure(dp->aux, true, dp->hpd->orientation);
 		if (rc)
 			return rc;
 	}
@@ -1709,8 +1713,8 @@ static int dp_display_usbpd_disconnect_cb(struct device *dev)
 	dp->aux->abort(dp->aux, true);
 
 	if (!dp->debug->sim_mode && !dp->no_aux_switch
-	    && !dp->parser->gpio_aux_switch)
-		dp->aux->aux_switch(dp->aux, false, ORIENTATION_NONE);
+	    && !dp->parser->gpio_aux_switch && dp->aux->switch_configure)
+		dp->aux->switch_configure(dp->aux, false, ORIENTATION_NONE);
 
 	dp_display_disconnect_sync(dp);
 
@@ -2158,8 +2162,15 @@ static int dp_init_sub_modules(struct dp_display_private *dp)
 		dp->no_aux_switch = true;
 	}
 
+	if (!strcmp(dp->aux_switch_node->name, "fsa4480"))
+		dp->switch_type = DP_AUX_SWITCH_FSA4480;
+	else if (!strcmp(dp->aux_switch_node->name, "wcd939x_i2c"))
+		dp->switch_type = DP_AUX_SWITCH_WCD939x;
+	else
+		dp->switch_type = DP_AUX_SWITCH_BYPASS;
+
 	dp->aux = dp_aux_get(dev, &dp->catalog->aux, dp->parser,
-			dp->aux_switch_node, dp->aux_bridge);
+			dp->aux_switch_node, dp->aux_bridge, dp->switch_type);
 	if (IS_ERR(dp->aux)) {
 		rc = PTR_ERR(dp->aux);
 		DP_ERR("failed to initialize aux, rc = %d\n", rc);
