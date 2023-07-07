@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  */
 
-#include <linux/soc/qcom/fsa4480-i2c.h>
 #include <linux/delay.h>
+
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
+#include <linux/soc/qcom/fsa4480-i2c.h>
+#endif
+#if IS_ENABLED(CONFIG_QCOM_WCD939X_I2C)
+#include <linux/soc/qcom/wcd939x-i2c.h>
+#endif
 
 #include "dp_aux.h"
 #include "dp_hpd.h"
@@ -755,7 +761,8 @@ static void dp_aux_set_sim_mode(struct dp_aux *dp_aux,
 	mutex_unlock(&aux->mutex);
 }
 
-static int dp_aux_configure_aux_switch(struct dp_aux *dp_aux,
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
+static int dp_aux_configure_fsa_switch(struct dp_aux *dp_aux,
 		bool enable, int orientation)
 {
 	struct dp_aux_private *aux;
@@ -795,15 +802,69 @@ static int dp_aux_configure_aux_switch(struct dp_aux *dp_aux,
 			enable, orientation, event);
 
 	rc = fsa4480_switch_event(aux->aux_switch_node, event);
+
 	if (rc)
 		DP_AUX_ERR(dp_aux, "failed to configure fsa4480 i2c device (%d)\n", rc);
 end:
 	return rc;
 }
+#endif
+
+#if IS_ENABLED(CONFIG_QCOM_WCD939X_I2C)
+static int dp_aux_configure_wcd_switch(struct dp_aux *dp_aux,
+		bool enable, int orientation)
+{
+	struct dp_aux_private *aux;
+	int rc = 0;
+	enum wcd_usbss_cable_status status = WCD_USBSS_CABLE_DISCONNECT;
+	enum wcd_usbss_cable_types event = WCD_USBSS_DP_AUX_CC1;
+
+	if (!dp_aux) {
+		DP_AUX_ERR(dp_aux, "invalid input\n");
+		rc = -EINVAL;
+		goto end;
+	}
+
+	aux = container_of(dp_aux, struct dp_aux_private, dp_aux);
+
+	if (!aux->aux_switch_node) {
+		DP_AUX_DEBUG(dp_aux, "undefined wcd939x switch handle\n");
+		rc = -EINVAL;
+		goto end;
+	}
+
+	if (enable) {
+		status = WCD_USBSS_CABLE_CONNECT;
+
+		switch (orientation) {
+		case ORIENTATION_CC1:
+			event = WCD_USBSS_DP_AUX_CC1;
+			break;
+		case ORIENTATION_CC2:
+			event = WCD_USBSS_DP_AUX_CC2;
+			break;
+		default:
+			DP_AUX_ERR(dp_aux, "invalid orientation\n");
+			rc = -EINVAL;
+			goto end;
+		}
+	}
+
+	DP_AUX_DEBUG(dp_aux, "enable=%d, orientation=%d, event=%d\n",
+			enable, orientation, event);
+
+	rc = wcd_usbss_switch_update(event, status);
+
+	if (rc)
+		DP_AUX_ERR(dp_aux, "failed to configure wcd939x i2c device (%d)\n", rc);
+end:
+	return rc;
+}
+#endif
 
 struct dp_aux *dp_aux_get(struct device *dev, struct dp_catalog_aux *catalog,
 		struct dp_parser *parser, struct device_node *aux_switch,
-		struct dp_aux_bridge *aux_bridge)
+		struct dp_aux_bridge *aux_bridge, enum dp_aux_switch_type switch_type)
 {
 	int rc = 0;
 	struct dp_aux_private *aux;
@@ -841,7 +902,24 @@ struct dp_aux *dp_aux_get(struct device *dev, struct dp_catalog_aux *catalog,
 	dp_aux->reconfig = dp_aux_reconfig;
 	dp_aux->abort = dp_aux_abort_transaction;
 	dp_aux->set_sim_mode = dp_aux_set_sim_mode;
-	dp_aux->aux_switch = dp_aux_configure_aux_switch;
+
+	/*Condition to avoid allocating function pointers for aux bypass mode*/
+	if (switch_type != DP_AUX_SWITCH_BYPASS) {
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
+		if (switch_type == DP_AUX_SWITCH_FSA4480) {
+			dp_aux->switch_configure = dp_aux_configure_fsa_switch;
+			dp_aux->switch_register_notifier = fsa4480_reg_notifier;
+			dp_aux->switch_unregister_notifier = fsa4480_unreg_notifier;
+		}
+#endif
+#if IS_ENABLED(CONFIG_QCOM_WCD939X_I2C)
+		if (switch_type == DP_AUX_SWITCH_WCD939x) {
+			dp_aux->switch_configure = dp_aux_configure_wcd_switch;
+			dp_aux->switch_register_notifier = wcd_usbss_reg_notifier;
+			dp_aux->switch_unregister_notifier = wcd_usbss_unreg_notifier;
+		}
+#endif
+	}
 
 	return dp_aux;
 error:
