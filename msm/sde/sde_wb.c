@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -471,9 +471,6 @@ int sde_wb_get_mode_info(struct drm_connector *connector,
 	const u32 single_intf = 1;
 	const u32 no_enc = 0;
 	struct msm_display_topology *topology;
-	struct sde_wb_device *wb_dev = display;
-	u16 hdisplay;
-	int i;
 
 	if (!drm_mode || !mode_info || !avail_res ||
 			!avail_res->max_mixer_width || !display) {
@@ -481,17 +478,16 @@ int sde_wb_get_mode_info(struct drm_connector *connector,
 		return -EINVAL;
 	}
 
-	hdisplay = drm_mode->hdisplay;
-
-	/* find maximum display width to support */
-	for (i = 0; i < wb_dev->count_modes; i++)
-		hdisplay = max(hdisplay, wb_dev->modes[i].hdisplay);
-
 	topology = &mode_info->topology;
-	topology->num_lm = (avail_res->max_mixer_width <= hdisplay) ?
+	topology->num_lm = (avail_res->max_mixer_width <= drm_mode->hdisplay) ?
 			dual_lm : single_lm;
 	topology->num_enc = no_enc;
 	topology->num_intf = single_intf;
+
+	if (topology->num_lm == dual_lm && (drm_mode->hdisplay % 4)) {
+		SDE_ERROR("invalid mode settings for 3d-merge, hdisplay:%d\n", drm_mode->hdisplay);
+		return -EINVAL;
+	}
 
 	mode_info->comp_info.comp_type = MSM_DISPLAY_COMPRESSION_NONE;
 	mode_info->wide_bus_en = false;
