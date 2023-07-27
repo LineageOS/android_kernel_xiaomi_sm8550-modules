@@ -1099,6 +1099,7 @@ static int dp_display_host_init(struct dp_display_private *dp)
 	enable_irq(dp->irq);
 	dp_display_abort_hdcp(dp, false);
 
+	dp_display_qos_request(dp, true);
 	dp_display_state_add(DP_STATE_INITIALIZED);
 
 	/* log this as it results from user action of cable connection */
@@ -1187,6 +1188,7 @@ static void dp_display_host_deinit(struct dp_display_private *dp)
 		return;
 	}
 
+	dp_display_qos_request(dp, false);
 	dp_display_abort_hdcp(dp, true);
 	dp->ctrl->deinit(dp->ctrl);
 	dp->hpd->host_deinit(dp->hpd, &dp->catalog->hpd);
