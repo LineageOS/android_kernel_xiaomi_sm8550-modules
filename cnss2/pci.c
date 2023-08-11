@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/completion.h>
@@ -1838,6 +1838,20 @@ int cnss_pci_is_device_down(struct device *dev)
 }
 EXPORT_SYMBOL(cnss_pci_is_device_down);
 
+int cnss_pci_shutdown_cleanup(struct cnss_pci_data *pci_priv)
+{
+	int ret;
+
+	if (!pci_priv) {
+		cnss_pr_err("pci_priv is NULL\n");
+		return -ENODEV;
+	}
+
+	ret = del_timer(&pci_priv->dev_rddm_timer);
+	cnss_pr_dbg("%s RDDM timer deleted", ret ? "Active" : "Inactive");
+	return ret;
+}
+
 void cnss_pci_lock_reg_window(struct device *dev, unsigned long *flags)
 {
 	spin_lock_bh(&pci_reg_window_lock);
@@ -2310,9 +2324,6 @@ retry_mhi_suspend:
 		ret = mhi_force_rddm_mode(pci_priv->mhi_ctrl);
 		if (ret) {
 			cnss_pr_err("Failed to trigger RDDM, err = %d\n", ret);
-
-			cnss_pr_dbg("Sending host reset req\n");
-			ret = cnss_mhi_force_reset(pci_priv);
 			cnss_rddm_trigger_check(pci_priv);
 		}
 		break;
@@ -5975,8 +5986,24 @@ static void cnss_pci_dump_debug_reg(struct cnss_pci_data *pci_priv)
 
 static int cnss_pci_assert_host_sol(struct cnss_pci_data *pci_priv)
 {
-	if (cnss_get_host_sol_value(pci_priv->plat_priv))
-		return -EINVAL;
+	int ret;
+
+	ret = cnss_get_host_sol_value(pci_priv->plat_priv);
+	if (ret) {
+		if (ret < 0) {
+			cnss_pr_dbg("Host SOL functionality is not enabled\n");
+			return ret;
+		} else {
+			cnss_pr_dbg("Host SOL is already high\n");
+			/*
+			 * Return success if HOST SOL is already high.
+			 * This will indicate caller that a HOST SOL is
+			 * already asserted from some other thread and
+			 * no further action required from the caller.
+			 */
+			return 0;
+		}
+	}
 
 	cnss_pr_dbg("Assert host SOL GPIO to retry RDDM, expecting link down\n");
 	cnss_set_host_sol_value(pci_priv->plat_priv, 1);
@@ -6100,6 +6127,11 @@ int cnss_pci_force_fw_assert_hdlr(struct cnss_pci_data *pci_priv)
 		return 0;
 	}
 
+	/*
+	 * Fist try MHI SYS_ERR, if fails try HOST SOL and return.
+	 * If SOL is not enabled try HOST Reset Rquest after MHI
+	 * SYS_ERRR fails.
+	 */
 	ret = cnss_pci_set_mhi_state(pci_priv, CNSS_MHI_TRIGGER_RDDM);
 	if (ret) {
 		if (pci_priv->is_smmu_fault) {
@@ -6119,6 +6151,13 @@ int cnss_pci_force_fw_assert_hdlr(struct cnss_pci_data *pci_priv)
 			cnss_pci_pm_runtime_put_autosuspend(pci_priv, RTPM_ID_CNSS);
 			return 0;
 		}
+
+		cnss_pr_dbg("Sending Host Reset Req\n");
+		if (!cnss_mhi_force_reset(pci_priv)) {
+			ret = 0;
+			goto runtime_pm_put;
+		}
+
 		cnss_pci_dump_debug_reg(pci_priv);
 		cnss_schedule_recovery(&pci_priv->pci_dev->dev,
 				       CNSS_REASON_DEFAULT);
@@ -6734,9 +6773,6 @@ static void cnss_dev_rddm_timeout_hdlr(struct timer_list *t)
 
 	cnss_fatal_err("Timeout waiting for RDDM notification\n");
 
-	if (!cnss_pci_assert_host_sol(pci_priv))
-		return;
-
 	mhi_ee = mhi_get_exec_env(pci_priv->mhi_ctrl);
 	if (mhi_ee == MHI_EE_PBL)
 		cnss_pr_err("Device MHI EE is PBL, unable to collect dump\n");
@@ -6746,6 +6782,8 @@ static void cnss_dev_rddm_timeout_hdlr(struct timer_list *t)
 		cnss_schedule_recovery(&pci_priv->pci_dev->dev,
 				       CNSS_REASON_RDDM);
 	} else {
+		if (!cnss_pci_assert_host_sol(pci_priv))
+			return;
 		cnss_mhi_debug_reg_dump(pci_priv);
 		cnss_pci_bhi_debug_reg_dump(pci_priv);
 		cnss_pci_soc_scratch_reg_dump(pci_priv);
