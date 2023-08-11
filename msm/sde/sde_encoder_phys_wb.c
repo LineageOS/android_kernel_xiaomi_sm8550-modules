@@ -1949,12 +1949,14 @@ static void _sde_encoder_phys_wb_reset_state(struct sde_encoder_phys *phys_enc)
 	phys_enc->hw_cdm = NULL;
 	phys_enc->hw_ctl = NULL;
 	phys_enc->in_clone_mode = false;
-	kfree(wb_dev->modes);
-	wb_dev->modes = NULL;
-	wb_dev->count_modes = 0;
 	atomic_set(&phys_enc->pending_kickoff_cnt, 0);
 	atomic_set(&phys_enc->pending_retire_fence_cnt, 0);
 	atomic_set(&phys_enc->pending_ctl_start_cnt, 0);
+	mutex_lock(&wb_dev->wb_lock);
+	kfree(wb_dev->modes);
+	wb_dev->modes = NULL;
+	wb_dev->count_modes = 0;
+	mutex_unlock(&wb_dev->wb_lock);
 }
 
 static int _sde_encoder_phys_wb_wait_for_idle(struct sde_encoder_phys *phys_enc, bool force_wait)
