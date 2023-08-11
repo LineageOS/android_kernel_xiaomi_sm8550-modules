@@ -1103,8 +1103,8 @@ int dp_mst_sim_update(void *mst_sim_context, u32 port_num,
 		rc = -ENOMEM;
 		goto fail;
 	}
-
 	ctx->port_num = port_num;
+
 	for (i = 0; i < port_num; i++) {
 		ctx->ports[i] = ports[i];
 		if (ports[i].edid_size) {

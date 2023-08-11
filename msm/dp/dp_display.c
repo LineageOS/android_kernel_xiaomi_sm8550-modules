@@ -1099,6 +1099,7 @@ static int dp_display_host_init(struct dp_display_private *dp)
 	enable_irq(dp->irq);
 	dp_display_abort_hdcp(dp, false);
 
+	dp_display_qos_request(dp, true);
 	dp_display_state_add(DP_STATE_INITIALIZED);
 
 	/* log this as it results from user action of cable connection */
@@ -1187,6 +1188,7 @@ static void dp_display_host_deinit(struct dp_display_private *dp)
 		return;
 	}
 
+	dp_display_qos_request(dp, false);
 	dp_display_abort_hdcp(dp, true);
 	dp->ctrl->deinit(dp->ctrl);
 	dp->hpd->host_deinit(dp->hpd, &dp->catalog->hpd);
@@ -2158,8 +2160,10 @@ static int dp_init_sub_modules(struct dp_display_private *dp)
 
 	dp->aux_switch_node = of_parse_phandle(dp->pdev->dev.of_node, phandle, 0);
 	if (!dp->aux_switch_node) {
-		DP_DEBUG("cannot parse %s handle\n", phandle);
 		dp->no_aux_switch = true;
+		DP_WARN("Aux switch node not found, assigning bypass mode as switch type\n");
+		dp->switch_type = DP_AUX_SWITCH_BYPASS;
+		goto skip_node_name;
 	}
 
 	if (!strcmp(dp->aux_switch_node->name, "fsa4480"))
@@ -2169,6 +2173,7 @@ static int dp_init_sub_modules(struct dp_display_private *dp)
 	else
 		dp->switch_type = DP_AUX_SWITCH_BYPASS;
 
+skip_node_name:
 	dp->aux = dp_aux_get(dev, &dp->catalog->aux, dp->parser,
 			dp->aux_switch_node, dp->aux_bridge, dp->switch_type);
 	if (IS_ERR(dp->aux)) {

@@ -635,8 +635,8 @@ int sde_encoder_helper_unregister_irq(struct sde_encoder_phys *phys_enc,
 	struct sde_encoder_irq *irq;
 	int ret;
 
-	if (!phys_enc) {
-		SDE_ERROR("invalid encoder\n");
+	if (!phys_enc || intr_idx >= INTR_IDX_MAX) {
+		SDE_ERROR("invalid params\n");
 		return -EINVAL;
 	}
 	irq = &phys_enc->irq[intr_idx];
@@ -2777,6 +2777,7 @@ static void sde_encoder_virt_mode_set(struct drm_encoder *drm_enc,
 				sde_crtc_state->cached_cwb_enc_mask);
 		sde_crtc_state->cwb_enc_mask = sde_crtc_state->cached_cwb_enc_mask;
 		sde_encoder_set_clone_mode(drm_enc, crtc_state);
+		sde_crtc->cached_encoder_mask |= drm_encoder_mask(drm_enc);
 	}
 
 	/* reserve dynamic resources now, indicating non test-only */
@@ -3271,6 +3272,10 @@ static void sde_encoder_virt_enable(struct drm_encoder *drm_enc)
 		return;
 	}
 
+	if (sde_encoder_is_built_in_display(drm_enc) &&
+			msm_is_mode_seamless_poms(&c_state->msm_mode))
+		drm_crtc_vblank_put(sde_enc->crtc);
+
 	memset(&sde_enc->cur_master->intf_cfg_v1, 0,
 			sizeof(sde_enc->cur_master->intf_cfg_v1));
 
@@ -3359,6 +3364,7 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 	struct sde_encoder_virt *sde_enc = NULL;
 	struct sde_connector *sde_conn;
 	struct sde_kms *sde_kms;
+	struct sde_connector_state *c_state = NULL;
 	enum sde_intf_mode intf_mode;
 	int ret, i = 0;
 
@@ -3390,6 +3396,12 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 	if (!sde_kms)
 		return;
 
+	c_state = to_sde_connector_state(sde_enc->cur_master->connector->state);
+	if (!c_state) {
+		SDE_ERROR("invalid connector state\n");
+		return;
+	}
+
 	intf_mode = sde_encoder_get_intf_mode(drm_enc);
 
 	SDE_EVT32(DRMID(drm_enc));
@@ -3412,6 +3424,10 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 	_sde_encoder_input_handler_unregister(drm_enc);
 
 	flush_delayed_work(&sde_conn->status_work);
+
+	if (sde_encoder_is_built_in_display(drm_enc) &&
+			msm_is_mode_seamless_poms(&c_state->msm_mode))
+		drm_crtc_vblank_get(sde_enc->crtc);
 	/*
 	 * For primary command mode and video mode encoders, execute the
 	 * resource control pre-stop operations before the physical encoders
@@ -3447,7 +3463,8 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 	 * wait for any pending vsync timestamp event to sf
 	 * to ensure vbalnk irq is disabled.
 	 */
-	if (sde_enc->vblank_enabled)
+	if (sde_enc->vblank_enabled &&
+			!msm_is_mode_seamless_poms(&c_state->msm_mode))
 		sde_encoder_wait_for_vsync_event_complete(sde_enc);
 
 	/*
