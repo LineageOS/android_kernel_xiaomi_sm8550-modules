@@ -1584,8 +1584,9 @@ static void _sde_crtc_program_lm_output_roi(struct drm_crtc *crtc)
 
 		lm_roi = &cstate->lm_roi[lm_idx];
 		hw_lm = sde_crtc->mixers[lm_idx].hw_lm;
-		if (!sde_crtc->mixers_swapped)
-			right_mixer = lm_idx % MAX_MIXERS_PER_LAYOUT;
+		right_mixer = lm_idx % MAX_MIXERS_PER_LAYOUT;
+		if (sde_crtc->mixers_swapped)
+			right_mixer = !right_mixer;
 
 		if (lm_roi->w != hw_lm->cfg.out_width ||
 				lm_roi->h != hw_lm->cfg.out_height ||
