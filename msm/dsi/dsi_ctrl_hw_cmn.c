@@ -1760,10 +1760,11 @@ int dsi_ctrl_hw_cmn_ctrl_reset(struct dsi_ctrl_hw *ctrl,
 void dsi_ctrl_hw_cmn_mask_error_intr(struct dsi_ctrl_hw *ctrl, u32 idx, bool en)
 {
 	u32 reg = 0;
-	u32 fifo_status = 0, timeout_status = 0;
+	u32 fifo_status = 0, timeout_status = 0, pll_unlock_status = 0;
 	u32 overflow_clear = BIT(10) | BIT(18) | BIT(22) | BIT(26) | BIT(30);
 	u32 underflow_clear = BIT(19) | BIT(23) | BIT(27) | BIT(31);
 	u32 lp_rx_clear = BIT(4);
+	u32 pll_unlock_clear = BIT(16);
 
 	reg = DSI_R32(ctrl, DSI_ERR_INT_MASK0);
 
@@ -1808,8 +1809,11 @@ void dsi_ctrl_hw_cmn_mask_error_intr(struct dsi_ctrl_hw *ctrl, u32 idx, bool en)
 	if (idx & BIT(DSI_PLL_UNLOCK_ERR)) {
 		if (en)
 			reg |= BIT(28);
-		else
+		else {
 			reg &= ~BIT(28);
+			pll_unlock_status = DSI_R32(ctrl, DSI_CLK_STATUS);
+			DSI_W32(ctrl, DSI_CLK_STATUS, pll_unlock_status | pll_unlock_clear);
+		}
 	}
 
 	DSI_W32(ctrl, DSI_ERR_INT_MASK0, reg);
