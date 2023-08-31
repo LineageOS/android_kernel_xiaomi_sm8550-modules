@@ -3385,8 +3385,8 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 	}
 
 	sde_enc = to_sde_encoder_virt(drm_enc);
-	if (!sde_enc->cur_master) {
-		SDE_ERROR("Invalid cur_master\n");
+	if (!sde_enc->cur_master || !sde_enc->cur_master->connector) {
+		SDE_ERROR("Invalid params\n");
 		return;
 	}
 	sde_conn = to_sde_connector(sde_enc->cur_master->connector);
@@ -3478,8 +3478,7 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 	sde_encoder_resource_control(drm_enc, SDE_ENC_RC_EVENT_STOP);
 
 	/* reset connector topology name property */
-	if (sde_enc->cur_master && sde_enc->cur_master->connector &&
-			sde_enc->crtc && sde_enc->crtc->state->active_changed) {
+	if (sde_enc->crtc && sde_enc->crtc->state->active_changed) {
 		ret = sde_rm_update_topology(&sde_kms->rm,
 				sde_enc->cur_master->connector->state, NULL);
 		if (ret) {
