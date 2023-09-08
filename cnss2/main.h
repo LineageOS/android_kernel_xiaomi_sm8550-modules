@@ -81,6 +81,10 @@
 #define CNSS_EVENT_SYNC_UNINTERRUPTIBLE (CNSS_EVENT_SYNC | \
 				CNSS_EVENT_UNINTERRUPTIBLE)
 #define CNSS_EVENT_SYNC_UNKILLABLE (CNSS_EVENT_SYNC | CNSS_EVENT_UNKILLABLE)
+#define QMI_WLFW_MAX_TME_OPT_FILE_NUM 3
+#define TME_OEM_FUSE_FILE_NAME		"peach_sec.dat"
+#define TME_RPR_FILE_NAME		"peach_rpr.bin"
+#define TME_DPR_FILE_NAME		"peach_dpr.bin"
 
 enum cnss_dt_type {
 	CNSS_DTT_LEGACY = 0,
@@ -552,6 +556,7 @@ struct cnss_plat_data {
 	struct cnss_fw_mem fw_mem[QMI_WLFW_MAX_NUM_MEM_SEG_V01];
 	struct cnss_fw_mem m3_mem;
 	struct cnss_fw_mem tme_lite_mem;
+	struct cnss_fw_mem tme_opt_file_mem[QMI_WLFW_MAX_TME_OPT_FILE_NUM];
 	struct cnss_fw_mem *cal_mem;
 	struct cnss_fw_mem aux_mem;
 	u64 cal_time;

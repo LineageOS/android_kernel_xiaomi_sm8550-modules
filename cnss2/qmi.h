@@ -87,6 +87,8 @@ void cnss_dms_deinit(struct cnss_plat_data *plat_priv);
 int cnss_wlfw_qdss_dnld_send_sync(struct cnss_plat_data *plat_priv);
 int cnss_wlfw_qdss_data_send_sync(struct cnss_plat_data *plat_priv, char *file_name,
 				  u32 total_size);
+int cnss_wlfw_tme_opt_file_dnld_send_sync(struct cnss_plat_data *plat_priv,
+				       enum wlfw_tme_lite_file_type_v01 file);
 int wlfw_qdss_trace_start(struct cnss_plat_data *plat_priv);
 int wlfw_qdss_trace_stop(struct cnss_plat_data *plat_priv, unsigned long long option);
 int cnss_wlfw_cal_report_req_send_sync(struct cnss_plat_data *plat_priv,
@@ -293,6 +295,12 @@ int cnss_wlfw_qdss_dnld_send_sync(struct cnss_plat_data *plat_priv)
 
 int cnss_wlfw_qdss_data_send_sync(struct cnss_plat_data *plat_priv, char *file_name,
 				  u32 total_size)
+{
+	return 0;
+}
+
+int cnss_wlfw_tme_opt_file_dnld_send_sync(struct cnss_plat_data *plat_priv,
+				       enum wlfw_tme_lite_file_type_v01 file)
 {
 	return 0;
 }
