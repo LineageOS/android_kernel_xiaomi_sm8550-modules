@@ -403,6 +403,8 @@ static void _sde_encoder_phys_wb_setup_roi(struct sde_encoder_phys *phys_enc,
 				wb_cfg->crop.x = wb_cfg->crop.x - pu_roi.x;
 				wb_cfg->crop.y = wb_cfg->crop.y - pu_roi.y;
 				hw_wb->ops.setup_crop(hw_wb, wb_cfg, true);
+			} else {
+				hw_wb->ops.setup_crop(hw_wb, wb_cfg, false);
 			}
 		} else if ((wb_cfg->roi.w != out_width) || (wb_cfg->roi.h != out_height)) {
 			hw_wb->ops.setup_crop(hw_wb, wb_cfg, true);
