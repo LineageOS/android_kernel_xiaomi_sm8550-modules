@@ -1925,8 +1925,9 @@ void reg_dmav2_setup_dspp_sixzonev2(struct sde_hw_dspp *ctx, void *cfg)
 	}
 
 	for (i = 0; i < num_of_mixers; i++) {
-		blk = dspp_mapping[dspp_list[i]->idx];
-		REG_DMA_INIT_OPS(dma_write_cfg, blk, SIX_ZONE,
+		u32 modify_blk = dspp_mapping[dspp_list[i]->idx];
+
+		REG_DMA_INIT_OPS(dma_write_cfg, modify_blk, SIX_ZONE,
 			dspp_buf[SIX_ZONE][ctx->idx]);
 
 		REG_DMA_SETUP_OPS(dma_write_cfg, 0, NULL, 0, HW_BLK_SELECT,
