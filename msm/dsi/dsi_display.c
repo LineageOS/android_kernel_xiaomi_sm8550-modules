@@ -7805,12 +7805,6 @@ int dsi_display_set_mode(struct dsi_display *display,
 		}
 	}
 
-	rc = dsi_display_restore_bit_clk(display, &adj_mode);
-	if (rc) {
-		DSI_ERR("[%s] bit clk rate cannot be restored\n", display->name);
-		goto error;
-	}
-
 	rc = dsi_display_validate_mode_set(display, &adj_mode, flags);
 	if (rc) {
 		DSI_ERR("[%s] mode cannot be set\n", display->name);
