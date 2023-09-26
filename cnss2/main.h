@@ -277,6 +277,7 @@ enum cnss_fw_dump_type {
 	CNSS_FW_IMAGE,
 	CNSS_FW_RDDM,
 	CNSS_FW_REMOTE_HEAP,
+	CNSS_FW_CAL,
 	CNSS_FW_DUMP_TYPE_MAX,
 };
 

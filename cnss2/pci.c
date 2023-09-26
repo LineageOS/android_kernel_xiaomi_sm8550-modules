@@ -5937,7 +5937,7 @@ static void cnss_pci_add_dump_seg(struct cnss_pci_data *pci_priv,
 	cnss_pr_dbg("Seg: %x, va: %pK, dma: %pa, size: 0x%zx\n",
 		    seg_no, va, &dma, size);
 
-	if (cnss_va_to_pa(dev, size, va, dma, &pa, DMA_ATTR_FORCE_CONTIGUOUS))
+	if (type == CNSS_FW_CAL || cnss_va_to_pa(dev, size, va, dma, &pa, DMA_ATTR_FORCE_CONTIGUOUS))
 		return;
 
 	cnss_minidump_add_region(plat_priv, type, seg_no, va, pa, size);
@@ -6212,6 +6212,16 @@ void cnss_pci_collect_dump_info(struct cnss_pci_data *pci_priv, bool in_panic)
 			} else {
 				cnss_pr_dbg("Skip remote heap dumps as it is non-contiguous\n");
 			}
+		} else if (fw_mem[i].type == CNSS_MEM_CAL_V01) {
+				cnss_pr_dbg("Collect CAL memory dump segment\n");
+				cnss_pci_add_dump_seg(pci_priv, dump_seg,
+						      CNSS_FW_CAL, j,
+						      fw_mem[i].va,
+						      fw_mem[i].pa,
+						      fw_mem[i].size);
+				dump_seg++;
+				dump_data->nentries++;
+				j++;
 		}
 	}
 
@@ -6260,6 +6270,13 @@ void cnss_pci_clear_dump_info(struct cnss_pci_data *pci_priv)
 		    (fw_mem[i].attrs & DMA_ATTR_FORCE_CONTIGUOUS)) {
 			cnss_pci_remove_dump_seg(pci_priv, dump_seg,
 						 CNSS_FW_REMOTE_HEAP, j,
+						 fw_mem[i].va, fw_mem[i].pa,
+						 fw_mem[i].size);
+			dump_seg++;
+			j++;
+		} else if (fw_mem[i].type == CNSS_MEM_CAL_V01) {
+			cnss_pci_remove_dump_seg(pci_priv, dump_seg,
+						 CNSS_FW_CAL, j,
 						 fw_mem[i].va, fw_mem[i].pa,
 						 fw_mem[i].size);
 			dump_seg++;
