@@ -2119,11 +2119,7 @@ int msm_vdec_qbuf(struct msm_vidc_inst *inst, struct vb2_buffer *vb2)
 	}
 
 	if (inst->adjust_priority) {
-		s32 priority = inst->capabilities->cap[PRIORITY].value;
-
-		priority += inst->adjust_priority;
 		inst->adjust_priority = 0;
-		msm_vidc_update_cap_value(inst, PRIORITY, priority, __func__);
 		msm_vidc_set_session_priority(inst, PRIORITY);
 	}
 
