@@ -99,6 +99,7 @@ static DEFINE_SPINLOCK(time_sync_lock);
 #define HANG_DATA_LENGTH		384
 #define HST_HANG_DATA_OFFSET		((3 * 1024 * 1024) - HANG_DATA_LENGTH)
 #define HSP_HANG_DATA_OFFSET		((2 * 1024 * 1024) - HANG_DATA_LENGTH)
+#define GNO_HANG_DATA_OFFSET		(0x7d000 - HANG_DATA_LENGTH)
 
 #define AFC_SLOT_SIZE                   0x1000
 #define AFC_MAX_SLOT                    2
@@ -5935,6 +5936,10 @@ static void cnss_pci_send_hang_event(struct cnss_pci_data *pci_priv)
 	case PEACH_DEVICE_ID:
 		offset = plat_priv->hang_data_addr_offset;
 		length = plat_priv->hang_event_data_len;
+		break;
+	case QCN7605_DEVICE_ID:
+		offset = GNO_HANG_DATA_OFFSET;
+		length = HANG_DATA_LENGTH;
 		break;
 	default:
 		cnss_pr_err("Skip Hang Event Data as unsupported Device ID received: %d\n",
