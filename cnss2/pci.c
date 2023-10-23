@@ -996,6 +996,9 @@ static void cnss_pci_select_window(struct cnss_pci_data *pci_priv, u32 offset)
 	u32 window_enable = WINDOW_ENABLE_BIT | window;
 	u32 val;
 
+	if (plat_priv->device_id == QCN7605_DEVICE_ID)
+		window_enable = QCN7605_WINDOW_ENABLE_BIT | window;
+
 	if (plat_priv->device_id == PEACH_DEVICE_ID) {
 		writel_relaxed(window_enable, pci_priv->bar +
 			       PEACH_PCIE_REMAP_BAR_CTRL_OFFSET);
@@ -1003,9 +1006,6 @@ static void cnss_pci_select_window(struct cnss_pci_data *pci_priv, u32 offset)
 		writel_relaxed(window_enable, pci_priv->bar +
 			       QCA6390_PCIE_REMAP_BAR_CTRL_OFFSET);
 	}
-
-	if (plat_priv->device_id == QCN7605_DEVICE_ID)
-		window_enable = QCN7605_WINDOW_ENABLE_BIT | window;
 
 	if (window != pci_priv->remap_window) {
 		pci_priv->remap_window = window;
