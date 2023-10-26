@@ -7275,6 +7275,8 @@ static int cnss_pci_probe(struct pci_dev *pci_dev,
 
 	cnss_update_supported_link_info(pci_priv);
 
+	init_completion(&pci_priv->wake_event_complete);
+
 	ret = cnss_reg_pci_event(pci_priv);
 	if (ret) {
 		cnss_pr_err("Failed to register PCI event, err = %d\n", ret);
@@ -7319,7 +7321,6 @@ static int cnss_pci_probe(struct pci_dev *pci_dev,
 		cnss_pci_get_link_status(pci_priv);
 		cnss_pci_set_wlaon_pwr_ctrl(pci_priv, false, true, false);
 		cnss_pci_wake_gpio_init(pci_priv);
-		init_completion(&pci_priv->wake_event_complete);
 		break;
 	default:
 		cnss_pr_err("Unknown PCI device found: 0x%x\n",
