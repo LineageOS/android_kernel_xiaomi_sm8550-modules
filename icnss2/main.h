@@ -484,7 +484,6 @@ struct icnss_priv {
 	struct list_head icnss_tcdev_list;
 	struct mutex tcdev_lock;
 	bool is_chain1_supported;
-	bool chain_reg_info_updated;
 	u32 hw_trc_override;
 	struct icnss_dms_data dms;
 	u8 use_nv_mac;

@@ -925,6 +925,12 @@ static int icnss_driver_event_server_arrive(struct icnss_priv *priv,
 
 	set_bit(ICNSS_WLFW_CONNECTED, &priv->state);
 
+	if (priv->device_id == ADRASTEA_DEVICE_ID) {
+		ret = icnss_hw_power_on(priv);
+		if (ret)
+			goto fail;
+	}
+
 	ret = wlfw_ind_register_send_sync_msg(priv);
 	if (ret < 0) {
 		if (ret == -EALREADY) {
@@ -990,12 +996,20 @@ static int icnss_driver_event_server_arrive(struct icnss_priv *priv,
 		goto fail;
 	}
 
-	ret = icnss_hw_power_on(priv);
-	if (ret)
-		goto fail;
+	if (priv->device_id == ADRASTEA_DEVICE_ID && priv->is_chain1_supported) {
+		ret = icnss_power_on_chain1_reg(priv);
+		if (ret) {
+			ignore_assert = true;
+			goto fail;
+		}
+	}
 
 	if (priv->device_id == WCN6750_DEVICE_ID ||
 	    priv->device_id == WCN6450_DEVICE_ID) {
+		ret = icnss_hw_power_on(priv);
+		if (ret)
+			goto fail;
+
 		ret = wlfw_device_info_send_msg(priv);
 		if (ret < 0) {
 			ignore_assert = true;
