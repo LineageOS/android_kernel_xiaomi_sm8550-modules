@@ -4815,6 +4815,7 @@ static int icnss_probe(struct platform_device *pdev)
 		icnss_pr_err("fw service registration failed: %d\n", ret);
 		goto out_destroy_wq;
 	}
+	icnss_power_misc_params_init(priv);
 
 	icnss_enable_recovery(priv);
 
