@@ -873,7 +873,7 @@ int icnss_update_cpr_info(struct icnss_priv *priv)
 {
 	struct icnss_cpr_info *cpr_info = &priv->cpr_info;
 
-	if (!cpr_info->vreg_ol_cpr || (!priv->mbox_chan && !priv->qmp)) {
+	if (!cpr_info->vreg_ol_cpr || (!priv->mbox_chan && !priv->use_direct_qmp)) {
 		icnss_pr_dbg("Mbox channel / QMP / OL CPR Vreg not configured\n");
 		return 0;
 	}
