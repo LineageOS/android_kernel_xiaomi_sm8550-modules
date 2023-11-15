@@ -2003,6 +2003,7 @@ int sde_cp_crtc_check_properties(struct drm_crtc *crtc,
 {
 	struct sde_crtc *sde_crtc = NULL;
 	struct sde_crtc_state *sde_crtc_state = NULL;
+	struct drm_display_mode *old_mode, *new_mode;
 	int i, ret = 0;
 
 	if (!crtc || !crtc->dev || !state) {
@@ -2023,8 +2024,11 @@ int sde_cp_crtc_check_properties(struct drm_crtc *crtc,
 		return -EINVAL;
 	}
 
-	/* force revalidation of some properties when there is a mode switch */
-	if (state->mode_changed)
+	/* force revalidation of some properties when there is a resolution switch */
+	old_mode = &crtc->state->adjusted_mode;
+	new_mode = &state->adjusted_mode;
+	if ((old_mode->hdisplay != new_mode->hdisplay) ||
+		(old_mode->vdisplay != new_mode->vdisplay))
 		sde_cp_crtc_res_change(crtc);
 
 	mutex_lock(&sde_crtc->crtc_cp_lock);
