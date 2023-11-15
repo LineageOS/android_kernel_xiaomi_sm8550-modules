@@ -6809,6 +6809,7 @@ static int msm_vidc_check_resolution_supported(struct msm_vidc_inst *inst)
 static int msm_vidc_check_max_sessions(struct msm_vidc_inst *inst)
 {
 	u32 width = 0, height = 0;
+	u32 aspect_ratio = 0;
 	u32 num_1080p_sessions = 0, num_4k_sessions = 0, num_8k_sessions = 0;
 	struct msm_vidc_inst *i;
 	struct msm_vidc_core *core;
@@ -6838,6 +6839,20 @@ static int msm_vidc_check_max_sessions(struct msm_vidc_inst *inst)
 			height = i->crop.height;
 		}
 
+		/* In XR use cases with sliced height, width can be large
+		 * but the corresponding height is minimal. To support such
+		 * use cases below aspect ratio is considered. If the aspect
+		 * ratio is more than 7(based on experiments) then we skip
+		 * the resolution checks.
+		 */
+		if (is_decode_session(i)) {
+			if (width > height)
+				aspect_ratio = width / height;
+			else
+				aspect_ratio = height / width;
+			if (aspect_ratio > 7)
+				continue;
+		}
 		/*
 		 * one 8k session equals to 64 720p sessions in reality.
 		 * So for one 8k session the number of 720p sessions will
