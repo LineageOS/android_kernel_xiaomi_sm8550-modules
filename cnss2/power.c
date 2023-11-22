@@ -1784,7 +1784,7 @@ int cnss_update_cpr_info(struct cnss_plat_data *plat_priv)
 		return -EINVAL;
 
 	if (!plat_priv->vreg_ol_cpr ||
-	    (!plat_priv->mbox_chan && !plat_priv->qmp)) {
+	    (!plat_priv->mbox_chan && !plat_priv->use_direct_qmp)) {
 		cnss_pr_dbg("Mbox channel / QMP / OL CPR Vreg not configured\n");
 	} else {
 		return cnss_aop_set_vreg_param(plat_priv,
@@ -1865,7 +1865,7 @@ int cnss_enable_int_pow_amp_vreg(struct cnss_plat_data *plat_priv)
 	}
 
 	if (!plat_priv->vreg_ipa ||
-	    (!plat_priv->mbox_chan && !plat_priv->qmp)) {
+	    (!plat_priv->mbox_chan && !plat_priv->use_direct_qmp)) {
 		cnss_pr_dbg("Mbox channel / QMP / IPA Vreg not configured\n");
 	} else {
 		ret = cnss_aop_set_vreg_param(plat_priv,
