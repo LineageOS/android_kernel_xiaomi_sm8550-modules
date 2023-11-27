@@ -440,6 +440,8 @@ extern int cnss_audio_smmu_map(struct device *dev, phys_addr_t paddr,
 			       dma_addr_t iova, size_t size);
 extern void cnss_audio_smmu_unmap(struct device *dev, dma_addr_t iova,
 				 size_t size);
+extern int cnss_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
+					size_t *size);
 extern int cnss_get_pci_slot(struct device *dev);
 extern int cnss_pci_get_reg_dump(struct device *dev, uint8_t *buffer,
 				 uint32_t len);
