@@ -402,6 +402,7 @@ enum wlfw_lpass_ssr_reason_v01 {
 #define QMI_WLFW_HOST_PCIE_GEN_SWITCH_V01 ((u64)0x01ULL)
 #define QMI_WLFW_DIRECT_LINK_SUPPORT_V01 ((u64)0x02ULL)
 #define QMI_WLFW_AUX_UC_SUPPORT_V01 ((u64)0x04ULL)
+#define QMI_WLFW_CALDB_SEG_DDR_SUPPORT_V01 ((u64)0x08ull)
 
 struct wlfw_ce_tgt_pipe_cfg_s_v01 {
 	u32 pipe_num;

@@ -346,6 +346,7 @@ enum cnss_recovery_reason {
 enum cnss_fw_caps {
 	CNSS_FW_CAP_DIRECT_LINK_SUPPORT,
 	CNSS_FW_CAP_AUX_UC_SUPPORT,
+	CNSS_FW_CAP_CALDB_SEG_DDR_SUPPORT,
 };
 
 enum cnss_remote_mem_type {

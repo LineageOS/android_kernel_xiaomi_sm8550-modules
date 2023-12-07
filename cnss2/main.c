@@ -592,6 +592,10 @@ bool cnss_get_fw_cap(struct device *dev, enum cnss_fw_caps fw_cap)
 		if (is_supported && cnss_get_audio_iommu_domain(plat_priv))
 			is_supported = false;
 		break;
+	case CNSS_FW_CAP_CALDB_SEG_DDR_SUPPORT:
+		is_supported = !!(plat_priv->fw_caps &
+				  QMI_WLFW_CALDB_SEG_DDR_SUPPORT_V01);
+		break;
 	default:
 		cnss_pr_err("Invalid FW Capability: 0x%x\n", fw_cap);
 	}
