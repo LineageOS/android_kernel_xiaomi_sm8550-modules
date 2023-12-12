@@ -22,7 +22,9 @@ LOCAL_MODULE_KO_DIRS += cnss_genl/cnss_nl.ko
 LOCAL_MODULE_KO_DIRS += cnss_prealloc/cnss_prealloc.ko
 LOCAL_MODULE_KO_DIRS += cnss_utils/cnss_utils.ko
 LOCAL_MODULE_KO_DIRS += icnss2/icnss2.ko
-DLKM_DIR := $(TOP)/device/qcom/common/dlkm
+
+BOARD_COMMON_DIR ?= device/qcom/common
+DLKM_DIR := $(TOP)/$(BOARD_COMMON_DIR)/dlkm
 
 # WLAN_PLATFORM_ROOT needs to be a absolute since it will be used
 # for header files. $(TOP) cannot be used here since it will be

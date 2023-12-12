@@ -880,8 +880,41 @@ int cnss_get_pinctrl(struct cnss_plat_data *plat_priv)
 							       0);
 		cnss_pr_dbg("Switch control GPIO: %d\n",
 			    pinctrl_info->sw_ctrl_gpio);
+
+		pinctrl_info->sw_ctrl =
+			pinctrl_lookup_state(pinctrl_info->pinctrl,
+					     "sw_ctrl");
+		if (IS_ERR_OR_NULL(pinctrl_info->sw_ctrl)) {
+			ret = PTR_ERR(pinctrl_info->sw_ctrl);
+			cnss_pr_dbg("Failed to get sw_ctrl state, err = %d\n",
+				    ret);
+		} else {
+			ret = pinctrl_select_state(pinctrl_info->pinctrl,
+						   pinctrl_info->sw_ctrl);
+			if (ret)
+				cnss_pr_err("Failed to select sw_ctrl state, err = %d\n",
+					    ret);
+		}
 	} else {
 		pinctrl_info->sw_ctrl_gpio = -EINVAL;
+	}
+
+	if (of_find_property(dev->of_node, WLAN_SW_CTRL_GPIO, NULL)) {
+		pinctrl_info->sw_ctrl_wl_cx =
+			pinctrl_lookup_state(pinctrl_info->pinctrl,
+					     "sw_ctrl_wl_cx");
+		if (IS_ERR_OR_NULL(pinctrl_info->sw_ctrl_wl_cx)) {
+			ret = PTR_ERR(pinctrl_info->sw_ctrl_wl_cx);
+			cnss_pr_dbg("Failed to get sw_ctrl_wl_cx state, err = %d\n",
+				    ret);
+		} else {
+
+			ret = pinctrl_select_state(pinctrl_info->pinctrl,
+						   pinctrl_info->sw_ctrl_wl_cx);
+			if (ret)
+				cnss_pr_err("Failed to select sw_ctrl_wl_cx state, err = %d\n",
+					    ret);
+		}
 	}
 
 	/* Find out and configure all those GPIOs which need to be setup

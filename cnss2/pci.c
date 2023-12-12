@@ -504,6 +504,21 @@ static struct cnss_pci_reg pci_scratch[] = {
 	{ NULL },
 };
 
+static struct cnss_pci_reg pci_bhi_debug[] = {
+	{ "PCIE_BHIE_DEBUG_0", PCIE_PCIE_BHIE_DEBUG_0 },
+	{ "PCIE_BHIE_DEBUG_1", PCIE_PCIE_BHIE_DEBUG_1 },
+	{ "PCIE_BHIE_DEBUG_2", PCIE_PCIE_BHIE_DEBUG_2 },
+	{ "PCIE_BHIE_DEBUG_3", PCIE_PCIE_BHIE_DEBUG_3 },
+	{ "PCIE_BHIE_DEBUG_4", PCIE_PCIE_BHIE_DEBUG_4 },
+	{ "PCIE_BHIE_DEBUG_5", PCIE_PCIE_BHIE_DEBUG_5 },
+	{ "PCIE_BHIE_DEBUG_6", PCIE_PCIE_BHIE_DEBUG_6 },
+	{ "PCIE_BHIE_DEBUG_7", PCIE_PCIE_BHIE_DEBUG_7 },
+	{ "PCIE_BHIE_DEBUG_8", PCIE_PCIE_BHIE_DEBUG_8 },
+	{ "PCIE_BHIE_DEBUG_9", PCIE_PCIE_BHIE_DEBUG_9 },
+	{ "PCIE_BHIE_DEBUG_10", PCIE_PCIE_BHIE_DEBUG_10 },
+	{ NULL },
+};
+
 /* First field of the structure is the device bit mask. Use
  * enum cnss_pci_reg_mask as reference for the value.
  */
@@ -785,7 +800,6 @@ static bool cnss_should_suspend_pwroff(struct pci_dev *pci_dev);
 static void cnss_pci_update_link_event(struct cnss_pci_data *pci_priv,
 				       enum cnss_bus_event_type type,
 				       void *data);
-
 
 #if IS_ENABLED(CONFIG_MHI_BUS_MISC)
 static void cnss_mhi_debug_reg_dump(struct cnss_pci_data *pci_priv)
@@ -1411,6 +1425,59 @@ static void cnss_pci_soc_scratch_reg_dump(struct cnss_pci_data *pci_priv)
 	}
 }
 
+static void cnss_pci_soc_reset_cause_reg_dump(struct cnss_pci_data *pci_priv)
+{
+	u32 val;
+
+	switch (pci_priv->device_id) {
+	case PEACH_DEVICE_ID:
+		break;
+	default:
+		return;
+	}
+
+	if (in_interrupt() || irqs_disabled())
+		return;
+
+	if (cnss_pci_check_link_status(pci_priv))
+		return;
+
+	cnss_pr_dbg("Start to dump SOC Reset Cause registers\n");
+
+	if (cnss_pci_reg_read(pci_priv, WLAON_SOC_RESET_CAUSE_SHADOW_REG,
+			      &val))
+		return;
+	cnss_pr_dbg("WLAON_SOC_RESET_CAUSE_SHADOW_REG = 0x%x\n",
+		     val);
+
+}
+
+static void cnss_pci_bhi_debug_reg_dump(struct cnss_pci_data *pci_priv)
+{
+	u32 reg_offset, val;
+	int i;
+
+	switch (pci_priv->device_id) {
+	case PEACH_DEVICE_ID:
+		break;
+	default:
+		return;
+	}
+
+	if (cnss_pci_check_link_status(pci_priv))
+		return;
+
+	cnss_pr_dbg("Start to dump PCIE BHIE DEBUG registers\n");
+
+	for (i = 0; pci_bhi_debug[i].name; i++) {
+		reg_offset = pci_bhi_debug[i].offset;
+		if (cnss_pci_reg_read(pci_priv, reg_offset, &val))
+			return;
+		cnss_pr_dbg("PCIE__%s = 0x%x\n",
+			     pci_bhi_debug[i].name, val);
+	}
+}
+
 int cnss_suspend_pci_link(struct cnss_pci_data *pci_priv)
 {
 	int ret = 0;
@@ -1690,6 +1757,8 @@ static void cnss_pci_dump_bl_sram_mem(struct cnss_pci_data *pci_priv)
 	u32 sbl_log_def_end = SRAM_END;
 	int i;
 
+	cnss_pci_soc_reset_cause_reg_dump(pci_priv);
+
 	switch (pci_priv->device_id) {
 	case QCA6390_DEVICE_ID:
 		pbl_log_sram_start = QCA6390_DEBUG_PBL_LOG_SRAM_START;
@@ -1739,7 +1808,7 @@ static void cnss_pci_dump_bl_sram_mem(struct cnss_pci_data *pci_priv)
 
 	ee = mhi_get_exec_env(pci_priv->mhi_ctrl);
 	if (CNSS_MHI_IN_MISSION_MODE(ee)) {
-		cnss_pr_dbg("Avoid Dumping PBL log data in Mission mode\n");
+		cnss_pr_err("Avoid Dumping PBL log data in Mission mode\n");
 		return;
 	}
 
@@ -1762,7 +1831,7 @@ static void cnss_pci_dump_bl_sram_mem(struct cnss_pci_data *pci_priv)
 
 	ee = mhi_get_exec_env(pci_priv->mhi_ctrl);
 	if (CNSS_MHI_IN_MISSION_MODE(ee)) {
-		cnss_pr_dbg("Avoid Dumping SBL log data in Mission mode\n");
+		cnss_pr_err("Avoid Dumping SBL log data in Mission mode\n");
 		return;
 	}
 
@@ -1836,6 +1905,7 @@ static int cnss_pci_handle_mhi_poweron_timeout(struct cnss_pci_data *pci_priv)
 	} else {
 		cnss_pr_dbg("RDDM cookie is not set and device SOL is low\n");
 		cnss_mhi_debug_reg_dump(pci_priv);
+		cnss_pci_bhi_debug_reg_dump(pci_priv);
 		cnss_pci_soc_scratch_reg_dump(pci_priv);
 		/* Dump PBL/SBL error log if RDDM cookie is not set */
 		cnss_pci_dump_bl_sram_mem(pci_priv);
@@ -2374,7 +2444,6 @@ retry:
 	/* Start the timer to dump MHI/PBL/SBL debug data periodically */
 	mod_timer(&pci_priv->boot_debug_timer,
 		  jiffies + msecs_to_jiffies(BOOT_DEBUG_TIMEOUT_MS));
-
 	ret = cnss_pci_set_mhi_state(pci_priv, CNSS_MHI_POWER_ON);
 	del_timer_sync(&pci_priv->boot_debug_timer);
 	if (ret == 0)
@@ -5675,6 +5744,7 @@ static void cnss_pci_dump_debug_reg(struct cnss_pci_data *pci_priv)
 	cnss_pr_dbg("Start to dump debug registers\n");
 
 	cnss_mhi_debug_reg_dump(pci_priv);
+	cnss_pci_bhi_debug_reg_dump(pci_priv);
 	cnss_pci_soc_scratch_reg_dump(pci_priv);
 	cnss_pci_dump_ce_reg(pci_priv, CNSS_CE_COMMON);
 	cnss_pci_dump_ce_reg(pci_priv, CNSS_CE_09);
@@ -5697,6 +5767,7 @@ static void cnss_pci_mhi_reg_dump(struct cnss_pci_data *pci_priv)
 	if (!cnss_pci_check_link_status(pci_priv))
 		cnss_mhi_debug_reg_dump(pci_priv);
 
+	cnss_pci_bhi_debug_reg_dump(pci_priv);
 	cnss_pci_soc_scratch_reg_dump(pci_priv);
 	cnss_pci_dump_misc_reg(pci_priv);
 	cnss_pci_dump_shadow_reg(pci_priv);
@@ -5760,6 +5831,7 @@ retry:
 	if (!cnss_pci_assert_host_sol(pci_priv))
 		return 0;
 	cnss_mhi_debug_reg_dump(pci_priv);
+	cnss_pci_bhi_debug_reg_dump(pci_priv);
 	cnss_pci_soc_scratch_reg_dump(pci_priv);
 	cnss_schedule_recovery(&pci_priv->pci_dev->dev,
 			       CNSS_REASON_TIMEOUT);
@@ -6071,9 +6143,9 @@ void cnss_pci_collect_dump_info(struct cnss_pci_data *pci_priv, bool in_panic)
 	}
 
 	cnss_mhi_debug_reg_dump(pci_priv);
+	cnss_pci_bhi_debug_reg_dump(pci_priv);
 	cnss_pci_soc_scratch_reg_dump(pci_priv);
 	cnss_pci_dump_misc_reg(pci_priv);
-
 	cnss_rddm_trigger_debug(pci_priv);
 	ret = mhi_download_rddm_image(pci_priv->mhi_ctrl, in_panic);
 	if (ret) {
@@ -6436,6 +6508,7 @@ static void cnss_dev_rddm_timeout_hdlr(struct timer_list *t)
 				       CNSS_REASON_RDDM);
 	} else {
 		cnss_mhi_debug_reg_dump(pci_priv);
+		cnss_pci_bhi_debug_reg_dump(pci_priv);
 		cnss_pci_soc_scratch_reg_dump(pci_priv);
 		cnss_schedule_recovery(&pci_priv->pci_dev->dev,
 				       CNSS_REASON_TIMEOUT);
@@ -6465,6 +6538,7 @@ static void cnss_boot_debug_timeout_hdlr(struct timer_list *t)
 	cnss_pr_dbg("Dump MHI/PBL/SBL debug data every %ds during MHI power on\n",
 		    BOOT_DEBUG_TIMEOUT_MS / 1000);
 	cnss_mhi_debug_reg_dump(pci_priv);
+	cnss_pci_bhi_debug_reg_dump(pci_priv);
 	cnss_pci_soc_scratch_reg_dump(pci_priv);
 	cnss_pci_dump_bl_sram_mem(pci_priv);
 
@@ -7275,6 +7349,8 @@ static int cnss_pci_probe(struct pci_dev *pci_dev,
 
 	cnss_update_supported_link_info(pci_priv);
 
+	init_completion(&pci_priv->wake_event_complete);
+
 	ret = cnss_reg_pci_event(pci_priv);
 	if (ret) {
 		cnss_pr_err("Failed to register PCI event, err = %d\n", ret);
@@ -7319,7 +7395,6 @@ static int cnss_pci_probe(struct pci_dev *pci_dev,
 		cnss_pci_get_link_status(pci_priv);
 		cnss_pci_set_wlaon_pwr_ctrl(pci_priv, false, true, false);
 		cnss_pci_wake_gpio_init(pci_priv);
-		init_completion(&pci_priv->wake_event_complete);
 		break;
 	default:
 		cnss_pr_err("Unknown PCI device found: 0x%x\n",
