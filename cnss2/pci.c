@@ -48,7 +48,8 @@
 #define DEFAULT_PHY_M3_FILE_NAME	"m3.bin"
 #define DEFAULT_AUX_FILE_NAME		"aux_ucode.elf"
 #define DEFAULT_PHY_UCODE_FILE_NAME	"phy_ucode.elf"
-#define TME_PATCH_FILE_NAME		"tmel_patch.elf"
+#define TME_PATCH_FILE_NAME_1_0		"tmel_peach_10.elf"
+#define TME_PATCH_FILE_NAME_2_0		"tmel_peach_20.elf"
 #define PHY_UCODE_V2_FILE_NAME		"phy_ucode20.elf"
 #define DEFAULT_FW_FILE_NAME		"amss.bin"
 #define FW_V2_FILE_NAME			"amss20.bin"
@@ -4855,7 +4856,10 @@ int cnss_pci_load_tme_patch(struct cnss_pci_data *pci_priv)
 
 	switch (pci_priv->device_id) {
 	case PEACH_DEVICE_ID:
-		tme_patch_filename = TME_PATCH_FILE_NAME;
+		if (plat_priv->device_version.major_version == FW_V1_NUMBER)
+			tme_patch_filename = TME_PATCH_FILE_NAME_1_0;
+		else if (plat_priv->device_version.major_version == FW_V2_NUMBER)
+			tme_patch_filename = TME_PATCH_FILE_NAME_2_0;
 		break;
 	case QCA6174_DEVICE_ID:
 	case QCA6290_DEVICE_ID:
@@ -4870,8 +4874,7 @@ int cnss_pci_load_tme_patch(struct cnss_pci_data *pci_priv)
 	}
 
 	if (!tme_lite_mem->va && !tme_lite_mem->size) {
-		cnss_pci_add_fw_prefix_name(pci_priv, filename,
-					    tme_patch_filename);
+		scnprintf(filename, MAX_FIRMWARE_NAME_LEN, "%s", tme_patch_filename);
 
 		ret = firmware_request_nowarn(&fw_entry, filename,
 					      &pci_priv->pci_dev->dev);

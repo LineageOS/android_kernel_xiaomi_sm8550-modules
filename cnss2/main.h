@@ -59,6 +59,7 @@
 #define CNSS_RAMDUMP_MAGIC		0x574C414E
 #define CNSS_RAMDUMP_VERSION		0
 #define MAX_FIRMWARE_NAME_LEN		40
+#define FW_V1_NUMBER                    1
 #define FW_V2_NUMBER                    2
 #ifdef CONFIG_CNSS_SUPPORT_DUAL_DEV
 #define POWER_ON_RETRY_MAX_TIMES	2
