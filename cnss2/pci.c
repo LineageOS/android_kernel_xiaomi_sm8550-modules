@@ -255,6 +255,124 @@ static const struct mhi_channel_config cnss_mhi_channels[] = {
 #endif
 };
 
+static const struct mhi_channel_config cnss_mhi_channels_no_diag[] = {
+	{
+		.num = 0,
+		.name = "LOOPBACK",
+		.num_elements = 32,
+		.event_ring = 1,
+		.dir = DMA_TO_DEVICE,
+		.ee_mask = 0x4,
+		.pollcfg = 0,
+		.doorbell = MHI_DB_BRST_DISABLE,
+		.lpm_notify = false,
+		.offload_channel = false,
+		.doorbell_mode_switch = false,
+		.auto_queue = false,
+	},
+	{
+		.num = 1,
+		.name = "LOOPBACK",
+		.num_elements = 32,
+		.event_ring = 1,
+		.dir = DMA_FROM_DEVICE,
+		.ee_mask = 0x4,
+		.pollcfg = 0,
+		.doorbell = MHI_DB_BRST_DISABLE,
+		.lpm_notify = false,
+		.offload_channel = false,
+		.doorbell_mode_switch = false,
+		.auto_queue = false,
+	},
+	{
+		.num = 20,
+		.name = "IPCR",
+		.num_elements = 64,
+		.event_ring = 1,
+		.dir = DMA_TO_DEVICE,
+		.ee_mask = 0x4,
+		.pollcfg = 0,
+		.doorbell = MHI_DB_BRST_DISABLE,
+		.lpm_notify = false,
+		.offload_channel = false,
+		.doorbell_mode_switch = false,
+		.auto_queue = false,
+	},
+	{
+		.num = 21,
+		.name = "IPCR",
+		.num_elements = 64,
+		.event_ring = 1,
+		.dir = DMA_FROM_DEVICE,
+		.ee_mask = 0x4,
+		.pollcfg = 0,
+		.doorbell = MHI_DB_BRST_DISABLE,
+		.lpm_notify = false,
+		.offload_channel = false,
+		.doorbell_mode_switch = false,
+		.auto_queue = true,
+	},
+/* All MHI satellite config to be at the end of data struct */
+#if IS_ENABLED(CONFIG_MHI_SATELLITE)
+	{
+		.num = 50,
+		.name = "ADSP_0",
+		.num_elements = 64,
+		.event_ring = 3,
+		.dir = DMA_BIDIRECTIONAL,
+		.ee_mask = 0x4,
+		.pollcfg = 0,
+		.doorbell = MHI_DB_BRST_DISABLE,
+		.lpm_notify = false,
+		.offload_channel = true,
+		.doorbell_mode_switch = false,
+		.auto_queue = false,
+	},
+	{
+		.num = 51,
+		.name = "ADSP_1",
+		.num_elements = 64,
+		.event_ring = 3,
+		.dir = DMA_BIDIRECTIONAL,
+		.ee_mask = 0x4,
+		.pollcfg = 0,
+		.doorbell = MHI_DB_BRST_DISABLE,
+		.lpm_notify = false,
+		.offload_channel = true,
+		.doorbell_mode_switch = false,
+		.auto_queue = false,
+	},
+	{
+		.num = 70,
+		.name = "ADSP_2",
+		.num_elements = 64,
+		.event_ring = 3,
+		.dir = DMA_BIDIRECTIONAL,
+		.ee_mask = 0x4,
+		.pollcfg = 0,
+		.doorbell = MHI_DB_BRST_DISABLE,
+		.lpm_notify = false,
+		.offload_channel = true,
+		.doorbell_mode_switch = false,
+		.auto_queue = false,
+	},
+	{
+		.num = 71,
+		.name = "ADSP_3",
+		.num_elements = 64,
+		.event_ring = 3,
+		.dir = DMA_BIDIRECTIONAL,
+		.ee_mask = 0x4,
+		.pollcfg = 0,
+		.doorbell = MHI_DB_BRST_DISABLE,
+		.lpm_notify = false,
+		.offload_channel = true,
+		.doorbell_mode_switch = false,
+		.auto_queue = false,
+	},
+#endif
+};
+
 static const struct mhi_channel_config cnss_mhi_channels_genoa[] = {
 	{
 		.num = 0,
@@ -403,6 +521,22 @@ static const struct mhi_event_config cnss_mhi_events[] = {
 #define CNSS_MHI_SATELLITE_CH_CFG_COUNT 0
 #define CNSS_MHI_SATELLITE_EVT_COUNT 0
 #endif
+
+static const struct mhi_controller_config cnss_mhi_config_no_diag = {
+#if IS_ENABLED(CONFIG_MHI_SATELLITE)
+	.max_channels = 72,
+#else
+	.max_channels = 32,
+#endif
+	.timeout_ms = 10000,
+	.use_bounce_buf = false,
+	.buf_len = 0x8000,
+	.num_channels = ARRAY_SIZE(cnss_mhi_channels_no_diag),
+	.ch_cfg = cnss_mhi_channels_no_diag,
+	.num_events = ARRAY_SIZE(cnss_mhi_events),
+	.event_cfg = cnss_mhi_events,
+	.m2_no_db = true,
+};
 
 static const struct mhi_controller_config cnss_mhi_config_default = {
 #if IS_ENABLED(CONFIG_MHI_SATELLITE)
@@ -6957,6 +7091,11 @@ static int cnss_pci_register_mhi(struct cnss_pci_data *pci_priv)
 			cnss_mhi_config = &cnss_mhi_config_genoa;
 		else
 			cnss_mhi_config = &cnss_mhi_config_no_satellite;
+	}
+
+	/* DIAG no longer supported on PEACH and later chipset */
+	if (plat_priv->device_id >= PEACH_DEVICE_ID) {
+		cnss_mhi_config = &cnss_mhi_config_no_diag;
 	}
 
 	mhi_ctrl->tme_supported_image = cnss_is_tme_supported(pci_priv);
