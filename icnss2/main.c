@@ -45,9 +45,7 @@
 #include <linux/soc/qcom/pdr.h>
 #include <linux/remoteproc.h>
 #include <linux/version.h>
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
 #include <trace/hooks/remoteproc.h>
-#endif
 #ifdef SLATE_MODULE_ENABLED
 #include <linux/soc/qcom/slatecom_interface.h>
 #include <linux/soc/qcom/slate_events_bridge_intf.h>
@@ -4693,7 +4691,6 @@ static inline bool icnss_use_nv_mac(struct icnss_priv *priv)
 				     "use-nv-mac");
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
 static void rproc_restart_level_notifier(void *data, struct rproc *rproc)
 {
 	struct icnss_subsys_restart_level_data *restart_level_data;
@@ -4715,7 +4712,6 @@ static void rproc_restart_level_notifier(void *data, struct rproc *rproc)
 					0, restart_level_data);
 	}
 }
-#endif
 
 #if IS_ENABLED(CONFIG_WCNSS_MEM_PRE_ALLOC)
 static void icnss_initialize_mem_pool(unsigned long device_id)
@@ -4735,31 +4731,15 @@ static void icnss_deinitialize_mem_pool(void)
 }
 #endif
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
 static void register_rproc_restart_level_notifier(void)
 {
 	register_trace_android_vh_rproc_recovery_set(rproc_restart_level_notifier, NULL);
 }
-#else
-static void register_rproc_restart_level_notifier(void)
-{
-	return;
-}
-#endif
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
 static void unregister_rproc_restart_level_notifier(void)
 {
 	unregister_trace_android_vh_rproc_recovery_set(rproc_restart_level_notifier, NULL);
 }
-#else
-static void unregister_rproc_restart_level_notifier(void)
-{
-	return;
-}
-#endif
-
-
 
 static int icnss_probe(struct platform_device *pdev)
 {
