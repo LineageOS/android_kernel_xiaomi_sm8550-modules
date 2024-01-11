@@ -613,6 +613,7 @@ struct cnss_plat_data {
 	u64 fw_caps;
 	u8 pcie_gen_speed;
 	struct iommu_domain *audio_iommu_domain;
+	bool is_audio_shared_iommu_group;
 	struct cnss_dms_data dms;
 	int power_up_error;
 	u32 hw_trc_override;
