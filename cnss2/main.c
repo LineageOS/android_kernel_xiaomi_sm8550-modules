@@ -590,8 +590,6 @@ bool cnss_get_fw_cap(struct device *dev, enum cnss_fw_caps fw_cap)
 	case CNSS_FW_CAP_DIRECT_LINK_SUPPORT:
 		is_supported = !!(plat_priv->fw_caps &
 				  QMI_WLFW_DIRECT_LINK_SUPPORT_V01);
-		if (is_supported && cnss_get_audio_iommu_domain(plat_priv))
-			is_supported = false;
 		break;
 	case CNSS_FW_CAP_CALDB_SEG_DDR_SUPPORT:
 		is_supported = !!(plat_priv->fw_caps &
@@ -606,6 +604,30 @@ bool cnss_get_fw_cap(struct device *dev, enum cnss_fw_caps fw_cap)
 	return is_supported;
 }
 EXPORT_SYMBOL(cnss_get_fw_cap);
+
+/**
+ * cnss_audio_is_direct_link_supported - Check whether Audio can be used for direct link support
+ * @dev: Device
+ *
+ * Return: TRUE if supported, FALSE on failure or if not supported
+ */
+bool cnss_audio_is_direct_link_supported(struct device *dev)
+{
+	struct cnss_plat_data *plat_priv = cnss_bus_dev_to_plat_priv(dev);
+	bool is_supported = false;
+
+	if (!plat_priv) {
+		cnss_pr_err("plat_priv not available to check audio direct link cap\n");
+		return is_supported;
+	}
+
+	if (cnss_get_audio_iommu_domain(plat_priv) == 0)
+		is_supported = true;
+
+	return is_supported;
+}
+EXPORT_SYMBOL(cnss_audio_is_direct_link_supported);
+
 
 void cnss_request_pm_qos(struct device *dev, u32 qos_val)
 {
