@@ -492,6 +492,8 @@ struct icnss_priv {
 	struct qmp *qmp;
 #endif
 	bool use_direct_qmp;
+	const char **pdc_init_table;
+	int pdc_init_table_len;
 	u32 wlan_en_delay_ms;
 	u32 wlan_en_delay_ms_user;
 	struct class *icnss_ramdump_class;
@@ -552,6 +554,8 @@ void icnss_add_fw_prefix_name(struct icnss_priv *priv, char *prefix_name,
 			      char *name);
 int icnss_aop_interface_init(struct icnss_priv *priv);
 void icnss_aop_interface_deinit(struct icnss_priv *priv);
+int icnss_aop_pdc_reconfig(struct icnss_priv *priv);
+void icnss_power_misc_params_init(struct icnss_priv *priv);
 void icnss_recovery_timeout_hdlr(struct timer_list *t);
 void icnss_wpss_ssr_timeout_hdlr(struct timer_list *t);
 #endif

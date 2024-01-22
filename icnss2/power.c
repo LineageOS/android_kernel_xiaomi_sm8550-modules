@@ -751,13 +751,14 @@ int icnss_aop_interface_init(struct icnss_priv *priv)
 {
 	struct mbox_client *mbox = &priv->mbox_client_data;
 	struct mbox_chan *chan;
-	int ret = 0;
+	int ret = 0, ol_cpr = 0;
 
-	ret = of_property_read_string(priv->pdev->dev.of_node,
-				      "qcom,vreg_ol_cpr",
-				      &priv->cpr_info.vreg_ol_cpr);
-	if (ret) {
-		icnss_pr_dbg("Vreg for OL CPR not configured\n");
+	ol_cpr = of_property_read_string(priv->pdev->dev.of_node,
+					 "qcom,vreg_ol_cpr",
+					 &priv->cpr_info.vreg_ol_cpr);
+
+	if (ol_cpr && !priv->pdc_init_table) {
+		icnss_pr_dbg("Vreg for OL CPR and pdc_init table not configured\n");
 		return -EINVAL;
 	}
 
@@ -789,11 +790,15 @@ int icnss_aop_interface_init(struct icnss_priv *priv)
 		priv->mbox_chan = chan;
 		icnss_pr_dbg("Mbox channel initialized\n");
 	}
+	ret = icnss_aop_pdc_reconfig(priv);
+	if (ret)
+		icnss_pr_err("Failed to reconfig WLAN PDC, err = %d\n", ret);
+
 	return ret;
 }
 
 /**
- * cnss_aop_interface_deinit: Cleanup AOP interface
+ * icnss_aop_interface_deinit: Cleanup AOP interface
  * @priv: Pointer to icnss platform data
  *
  * Cleanup mbox channel or QMP whichever was configured during initialization.
@@ -850,6 +855,53 @@ static int icnss_aop_set_vreg_param(struct icnss_priv *priv,
 
 	return ret;
 }
+
+/* icnss_aop_pdc_reconfig: Send AOP msg to configure PDC table for WLAN device
+ * @priv: Pointer to icnss platform data
+ *
+ * Send AOP QMP or Mbox msg to configure PDC table for WLAN device
+ *
+ * Return: 0 for success, otherwise error code
+ */
+int icnss_aop_pdc_reconfig(struct icnss_priv *priv)
+{
+	u32 i;
+	int ret;
+	char *mbox_msg;
+	struct qmp_pkt pkt;
+
+	if (priv->pdc_init_table_len <= 0 || !priv->pdc_init_table)
+		return 0;
+
+	icnss_pr_dbg("Setting PDC defaults for device ID: (0x%x)\n",
+		     priv->device_id);
+	for (i = 0; i < priv->pdc_init_table_len; i++) {
+		mbox_msg = (char *)priv->pdc_init_table[i];
+		if (priv->use_direct_qmp) {
+			icnss_pr_dbg("Sending AOP QMP msg: %s\n", mbox_msg);
+			ret = qmp_send(priv->qmp, mbox_msg,
+				       ICNSS_MBOX_MSG_MAX_LEN);
+			if (ret < 0)
+				icnss_pr_err("Failed to send AOP QMP msg: %s\n",
+					     mbox_msg);
+			else
+				ret = 0;
+		} else {
+			icnss_pr_dbg("Sending AOP Mbox msg: %s\n", mbox_msg);
+			pkt.size = ICNSS_MBOX_MSG_MAX_LEN;
+			pkt.data = mbox_msg;
+
+			ret = mbox_send_message(priv->mbox_chan, &pkt);
+			if (ret < 0)
+				icnss_pr_err("Failed to send AOP mbox msg: %s,ret: %d\n",
+					     mbox_msg, ret);
+			else
+				ret = 0;
+		}
+	}
+	return ret;
+}
+
 #else
 int icnss_aop_interface_init(struct icnss_priv *priv)
 {
@@ -867,7 +919,41 @@ static int icnss_aop_set_vreg_param(struct icnss_priv *priv,
 {
 	return 0;
 }
+
+int icnss_aop_pdc_reconfig(struct icnss_priv *priv)
+{
+	return 0;
+}
+
 #endif
+
+void icnss_power_misc_params_init(struct icnss_priv *priv)
+{
+	struct device *dev = &priv->pdev->dev;
+	int ret;
+
+	/* common DT Entries */
+	priv->pdc_init_table_len =
+				of_property_count_strings(dev->of_node,
+							  "qcom,pdc_init_table");
+	if (priv->pdc_init_table_len > 0) {
+		priv->pdc_init_table =
+			kcalloc(priv->pdc_init_table_len,
+				sizeof(char *), GFP_KERNEL);
+		if (priv->pdc_init_table) {
+			ret = of_property_read_string_array(dev->of_node,
+						"qcom,pdc_init_table",
+						priv->pdc_init_table,
+						priv->pdc_init_table_len);
+			if (ret < 0)
+				icnss_pr_err("Failed to get PDC Init Table\n");
+		} else {
+			icnss_pr_err("Failed to alloc PDC Init Table mem\n");
+		}
+	} else {
+		icnss_pr_dbg("PDC Init Table not configured\n");
+	}
+}
 
 int icnss_update_cpr_info(struct icnss_priv *priv)
 {

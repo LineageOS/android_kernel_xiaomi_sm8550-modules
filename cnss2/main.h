@@ -59,6 +59,7 @@
 #define CNSS_RAMDUMP_MAGIC		0x574C414E
 #define CNSS_RAMDUMP_VERSION		0
 #define MAX_FIRMWARE_NAME_LEN		40
+#define FW_V1_NUMBER                    1
 #define FW_V2_NUMBER                    2
 #ifdef CONFIG_CNSS_SUPPORT_DUAL_DEV
 #define POWER_ON_RETRY_MAX_TIMES	2
@@ -80,6 +81,10 @@
 #define CNSS_EVENT_SYNC_UNINTERRUPTIBLE (CNSS_EVENT_SYNC | \
 				CNSS_EVENT_UNINTERRUPTIBLE)
 #define CNSS_EVENT_SYNC_UNKILLABLE (CNSS_EVENT_SYNC | CNSS_EVENT_UNKILLABLE)
+#define QMI_WLFW_MAX_TME_OPT_FILE_NUM 3
+#define TME_OEM_FUSE_FILE_NAME		"peach_sec.dat"
+#define TME_RPR_FILE_NAME		"peach_rpr.bin"
+#define TME_DPR_FILE_NAME		"peach_dpr.bin"
 
 enum cnss_dt_type {
 	CNSS_DTT_LEGACY = 0,
@@ -277,6 +282,7 @@ enum cnss_fw_dump_type {
 	CNSS_FW_IMAGE,
 	CNSS_FW_RDDM,
 	CNSS_FW_REMOTE_HEAP,
+	CNSS_FW_CAL,
 	CNSS_FW_DUMP_TYPE_MAX,
 };
 
@@ -550,6 +556,7 @@ struct cnss_plat_data {
 	struct cnss_fw_mem fw_mem[QMI_WLFW_MAX_NUM_MEM_SEG_V01];
 	struct cnss_fw_mem m3_mem;
 	struct cnss_fw_mem tme_lite_mem;
+	struct cnss_fw_mem tme_opt_file_mem[QMI_WLFW_MAX_TME_OPT_FILE_NUM];
 	struct cnss_fw_mem *cal_mem;
 	struct cnss_fw_mem aux_mem;
 	u64 cal_time;

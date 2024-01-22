@@ -154,6 +154,22 @@ int cnss_bus_load_tme_patch(struct cnss_plat_data *plat_priv)
 	}
 }
 
+int cnss_bus_load_tme_opt_file(struct cnss_plat_data *plat_priv,
+				enum wlfw_tme_lite_file_type_v01 file)
+{
+	if (!plat_priv)
+		return -ENODEV;
+
+	switch (plat_priv->bus_type) {
+	case CNSS_BUS_PCI:
+		return cnss_pci_load_tme_opt_file(plat_priv->bus_priv, file);
+	default:
+		cnss_pr_err("Unsupported bus type: %d\n",
+			    plat_priv->bus_type);
+		return -EINVAL;
+	}
+}
+
 int cnss_bus_load_m3(struct cnss_plat_data *plat_priv)
 {
 	if (!plat_priv)
@@ -456,6 +472,37 @@ int cnss_bus_register_driver_hdlr(struct cnss_plat_data *plat_priv, void *data)
 		cnss_pr_err("Unsupported bus type: %d\n",
 			    plat_priv->bus_type);
 		return -EINVAL;
+	}
+}
+
+int cnss_bus_runtime_pm_get_sync(struct cnss_plat_data *plat_priv)
+{
+	if (!plat_priv)
+		return -ENODEV;
+
+	switch (plat_priv->bus_type) {
+	case CNSS_BUS_PCI:
+		return cnss_pci_pm_runtime_get_sync(plat_priv->bus_priv, RTPM_ID_CNSS);
+	default:
+		cnss_pr_err("Unsupported bus type: %d\n",
+			    plat_priv->bus_type);
+		return -EINVAL;
+	}
+}
+
+void cnss_bus_runtime_pm_put(struct cnss_plat_data *plat_priv)
+{
+	if (!plat_priv)
+		return;
+
+	switch (plat_priv->bus_type) {
+	case CNSS_BUS_PCI:
+		cnss_pci_pm_runtime_mark_last_busy(plat_priv->bus_priv);
+		cnss_pci_pm_runtime_put_autosuspend(plat_priv->bus_priv, RTPM_ID_CNSS);
+		break;
+	default:
+		cnss_pr_err("Unsupported bus type: %d\n",
+			    plat_priv->bus_type);
 	}
 }
 

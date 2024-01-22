@@ -592,6 +592,10 @@ bool cnss_get_fw_cap(struct device *dev, enum cnss_fw_caps fw_cap)
 		if (is_supported && cnss_get_audio_iommu_domain(plat_priv))
 			is_supported = false;
 		break;
+	case CNSS_FW_CAP_CALDB_SEG_DDR_SUPPORT:
+		is_supported = !!(plat_priv->fw_caps &
+				  QMI_WLFW_CALDB_SEG_DDR_SUPPORT_V01);
+		break;
 	default:
 		cnss_pr_err("Invalid FW Capability: 0x%x\n", fw_cap);
 	}
@@ -759,6 +763,28 @@ void cnss_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
 		    roundup(size, PAGE_SIZE));
 }
 EXPORT_SYMBOL(cnss_audio_smmu_unmap);
+
+int cnss_get_fw_lpass_shared_mem(struct device *dev, dma_addr_t *iova,
+				 size_t *size)
+{
+	struct cnss_plat_data *plat_priv = cnss_bus_dev_to_plat_priv(dev);
+	uint8_t i;
+
+	if (!plat_priv)
+		return -EINVAL;
+
+	for (i = 0; i < plat_priv->fw_mem_seg_len; i++) {
+		if (plat_priv->fw_mem[i].type ==
+		    QMI_WLFW_MEM_LPASS_SHARED_V01) {
+			*iova = plat_priv->fw_mem[i].pa;
+			*size = plat_priv->fw_mem[i].size;
+			return 0;
+		}
+	}
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL(cnss_get_fw_lpass_shared_mem);
 
 int cnss_athdiag_read(struct device *dev, u32 offset, u32 mem_type,
 		      u32 data_len, u8 *output)
@@ -2556,6 +2582,9 @@ static void *cnss_get_fw_mem_pa_to_va(struct cnss_fw_mem *fw_mem,
 	u32 local_size;
 
 	for (i = 0; i < mem_seg_len; i++) {
+		if (i == QMI_WLFW_MEM_LPASS_SHARED_V01)
+			continue;
+
 		local_pa = (u64)fw_mem[i].pa;
 		local_size = (u32)fw_mem[i].size;
 		if (pa == local_pa && size <= local_size) {
@@ -4095,6 +4124,23 @@ static ssize_t recovery_show(struct device *dev,
 	return curr_len;
 }
 
+static ssize_t tme_opt_file_download_show(struct device *dev,
+			     struct device_attribute *attr, char *buf)
+{
+	u32 buf_size = PAGE_SIZE;
+	u32 curr_len = 0;
+	u32 buf_written = 0;
+
+	buf_written = scnprintf(buf, buf_size,
+				"Usage: echo [file_type] > /sys/kernel/cnss/tme_opt_file_download\n"
+				"file_type = sec -- For OEM_FUSE file\n"
+				"file_type = rpr -- For RPR file\n"
+				"file_type = dpr -- For DPR file\n");
+
+	curr_len += buf_written;
+	return curr_len;
+}
+
 static ssize_t time_sync_period_show(struct device *dev,
 				     struct device_attribute *attr,
 				     char *buf)
@@ -4344,6 +4390,44 @@ static ssize_t qdss_conf_download_store(struct device *dev,
 	return count;
 }
 
+static ssize_t tme_opt_file_download_store(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf, size_t count)
+{
+	struct cnss_plat_data *plat_priv = dev_get_drvdata(dev);
+	char cmd[5];
+
+	if (sscanf(buf, "%s", cmd) != 1)
+		return -EINVAL;
+
+	if (!test_bit(CNSS_FW_READY, &plat_priv->driver_state)) {
+		cnss_pr_err("Firmware is not ready yet\n");
+		return 0;
+	}
+
+	if (plat_priv->device_id == PEACH_DEVICE_ID &&
+	    cnss_bus_runtime_pm_get_sync(plat_priv) < 0)
+		goto runtime_pm_put;
+
+	if (strcmp(cmd, "sec") == 0) {
+		cnss_bus_load_tme_opt_file(plat_priv, WLFW_TME_LITE_OEM_FUSE_FILE_V01);
+		cnss_wlfw_tme_opt_file_dnld_send_sync(plat_priv, WLFW_TME_LITE_OEM_FUSE_FILE_V01);
+	} else if (strcmp(cmd, "rpr") == 0) {
+		cnss_bus_load_tme_opt_file(plat_priv, WLFW_TME_LITE_RPR_FILE_V01);
+		cnss_wlfw_tme_opt_file_dnld_send_sync(plat_priv, WLFW_TME_LITE_RPR_FILE_V01);
+	} else if (strcmp(cmd, "dpr") == 0) {
+		cnss_bus_load_tme_opt_file(plat_priv, WLFW_TME_LITE_DPR_FILE_V01);
+		cnss_wlfw_tme_opt_file_dnld_send_sync(plat_priv, WLFW_TME_LITE_DPR_FILE_V01);
+	}
+
+	cnss_pr_dbg("Received tme_opt_file_download indication cmd: %s\n", cmd);
+
+runtime_pm_put:
+	if (plat_priv->device_id == PEACH_DEVICE_ID)
+		cnss_bus_runtime_pm_put(plat_priv);
+	return count;
+}
+
 static ssize_t hw_trace_override_store(struct device *dev,
 				       struct device_attribute *attr,
 				       const char *buf, size_t count)
@@ -4381,6 +4465,7 @@ static DEVICE_ATTR_WO(enable_hds);
 static DEVICE_ATTR_WO(qdss_trace_start);
 static DEVICE_ATTR_WO(qdss_trace_stop);
 static DEVICE_ATTR_WO(qdss_conf_download);
+static DEVICE_ATTR_RW(tme_opt_file_download);
 static DEVICE_ATTR_WO(hw_trace_override);
 static DEVICE_ATTR_WO(charger_mode);
 static DEVICE_ATTR_RW(time_sync_period);
@@ -4393,6 +4478,7 @@ static struct attribute *cnss_attrs[] = {
 	&dev_attr_qdss_trace_start.attr,
 	&dev_attr_qdss_trace_stop.attr,
 	&dev_attr_qdss_conf_download.attr,
+	&dev_attr_tme_opt_file_download.attr,
 	&dev_attr_hw_trace_override.attr,
 	&dev_attr_charger_mode.attr,
 	&dev_attr_time_sync_period.attr,
