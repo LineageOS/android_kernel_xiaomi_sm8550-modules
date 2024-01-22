@@ -479,7 +479,7 @@ static int icnss_send_smp2p(struct icnss_priv *priv,
 	unsigned int value = 0;
 	int ret;
 
-	if (!priv || IS_ERR(priv->smp2p_info[smp2p_entry].smem_state))
+	if (!priv || IS_ERR_OR_NULL(priv->smp2p_info[smp2p_entry].smem_state))
 		return -EINVAL;
 
 	/* No Need to check FW_DOWN for ICNSS_RESET_MSG */
@@ -679,7 +679,7 @@ static int icnss_get_temperature(struct icnss_priv *priv, int *temp)
 
 	icnss_pr_dbg("Thermal Sensor is %s\n", tsens);
 	thermal_dev = thermal_zone_get_zone_by_name(tsens);
-	if (IS_ERR(thermal_dev)) {
+	if (IS_ERR_OR_NULL(thermal_dev)) {
 		icnss_pr_err("Fail to get thermal zone. ret: %d",
 			     PTR_ERR(thermal_dev));
 		return PTR_ERR(thermal_dev);
@@ -810,7 +810,7 @@ retry:
 		qcom_smem_state_get(&priv->pdev->dev,
 				    icnss_smp2p_str[smp2p_entry],
 				    &priv->smp2p_info[smp2p_entry].smem_bit);
-	if (IS_ERR(priv->smp2p_info[smp2p_entry].smem_state)) {
+	if (IS_ERR_OR_NULL(priv->smp2p_info[smp2p_entry].smem_state)) {
 		if (retry++ < SMP2P_GET_MAX_RETRY) {
 			error = PTR_ERR(priv->smp2p_info[smp2p_entry].smem_state);
 			icnss_pr_err("Failed to get smem state, ret: %d Entry: %s",
@@ -2363,7 +2363,7 @@ static int icnss_wpss_early_ssr_register_notifier(struct icnss_priv *priv)
 		qcom_register_early_ssr_notifier("wpss",
 						 &priv->wpss_early_ssr_nb);
 
-	if (IS_ERR(priv->wpss_early_notify_handler)) {
+	if (IS_ERR_OR_NULL(priv->wpss_early_notify_handler)) {
 		ret = PTR_ERR(priv->wpss_early_notify_handler);
 		icnss_pr_err("WPSS register early notifier failed: %d\n", ret);
 	}
@@ -2385,7 +2385,7 @@ static int icnss_wpss_ssr_register_notifier(struct icnss_priv *priv)
 	priv->wpss_notify_handler =
 		qcom_register_ssr_notifier("wpss", &priv->wpss_ssr_nb);
 
-	if (IS_ERR(priv->wpss_notify_handler)) {
+	if (IS_ERR_OR_NULL(priv->wpss_notify_handler)) {
 		ret = PTR_ERR(priv->wpss_notify_handler);
 		icnss_pr_err("WPSS register notifier failed: %d\n", ret);
 	}
@@ -2493,7 +2493,7 @@ static int icnss_slate_ssr_register_notifier(struct icnss_priv *priv)
 	priv->slate_notify_handler =
 		qcom_register_ssr_notifier("slatefw", &priv->slate_ssr_nb);
 
-	if (IS_ERR(priv->slate_notify_handler)) {
+	if (IS_ERR_OR_NULL(priv->slate_notify_handler)) {
 		ret = PTR_ERR(priv->slate_notify_handler);
 		icnss_pr_err("SLATE register notifier failed: %d\n", ret);
 	}
@@ -2550,7 +2550,7 @@ static int icnss_modem_ssr_register_notifier(struct icnss_priv *priv)
 	priv->modem_notify_handler =
 		qcom_register_ssr_notifier("mpss", &priv->modem_ssr_nb);
 
-	if (IS_ERR(priv->modem_notify_handler)) {
+	if (IS_ERR_OR_NULL(priv->modem_notify_handler)) {
 		ret = PTR_ERR(priv->modem_notify_handler);
 		icnss_pr_err("Modem register notifier failed: %d\n", ret);
 	}
@@ -2562,7 +2562,7 @@ static int icnss_modem_ssr_register_notifier(struct icnss_priv *priv)
 
 static void icnss_wpss_early_ssr_unregister_notifier(struct icnss_priv *priv)
 {
-	if (IS_ERR(priv->wpss_early_notify_handler))
+	if (IS_ERR_OR_NULL(priv->wpss_early_notify_handler))
 		return;
 
 	qcom_unregister_early_ssr_notifier(priv->wpss_early_notify_handler,
@@ -5042,7 +5042,7 @@ static int icnss_pm_suspend(struct device *dev)
 	icnss_pr_vdbg("PM Suspend, state: 0x%lx\n", priv->state);
 
 	if (!priv->ops || !priv->ops->pm_suspend ||
-	    IS_ERR(priv->smp2p_info[ICNSS_SMP2P_OUT_POWER_SAVE].smem_state) ||
+	    IS_ERR_OR_NULL(priv->smp2p_info[ICNSS_SMP2P_OUT_POWER_SAVE].smem_state) ||
 	    !test_bit(ICNSS_DRIVER_PROBED, &priv->state))
 		return 0;
 
@@ -5080,7 +5080,7 @@ static int icnss_pm_resume(struct device *dev)
 	icnss_pr_vdbg("PM resume, state: 0x%lx\n", priv->state);
 
 	if (!priv->ops || !priv->ops->pm_resume ||
-	    IS_ERR(priv->smp2p_info[ICNSS_SMP2P_OUT_POWER_SAVE].smem_state) ||
+	    IS_ERR_OR_NULL(priv->smp2p_info[ICNSS_SMP2P_OUT_POWER_SAVE].smem_state) ||
 	    !test_bit(ICNSS_DRIVER_PROBED, &priv->state))
 		goto out;
 
@@ -5171,7 +5171,7 @@ static int icnss_pm_runtime_suspend(struct device *dev)
 	}
 
 	if (!priv->ops || !priv->ops->runtime_suspend ||
-	    IS_ERR(priv->smp2p_info[ICNSS_SMP2P_OUT_POWER_SAVE].smem_state))
+	    IS_ERR_OR_NULL(priv->smp2p_info[ICNSS_SMP2P_OUT_POWER_SAVE].smem_state))
 		goto out;
 
 	icnss_pr_vdbg("Runtime suspend\n");
@@ -5205,7 +5205,7 @@ static int icnss_pm_runtime_resume(struct device *dev)
 	}
 
 	if (!priv->ops || !priv->ops->runtime_resume ||
-	    IS_ERR(priv->smp2p_info[ICNSS_SMP2P_OUT_POWER_SAVE].smem_state))
+	    IS_ERR_OR_NULL(priv->smp2p_info[ICNSS_SMP2P_OUT_POWER_SAVE].smem_state))
 		goto out;
 
 	icnss_pr_vdbg("Runtime resume, state: 0x%lx\n", priv->state);
