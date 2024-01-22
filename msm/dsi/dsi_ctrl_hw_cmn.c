@@ -567,7 +567,7 @@ void dsi_ctrl_hw_cmn_setup_cmd_stream(struct dsi_ctrl_hw *ctrl,
 		this_frame_slices = pic_width / dsc.config.slice_width;
 		intf_ip_w = this_frame_slices * dsc.config.slice_width;
 
-		sde_dsc_populate_dsc_private_params(&dsc, intf_ip_w);
+		sde_dsc_populate_dsc_private_params(&dsc, intf_ip_w, ctrl->widebus_support);
 
 		width_final = dsc.bytes_per_pkt * dsc.pkt_per_line;
 		stride_final = dsc.bytes_per_pkt;

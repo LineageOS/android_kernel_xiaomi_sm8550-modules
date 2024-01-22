@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  */
 
@@ -418,6 +418,7 @@ static int _dce_dsc_setup_helper(struct sde_encoder_virt *sde_enc,
 	int dsc_pic_width;
 	int dsc_common_mode = 0;
 	int i, rc = 0;
+	bool widebus_en;
 
 	sde_kms = sde_encoder_get_kms(&sde_enc->base);
 
@@ -486,7 +487,9 @@ static int _dce_dsc_setup_helper(struct sde_encoder_virt *sde_enc,
 	else if ((dsc_common_mode & DSC_MODE_MULTIPLEX) || (dsc->half_panel_pu))
 		dsc->num_active_ss_per_enc = dsc->config.slice_count >> 1;
 
-	sde_dsc_populate_dsc_private_params(dsc, intf_ip_w);
+	widebus_en = sde_encoder_is_widebus_enabled(enc_master->parent);
+
+	sde_dsc_populate_dsc_private_params(dsc, intf_ip_w, widebus_en);
 
 	_dce_dsc_initial_line_calc(dsc, enc_ip_w, dsc_common_mode);
 
