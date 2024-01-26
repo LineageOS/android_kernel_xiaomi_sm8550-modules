@@ -5077,6 +5077,9 @@ int cnss_pci_load_tme_opt_file(struct cnss_pci_data *pci_priv,
 		return 0;
 	}
 
+	if (!tme_lite_mem)
+		return 0;
+
 	if (!tme_lite_mem->va && !tme_lite_mem->size) {
 		cnss_pci_add_fw_prefix_name(pci_priv, filename,
 					    tme_opt_filename);
