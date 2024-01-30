@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-/* Copyright (c) 2017, 2019 The Linux Foundation. All rights reserved. */
+/*
+ * Copyright (c) 2017, 2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ */
 
 #ifndef _CNSS_UTILS_H_
 #define _CNSS_UTILS_H_
@@ -43,5 +46,10 @@ extern u8 *cnss_utils_get_wlan_derived_mac_address(struct device *dev,
 extern void cnss_utils_set_cc_source(struct device *dev,
 				     enum cnss_utils_cc_src cc_source);
 extern enum cnss_utils_cc_src cnss_utils_get_cc_source(struct device *dev);
+
+#ifdef CONFIG_FEATURE_SMEM_MAILBOX
+extern int cnss_utils_smem_mailbox_write(struct device *dev, int flags,
+					 const __u8 *data, uint32_t len);
+#endif
 
 #endif
