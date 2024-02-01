@@ -2149,6 +2149,8 @@ static int cam_tfe_mgr_acquire_get_unified_structure_v2(
 					CAM_ISP_TFE_FLAG_SHDR_SLAVE_EN;
 	in_port->is_shdr_master  =  in->feature_flag &
 					CAM_ISP_TFE_FLAG_SHDR_MASTER_EN;
+	in_port->epd_supported  =  in->feature_flag &
+					CAM_ISP_TFE_FLAG_EPD_SUPPORT;
 
 
 	if (in_port->bayer_bin && in_port->qcfa_bin) {
