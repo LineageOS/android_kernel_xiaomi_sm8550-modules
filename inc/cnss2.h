@@ -333,7 +333,6 @@ enum cnss_driver_mode {
 	CNSS_CCPM,
 	CNSS_QVIT,
 	CNSS_CALIBRATION,
-	CNSS_DRIVER_MODE_MAX,
 };
 
 enum cnss_recovery_reason {

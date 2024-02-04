@@ -634,7 +634,6 @@ struct cnss_plat_data {
 	u32 hang_data_addr_offset;
 	/* bitmap to detect FEM combination */
 	u8 hwid_bitmap;
-	enum cnss_driver_mode driver_mode;
 	uint32_t num_shadow_regs_v3;
 	bool sec_peri_feature_disable;
 	struct device_node *dev_node;
