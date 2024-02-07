@@ -126,6 +126,8 @@ void dsi_phy_hw_v4_0_reset_clk_en_sel(struct dsi_phy_hw *phy);
 void dsi_phy_hw_v4_0_set_continuous_clk(struct dsi_phy_hw *phy, bool enable);
 void dsi_phy_hw_v4_0_commit_phy_timing(struct dsi_phy_hw *phy,
 		struct dsi_phy_per_lane_cfgs *timing);
+void dsi_phy_hw_v4_0_get_phy_timing(struct dsi_phy_hw *phy,
+		u32 *phy_timming, u32 size);
 
 /* Definitions for 4nm PHY hardware driver */
 void dsi_phy_hw_v5_0_enable(struct dsi_phy_hw *phy, struct dsi_phy_cfg *cfg);
@@ -144,6 +146,8 @@ void dsi_phy_hw_v5_0_reset_clk_en_sel(struct dsi_phy_hw *phy);
 void dsi_phy_hw_v5_0_set_continuous_clk(struct dsi_phy_hw *phy, bool enable);
 void dsi_phy_hw_v5_0_commit_phy_timing(struct dsi_phy_hw *phy,
 		struct dsi_phy_per_lane_cfgs *timing);
+void dsi_phy_hw_v5_0_get_phy_timing(struct dsi_phy_hw *phy,
+		u32 *phy_timming, u32 size);
 
 /* DSI controller common ops */
 u32 dsi_ctrl_hw_cmn_get_interrupt_status(struct dsi_ctrl_hw *ctrl);
@@ -181,6 +185,8 @@ void dsi_ctrl_hw_cmn_setup_avr(struct dsi_ctrl_hw *ctrl, bool enable);
 
 void dsi_ctrl_hw_cmn_set_video_timing(struct dsi_ctrl_hw *ctrl,
 			 struct dsi_mode_info *mode);
+u32 dsi_ctrl_hw_cmn_get_video_timing(struct dsi_ctrl_hw *ctrl,
+			 const char *type);
 void dsi_ctrl_hw_cmn_set_timing_db(struct dsi_ctrl_hw *ctrl,
 				     bool enable);
 void dsi_ctrl_hw_cmn_cmd_engine_setup(struct dsi_ctrl_hw *ctrl,

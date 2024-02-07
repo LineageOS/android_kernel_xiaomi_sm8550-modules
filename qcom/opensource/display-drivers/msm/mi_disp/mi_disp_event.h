@@ -1,0 +1,38 @@
+#ifndef _MI_DISP_EVENT_H_
+#define _MI_DISP_EVENT_H_
+
+enum disp_mievent_type {
+	MI_EVENT_PRI_PANEL_REG_ESD = 911001001,
+	MI_EVENT_PRI_PANEL_IRQ_ESD,
+	MI_EVENT_PRI_PLATFORM_ESD,
+	MI_EVENT_DSI_ERROR,
+	MI_EVENT_PANEL_HW_RESOURCE_GET_FAILED,
+	MI_EVENT_PANEL_RECOGNIZE_ERR,
+	MI_EVENT_PANEL_WP_READ_FAILED,
+	MI_EVENT_PANEL_UNDERRUN,
+	MI_EVENT_SEC_PANEL_REG_ESD = 911001101,
+	MI_EVENT_SEC_PANEL_IRQ_ESD,
+	MI_EVENT_SEC_PLATFORM_ESD,
+	MI_EVENT_PANEL_HARDWARE_ERR = 911001999,
+	MI_EVENT_MAX_EVENT_TYPE,
+};
+
+enum disp_mievent_recovery_type {
+	MI_EVENT_PRI_PANEL_REG_ESD_RECOVERY = 811001001,
+	MI_EVENT_PRI_PANEL_IRQ_ESD_RECOVERY,
+	MI_EVENT_PRI_PLATFORM_ESD_RECOVERY,
+	MI_EVENT_SEC_PANEL_REG_ESD_RECOVERY,
+	MI_EVENT_SEC_PANEL_IRQ_ESD_RECOVERY,
+	MI_EVENT_SEC_PLATFORM_ESD_RECOVERY,
+	MI_EVENT_MAX_EVENT_RECOVERY_TYPE,
+};
+
+extern unsigned int ESD_TYPE;
+#define MI_EVENT_ESD_COUNT_MAX 100 /* number of esd counted */
+#define MI_EVENT_ESD_TIMEOUT 60 /* the statistical unit is minutes */
+
+void mi_disp_mievent_str(unsigned int event_type);
+void mi_disp_mievent_int(int disp_id,unsigned int event_type);
+void mi_disp_mievent_recovery(unsigned int event_type);
+
+#endif /* _MI_DISP_EVENT_H_ */

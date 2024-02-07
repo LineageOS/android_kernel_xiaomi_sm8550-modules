@@ -455,6 +455,16 @@ struct dsi_ctrl_hw_ops {
 				 struct dsi_mode_info *mode);
 
 	/**
+	 * get_video_timing() - get the timing for video frame
+	 * @ctrl:          Pointer to controller host hardware.
+	 * @type:          Video timming type.
+	 *
+	 * Get the video timing parameters for the DSI video mode operation.
+	 */
+	u32 (*get_video_timing)(struct dsi_ctrl_hw *ctrl,
+				 const char *type);
+
+	/**
 	 * cmd_engine_setup() - setup dsi host controller for command mode
 	 * @ctrl:          Pointer to the controller host hardware.
 	 * @common_cfg:    Common configuration parameters.

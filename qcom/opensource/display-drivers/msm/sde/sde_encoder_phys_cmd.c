@@ -10,6 +10,7 @@
 #include "sde_core_irq.h"
 #include "sde_formats.h"
 #include "sde_trace.h"
+#include "mi_sde_encoder.h"
 
 #define SDE_DEBUG_CMDENC(e, fmt, ...) SDE_DEBUG("enc%d intf%d " fmt, \
 		(e) && (e)->base.parent ? \
@@ -208,6 +209,9 @@ static void _sde_encoder_phys_signal_frame_done(struct sde_encoder_phys *phys_en
 	struct sde_hw_ctl *ctl;
 	u32 scheduler_status = INVALID_CTL_STATUS, event = 0;
 	struct sde_hw_pp_vsync_info info[MAX_CHANNELS_PER_ENC] = {{0}};
+	ktime_t last_pp_done_timestamp = ktime_get();
+
+	sde_encoder_helper_get_pp_line_count(phys_enc->parent, info);
 
 	cmd_enc = to_sde_encoder_phys_cmd(phys_enc);
 	ctl = phys_enc->hw_ctl;
@@ -238,6 +242,7 @@ static void _sde_encoder_phys_signal_frame_done(struct sde_encoder_phys *phys_en
 		info[0].rd_ptr_line_count, info[1].pp_idx, info[1].intf_idx,
 		info[1].intf_frame_count, info[1].wr_ptr_line_count, info[1].rd_ptr_line_count);
 
+	phys_enc->last_pp_done_timestamp = last_pp_done_timestamp;
 	/*
 	 * For hw-fences, in the last frame during the autorefresh disable transition
 	 * hw won't trigger the output-fence signal once the frame is done, therefore
@@ -318,8 +323,12 @@ static void sde_encoder_phys_cmd_te_rd_ptr_irq(void *arg, int irq_idx)
 	unsigned long lock_flags;
 	u32 fence_ready = 0;
 
+	sde_encoder_helper_get_pp_line_count(phys_enc->parent, info);
+
 	if (!phys_enc || !phys_enc->hw_pp || !phys_enc->hw_intf || !phys_enc->hw_ctl)
 		return;
+
+	mi_sde_encoder_save_vsync_info(phys_enc);
 
 	SDE_ATRACE_BEGIN("rd_ptr_irq");
 	cmd_enc = to_sde_encoder_phys_cmd(phys_enc);
@@ -362,6 +371,8 @@ static void sde_encoder_phys_cmd_wr_ptr_irq(void *arg, int irq_idx)
 	struct sde_hw_ctl *ctl;
 	u32 event = 0, qsync_mode = 0;
 	struct sde_hw_pp_vsync_info info[MAX_CHANNELS_PER_ENC] = {{0}};
+
+	sde_encoder_helper_get_pp_line_count(phys_enc->parent, info);
 
 	if (!phys_enc || !phys_enc->hw_ctl)
 		return;
@@ -549,6 +560,8 @@ static void sde_encoder_phys_cmd_mode_set(
 static int _sde_encoder_phys_cmd_handle_framedone_timeout(
 		struct sde_encoder_phys *phys_enc)
 {
+	struct sde_connector *sde_conn = NULL;
+	struct dsi_display *display = NULL;
 	struct sde_encoder_phys_cmd *cmd_enc =
 			to_sde_encoder_phys_cmd(phys_enc);
 	bool recovery_events = sde_encoder_recovery_events_enabled(
@@ -570,6 +583,14 @@ static int _sde_encoder_phys_cmd_handle_framedone_timeout(
 
 	cmd_enc->frame_tx_timeout_report_cnt++;
 	pending_kickoff_cnt = atomic_read(&phys_enc->pending_kickoff_cnt) + 1;
+
+	sde_conn = to_sde_connector(phys_enc->connector);
+	if (sde_encoder_is_dsi_display(phys_enc->parent)) {
+		display = (struct dsi_display *)sde_conn->display;
+		if (display) {
+			SDE_ERROR("[%s] pingpong timeout!\n", display->name);
+		}
+	}
 
 	SDE_EVT32(DRMID(phys_enc->parent), phys_enc->hw_pp->idx - PINGPONG_0,
 			cmd_enc->frame_tx_timeout_report_cnt,
@@ -1244,6 +1265,8 @@ static void sde_encoder_phys_cmd_enable_helper(
 	if (hw_intf->ops.enable_wide_bus)
 		hw_intf->ops.enable_wide_bus(hw_intf,
 			sde_encoder_is_widebus_enabled(phys_enc->parent));
+
+	sde_encoder_override_tearcheck_rd_ptr(phys_enc);
 
 	/*
 	 * For pp-split, skip setting the flush bit for the slave intf, since
@@ -2010,6 +2033,8 @@ static void sde_encoder_phys_cmd_trigger_start(
 
 	if (!phys_enc)
 		return;
+
+	sde_encoder_helper_get_pp_line_count(phys_enc->parent, info);
 
 	/* we don't issue CTL_START when using autorefresh */
 	frame_cnt = _sde_encoder_phys_cmd_get_autorefresh_property(phys_enc);

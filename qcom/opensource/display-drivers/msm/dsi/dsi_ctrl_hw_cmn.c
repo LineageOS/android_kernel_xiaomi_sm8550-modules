@@ -529,6 +529,84 @@ void dsi_ctrl_hw_cmn_set_video_timing(struct dsi_ctrl_hw *ctrl,
 }
 
 /**
+ * get_video_timing() - get the timing for video frame
+ * @ctrl:          Pointer to controller host hardware.
+ * @mode:          Video mode information.
+ *
+ * Get the video timing parameters for the DSI video mode operation.
+ */
+u32 dsi_ctrl_hw_cmn_get_video_timing(struct dsi_ctrl_hw *ctrl,
+				     const char *type)
+{
+	u32 dsi_val = 0;
+
+	if (strncmp(type, "HPW", 3) == 0) {
+		u32 tmp_hpw;
+
+		tmp_hpw = DSI_R32(ctrl, DSI_VIDEO_MODE_HSYNC);
+		dsi_val  = (tmp_hpw >> 16) & 0xFFFF;
+		return dsi_val;
+	} else if (strncmp(type, "HFP", 3) == 0) {
+		u32 tmp_hfp, h_total, active_h_end;
+
+		tmp_hfp = DSI_R32(ctrl, DSI_VIDEO_MODE_TOTAL);
+		h_total = tmp_hfp & 0xFFFF;
+
+		tmp_hfp = DSI_R32(ctrl, DSI_VIDEO_MODE_ACTIVE_H);
+		active_h_end = (tmp_hfp >> 16) & 0xFFFF;
+
+		tmp_hfp = h_total - active_h_end + 1;
+
+		return tmp_hfp;
+	} else if (strncmp(type, "HBP", 3) == 0) {
+		u32 tmp_hbp;
+		u32 hs_end, active_h_start;
+
+		tmp_hbp = DSI_R32(ctrl, DSI_VIDEO_MODE_HSYNC);
+		hs_end  = (tmp_hbp >> 16) & 0xFFFF;
+		tmp_hbp = DSI_R32(ctrl, DSI_VIDEO_MODE_ACTIVE_H);
+		active_h_start = tmp_hbp & 0xFFFF;
+		tmp_hbp = active_h_start - hs_end;
+
+		return tmp_hbp;
+
+	} else if (strncmp(type, "VPW", 3) == 0) {
+		u32 tmp_vpw;
+
+		tmp_vpw = DSI_R32(ctrl, DSI_VIDEO_MODE_VSYNC_VPOS);
+		dsi_val  = (tmp_vpw >> 16) & 0xFFFF;
+
+		return dsi_val;
+	} else if (strncmp(type, "VFP", 3) == 0) {
+		u32 tmp_vfp, v_total, active_v_end;
+
+		tmp_vfp = DSI_R32(ctrl, DSI_VIDEO_MODE_TOTAL);
+		v_total = (tmp_vfp >> 16) & 0xFFFF;
+
+		tmp_vfp = DSI_R32(ctrl, + DSI_VIDEO_MODE_ACTIVE_V);
+		active_v_end = (tmp_vfp >> 16) & 0xFFFF;
+
+		tmp_vfp = v_total - active_v_end + 1;
+
+		return tmp_vfp;
+	} else if (strncmp(type, "VBP", 3) == 0) {
+		u32 tmp_vbp, vpos_end, active_v_start;
+
+		tmp_vbp = DSI_R32(ctrl, DSI_VIDEO_MODE_VSYNC_VPOS);
+		vpos_end  = (tmp_vbp >> 16) & 0xFFFF;
+
+		tmp_vbp = DSI_R32(ctrl, DSI_VIDEO_MODE_ACTIVE_V);
+		active_v_start = tmp_vbp & 0xFFFF;
+
+		tmp_vbp = active_v_start - vpos_end;
+		return tmp_vbp;
+	}
+
+	dsi_val = 0;
+	return dsi_val;
+}
+
+/**
  * setup_cmd_stream() - set up parameters for command pixel streams
  * @ctrl:              Pointer to controller host hardware.
  * @mode:              Pointer to mode information.

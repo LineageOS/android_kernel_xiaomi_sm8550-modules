@@ -4785,7 +4785,7 @@ void reg_dmav2_setup_vig_gamutv61(struct sde_hw_pipe *ctx, void *cfg)
 	if (len % transfer_size_bytes)
 		len = len + (transfer_size_bytes - len % transfer_size_bytes);
 
-	data = kvzalloc(len, GFP_KERNEL);
+	data = vzalloc(len);
 	if (!data)
 		return;
 
@@ -4850,7 +4850,7 @@ void reg_dmav2_setup_vig_gamutv61(struct sde_hw_pipe *ctx, void *cfg)
 		DRM_ERROR("failed to kick off ret %d\n", rc);
 
 exit:
-	kvfree(data);
+	vfree(data);
 }
 
 int reg_dmav1_setup_spr_cfg3_params(struct sde_hw_dspp *ctx,

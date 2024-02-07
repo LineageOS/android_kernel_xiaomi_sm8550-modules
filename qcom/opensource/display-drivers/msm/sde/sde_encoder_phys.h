@@ -23,8 +23,8 @@
 
 #define SDE_ENCODER_NAME_MAX	16
 
-/* wait for at most 2 vsync for lowest refresh rate (24hz) */
-#define DEFAULT_KICKOFF_TIMEOUT_MS		84
+/* wait for at most 2 vsync for lowest refresh rate (10hz) */
+#define DEFAULT_KICKOFF_TIMEOUT_MS		220
 
 /* if default timeout fails wait additional time in 1s increments */
 #define EXTENDED_KICKOFF_TIMEOUT_MS      1000
@@ -355,6 +355,9 @@ struct sde_encoder_phys {
 	atomic_t wbirq_refcount;
 	atomic_t vsync_cnt;
 	ktime_t last_vsync_timestamp;
+	ktime_t last_rd_ptr_timestamp;
+	ktime_t last_wr_ptr_timestamp;
+	ktime_t last_pp_done_timestamp;
 	atomic_t underrun_cnt;
 	atomic_t pending_kickoff_cnt;
 	atomic_t pending_retire_fence_cnt;
@@ -461,6 +464,7 @@ struct sde_encoder_phys_cmd {
  * @fb_disable:		Frame buffer to use during the disabling state
  * @sc_cfg:		Stores wb system cache config
  * @crtc:		Pointer to drm_crtc
+ * @pu_roi		Stores primary display roi if partial update is enabled
  * @prog_line:		Cached programmable line value used to trigger early wb-fence
  */
 struct sde_encoder_phys_wb {
@@ -480,6 +484,7 @@ struct sde_encoder_phys_wb {
 	struct drm_gem_object *bo_disable[SDE_MAX_PLANES];
 	struct drm_framebuffer *fb_disable;
 	struct sde_hw_wb_sc_cfg sc_cfg;
+	struct sde_rect pu_roi;
 	struct drm_crtc *crtc;
 	u32 prog_line;
 };

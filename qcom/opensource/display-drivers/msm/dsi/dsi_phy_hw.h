@@ -134,6 +134,8 @@ struct dsi_phy_cfg {
 	enum dsi_phy_type phy_type;
 	unsigned long bit_clk_rate_hz;
 	struct dsi_split_link_config split_link;
+	unsigned long clk_strength;
+	unsigned long deemph_eq_strength;
 };
 
 struct dsi_phy_hw;
@@ -382,6 +384,14 @@ struct dsi_phy_hw_ops {
 	 * @prepare:	  specify if PLL needs to be turned on or off.
 	 */
 	int (*pll_toggle)(void *pll, bool prepare);
+
+	/**
+	 * get_phy_timing() - Get PHY timing
+	 * @phy: Pointer to DSI PHY hardware object.
+	 * @timing: Pointer to PHY timing array
+	 */
+	void (*get_phy_timing)(struct dsi_phy_hw *phy,
+		u32 *phy_timming, u32 size);
 
 };
 

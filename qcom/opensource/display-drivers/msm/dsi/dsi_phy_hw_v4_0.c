@@ -966,3 +966,28 @@ void dsi_phy_hw_v4_0_set_continuous_clk(struct dsi_phy_hw *phy, bool enable)
 
 	wmb(); /* make sure request is set */
 }
+
+void dsi_phy_hw_v4_0_get_phy_timing(struct dsi_phy_hw *phy,
+          u32 *phy_timming, u32 size)
+{
+	if (!phy_timming || !phy || !size)
+		return;
+	if (size != DSI_PHY_TIMING_V4_SIZE) {
+		DSI_ERR("Unexpected timing array size %d\n", size);
+		return;
+	}
+	phy_timming[0] = DSI_R32(phy, DSIPHY_CMN_TIMING_CTRL_0);
+	phy_timming[1] = DSI_R32(phy, DSIPHY_CMN_TIMING_CTRL_1);
+	phy_timming[2] = DSI_R32(phy, DSIPHY_CMN_TIMING_CTRL_2);
+	phy_timming[3] = DSI_R32(phy, DSIPHY_CMN_TIMING_CTRL_3);
+	phy_timming[4] = DSI_R32(phy, DSIPHY_CMN_TIMING_CTRL_4);
+	phy_timming[5] = DSI_R32(phy, DSIPHY_CMN_TIMING_CTRL_5);
+	phy_timming[6] = DSI_R32(phy, DSIPHY_CMN_TIMING_CTRL_6);
+	phy_timming[7] = DSI_R32(phy, DSIPHY_CMN_TIMING_CTRL_7);
+	phy_timming[8] = DSI_R32(phy, DSIPHY_CMN_TIMING_CTRL_8);
+	phy_timming[9] = DSI_R32(phy, DSIPHY_CMN_TIMING_CTRL_9);
+	phy_timming[10] = DSI_R32(phy, DSIPHY_CMN_TIMING_CTRL_10);
+	phy_timming[11] = DSI_R32(phy, DSIPHY_CMN_TIMING_CTRL_11);
+	phy_timming[12] = DSI_R32(phy, DSIPHY_CMN_TIMING_CTRL_12);
+	phy_timming[13] = DSI_R32(phy, DSIPHY_CMN_TIMING_CTRL_13);
+}

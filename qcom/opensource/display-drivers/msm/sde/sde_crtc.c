@@ -48,6 +48,8 @@
 #include "msm_drv.h"
 #include "sde_vm.h"
 
+#include "mi_sde_crtc.h"
+
 #define SDE_PSTATES_MAX (SDE_STAGE_MAX * 4)
 #define SDE_MULTIRECT_PLANE_MAX (SDE_STAGE_MAX * 2)
 
@@ -1584,8 +1586,9 @@ static void _sde_crtc_program_lm_output_roi(struct drm_crtc *crtc)
 
 		lm_roi = &cstate->lm_roi[lm_idx];
 		hw_lm = sde_crtc->mixers[lm_idx].hw_lm;
-		if (!sde_crtc->mixers_swapped)
-			right_mixer = lm_idx % MAX_MIXERS_PER_LAYOUT;
+		right_mixer = lm_idx % MAX_MIXERS_PER_LAYOUT;
+		if (sde_crtc->mixers_swapped)
+			right_mixer = !right_mixer;
 
 		if (lm_roi->w != hw_lm->cfg.out_width ||
 				lm_roi->h != hw_lm->cfg.out_height ||
@@ -3209,8 +3212,10 @@ void sde_crtc_complete_commit(struct drm_crtc *crtc,
 	SDE_EVT32_VERBOSE(DRMID(crtc));
 
 	sde_kms = _sde_crtc_get_kms(crtc);
-	if (!sde_kms)
+	if (!sde_kms) {
+		SDE_ERROR("invalid kms\n");
 		return;
+	}
 
 	for (i = 0; i < MAX_DSI_DISPLAYS; i++) {
 		splash_display = &sde_kms->splash_data.splash_display[i];
@@ -4173,6 +4178,7 @@ static void _sde_crtc_atomic_begin(struct drm_crtc *crtc,
 
 	sde_crtc = to_sde_crtc(crtc);
 	dev = crtc->dev;
+	SDE_ATRACE_BEGIN("crtc_setup_mixers");
 
 	if (!sde_crtc->num_mixers) {
 		_sde_crtc_setup_mixers(crtc);
@@ -4183,6 +4189,7 @@ static void _sde_crtc_atomic_begin(struct drm_crtc *crtc,
 		_sde_crtc_setup_mixers(crtc);
 		sde_crtc->reinit_crtc_mixers = false;
 	}
+	SDE_ATRACE_END("crtc_setup_mixers");
 
 	list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
 		if (encoder->crtc != crtc)
@@ -4192,8 +4199,11 @@ static void _sde_crtc_atomic_begin(struct drm_crtc *crtc,
 		sde_encoder_trigger_kickoff_pending(encoder);
 	}
 
+	SDE_ATRACE_BEGIN("perf_crtc_update");
+
 	/* update performance setting */
 	sde_core_perf_crtc_update(crtc, 1, false);
+	SDE_ATRACE_END("perf_crtc_update");
 
 	/*
 	 * If no mixers have been allocated in sde_crtc_atomic_check(),
@@ -4202,13 +4212,17 @@ static void _sde_crtc_atomic_begin(struct drm_crtc *crtc,
 	 */
 	if (unlikely(!sde_crtc->num_mixers))
 		goto end;
+	SDE_ATRACE_BEGIN("crtc_blend_setup");
 
 	_sde_crtc_blend_setup(crtc, old_state, true);
 	_sde_crtc_dest_scaler_setup(crtc);
 	sde_cp_crtc_apply_noise(crtc, old_state);
+	SDE_ATRACE_END("crtc_blend_setup");
+	SDE_ATRACE_BEGIN("perf_crtc_update_uidle");
 
 	if (crtc->state->mode_changed || sde_kms->perf.catalog->uidle_cfg.dirty)
 		sde_core_perf_crtc_update_uidle(crtc, true);
+	SDE_ATRACE_END("perf_crtc_update_uidle");
 
 	/* update cached_encoder_mask if new conn is added or removed */
 	if (crtc->state->connectors_changed)
@@ -4227,9 +4241,11 @@ static void _sde_crtc_atomic_begin(struct drm_crtc *crtc,
 			crtc == splash_display->encoder->crtc)
 			cont_splash_enabled = true;
 	}
+	SDE_ATRACE_BEGIN("cp_crtc_apply_properties");
 
 	if (sde_kms_is_cp_operation_allowed(sde_kms))
 		sde_cp_crtc_apply_properties(crtc);
+	SDE_ATRACE_END("cp_crtc_apply_properties");
 
 	/*
 	 * PP_DONE irq is only used by command mode for now.
@@ -4679,6 +4695,8 @@ void sde_crtc_commit_kickoff(struct drm_crtc *crtc,
 
 	idle_pc_state = sde_crtc_get_property(cstate, CRTC_PROP_IDLE_PC_STATE);
 
+	mi_sde_crtc_check_layer_flags(crtc);
+
 	sde_crtc->kickoff_in_progress = true;
 	list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
 		if (encoder->crtc != crtc)
@@ -4690,7 +4708,7 @@ void sde_crtc_commit_kickoff(struct drm_crtc *crtc,
 		 */
 		params.affected_displays = _sde_crtc_get_displays_affected(crtc,
 				crtc->state);
-		if (sde_encoder_prepare_for_kickoff(encoder, &params))
+		if (sde_encoder_prepare_for_kickoff(encoder, &params, old_state))
 			sde_crtc->needs_hw_reset = true;
 
 		if (idle_pc_state != IDLE_PC_NONE)
@@ -6910,7 +6928,7 @@ void sde_crtc_set_qos_dirty(struct drm_crtc *crtc)
 		plane_mask |= drm_plane_mask(plane);
 	}
 	SDE_EVT32(DRMID(crtc), plane_mask);
-
+	
 	sde_crtc_update_line_time(crtc);
 }
 
@@ -7912,7 +7930,7 @@ void __sde_crtc_static_cache_read_work(struct kthread_work *work)
 	struct sde_hw_ctl *ctl = sde_crtc->mixers[0].hw_ctl;
 	struct drm_encoder *enc, *drm_enc = NULL;
 	struct drm_plane *plane;
-	struct sde_encoder_kickoff_params params = { 0 };
+	//struct sde_encoder_kickoff_params params = { 0 };
 
 	if (sde_crtc->cache_state != CACHE_STATE_FRAME_WRITE)
 		return;
@@ -7941,8 +7959,8 @@ void __sde_crtc_static_cache_read_work(struct kthread_work *work)
 		sde_plane_ctl_flush(plane, ctl, true);
 
 	/* Enable clocks and IRQ and wait for VBLANK */
-	params.affected_displays = _sde_crtc_get_displays_affected(crtc, crtc->state);
-	sde_encoder_prepare_for_kickoff(drm_enc, &params);
+	//params.affected_displays = _sde_crtc_get_displays_affected(crtc, crtc->state);
+	//sde_encoder_prepare_for_kickoff(drm_enc, &params);
 	sde_encoder_kickoff(drm_enc, false);
 	sde_encoder_wait_for_event(drm_enc, MSM_ENC_VBLANK);
 
