@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
- *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -77,7 +76,6 @@ static int32_t cam_flash_driver_cmd(struct cam_flash_ctrl *fctrl,
 			flash_acq_dev.device_handle;
 		fctrl->bridge_intf.session_hdl =
 			flash_acq_dev.session_handle;
-		fctrl->apply_streamoff = false;
 
 		rc = copy_to_user(u64_to_user_ptr(cmd->handle),
 			&flash_acq_dev,
@@ -136,15 +134,14 @@ static int32_t cam_flash_driver_cmd(struct cam_flash_ctrl *fctrl,
 				CAM_WARN(CAM_FLASH, "Power Down Failed");
 		}
 
-		fctrl->streamoff_count = 0;
 		fctrl->flash_state = CAM_FLASH_STATE_INIT;
 		break;
 	}
 	case CAM_QUERY_CAP: {
 		struct cam_flash_query_cap_info flash_cap = {0};
 
-		CAM_DBG(CAM_FLASH, "CAM_QUERY_CAP_V1");
-		flash_cap.slot_info  = fctrl->soc_info.index;
+		CAM_DBG(CAM_FLASH, "CAM_QUERY_CAP");
+		flash_cap.slot_info = fctrl->soc_info.index;
 		for (i = 0; i < fctrl->flash_num_sources; i++) {
 			flash_cap.max_current_flash[i] =
 				soc_private->flash_max_current[i];
@@ -162,39 +159,8 @@ static int32_t cam_flash_driver_cmd(struct cam_flash_ctrl *fctrl,
 			rc = -EFAULT;
 			goto release_mutex;
 		}
-		fctrl->apply_streamoff = false;
 		break;
 	}
-
-	case CAM_QUERY_CAP_V2: {
-		struct cam_flash_query_cap_info_v2 flash_cap = {0};
-
-		CAM_DBG(CAM_FLASH, "CAM_QUERY_CAP_V2");
-		flash_cap.slot_info  = fctrl->soc_info.index;
-		flash_cap.flash_type = soc_private->flash_type;
-		flash_cap.version = 1;
-		flash_cap.num_valid_params = 0;
-		for (i = 0; i < fctrl->flash_num_sources; i++) {
-			flash_cap.max_current_flash[i] =
-				soc_private->flash_max_current[i];
-			flash_cap.max_duration_flash[i] =
-				soc_private->flash_max_duration[i];
-		}
-
-		for (i = 0; i < fctrl->torch_num_sources; i++)
-			flash_cap.max_current_torch[i] =
-				soc_private->torch_max_current[i];
-
-		if (copy_to_user(u64_to_user_ptr(cmd->handle),
-			&flash_cap, sizeof(struct cam_flash_query_cap_info_v2))) {
-			CAM_ERR(CAM_FLASH, "Failed Copy to User");
-			rc = -EFAULT;
-			goto release_mutex;
-		}
-		break;
-	}
-
-
 	case CAM_START_DEV: {
 		CAM_INFO(CAM_FLASH, "CAM_START_DEV for dev_hdl: 0x%x",
 			fctrl->bridge_intf.device_hdl);
@@ -207,7 +173,6 @@ static int32_t cam_flash_driver_cmd(struct cam_flash_ctrl *fctrl,
 			goto release_mutex;
 		}
 
-		fctrl->apply_streamoff = false;
 		fctrl->flash_state = CAM_FLASH_STATE_START;
 		break;
 	}
@@ -449,7 +414,6 @@ static int cam_flash_component_bind(struct device *dev,
 	struct device_node *of_parent = NULL;
 	bool i3c_i2c_target;
 	struct platform_device *pdev = to_platform_device(dev);
-	struct cam_hw_soc_info *soc_info = NULL;
 
 	CAM_DBG(CAM_FLASH, "Binding flash component");
 	if (!pdev->dev.of_node) {
@@ -510,25 +474,6 @@ static int cam_flash_component_bind(struct device *dev,
 		fctrl->io_master_info.cci_client->cci_device = fctrl->cci_num;
 		CAM_DBG(CAM_FLASH, "cci-index %d", fctrl->cci_num, rc);
 
-		soc_info = &fctrl->soc_info;
-		if (!soc_info->gpio_data) {
-			CAM_INFO(CAM_FLASH, "No GPIO found");
-			rc = 0;
-			return rc;
-		}
-
-		if (!soc_info->gpio_data->cam_gpio_common_tbl_size) {
-			CAM_INFO(CAM_FLASH, "No GPIO found");
-			return -EINVAL;
-		}
-
-		rc = cam_sensor_util_init_gpio_pin_tbl(soc_info,
-				&fctrl->power_info.gpio_num_info);
-		if ((rc < 0) || (!fctrl->power_info.gpio_num_info)) {
-			CAM_ERR(CAM_FLASH, "No/Error Flash GPIOs");
-			return -EINVAL;
-		}
-
 		fctrl->i2c_data.per_frame =
 			kzalloc(sizeof(struct i2c_settings_array) *
 			MAX_PER_FRAME_ARRAY, GFP_KERNEL);
@@ -540,7 +485,6 @@ static int cam_flash_component_bind(struct device *dev,
 
 		INIT_LIST_HEAD(&(fctrl->i2c_data.init_settings.list_head));
 		INIT_LIST_HEAD(&(fctrl->i2c_data.config_settings.list_head));
-		INIT_LIST_HEAD(&(fctrl->i2c_data.streamoff_settings.list_head));
 		for (i = 0; i < MAX_PER_FRAME_ARRAY; i++)
 			INIT_LIST_HEAD(
 				&(fctrl->i2c_data.per_frame[i].list_head));
@@ -549,21 +493,6 @@ static int cam_flash_component_bind(struct device *dev,
 		fctrl->func_tbl.apply_setting = cam_flash_i2c_apply_setting;
 		fctrl->func_tbl.power_ops = cam_flash_i2c_power_ops;
 		fctrl->func_tbl.flush_req = cam_flash_i2c_flush_request;
-
-			/* Initialize regulators to default parameters */
-		for (i = 0; i < soc_info->num_rgltr; i++) {
-			soc_info->rgltr[i] = devm_regulator_get(soc_info->dev,
-				soc_info->rgltr_name[i]);
-			if (IS_ERR_OR_NULL(soc_info->rgltr[i])) {
-				rc = PTR_ERR(soc_info->rgltr[i]);
-				rc  = rc ? rc : -EINVAL;
-				CAM_ERR(CAM_FLASH, "Get failed for regulator %s %d",
-					soc_info->rgltr_name[i], rc);
-				goto free_cci_resource;
-			}
-			CAM_DBG(CAM_FLASH, "Get for regulator %s",
-				soc_info->rgltr_name[i]);
-		}
 	} else {
 		/* PMIC Flash */
 		fctrl->func_tbl.parser = cam_flash_pmic_pkt_parser;
@@ -749,7 +678,6 @@ static int cam_flash_i2c_component_bind(struct device *dev,
 
 	INIT_LIST_HEAD(&(fctrl->i2c_data.init_settings.list_head));
 	INIT_LIST_HEAD(&(fctrl->i2c_data.config_settings.list_head));
-	INIT_LIST_HEAD(&(fctrl->i2c_data.streamoff_settings.list_head));
 	for (i = 0; i < MAX_PER_FRAME_ARRAY; i++)
 		INIT_LIST_HEAD(&(fctrl->i2c_data.per_frame[i].list_head));
 

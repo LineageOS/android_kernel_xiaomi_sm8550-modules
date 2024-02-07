@@ -11,7 +11,7 @@
 #define CRE_BUS_RD_TYPE            0x1
 #define CRE_BUS_WR_TYPE            0x2
 
-static struct cam_cre_top_reg cre100_top_reg = {
+static struct cam_cre_top_reg top_reg = {
 	.hw_version            =  0x000,
 	.hw_cap                =  0x004,
 	.debug_0               =  0x080,
@@ -30,7 +30,7 @@ static struct cam_cre_top_reg cre100_top_reg = {
 	.top_spare             =  0x1FC,
 };
 
-struct cam_cre_top_reg_val cre100_top_reg_value = {
+struct cam_cre_top_reg_val top_reg_value = {
 	.hw_version = 0x10000000,
 	.hw_cap = 0x4000,
 	.irq_mask = 0xf,
@@ -46,7 +46,7 @@ struct cam_cre_top_reg_val cre100_top_reg_value = {
 	.hw_reset_cmd = 0x1,
 };
 
-struct cam_cre_bus_rd_reg cre100_bus_rd_reg = {
+struct cam_cre_bus_rd_reg bus_rd_reg = {
 	.hw_version     = 0x00,
 	.irq_mask       = 0x04,
 	.irq_clear      = 0x08,
@@ -82,7 +82,7 @@ struct cam_cre_bus_rd_reg cre100_bus_rd_reg = {
 	},
 };
 
-struct cam_cre_bus_wr_reg_val cre100_bus_wr_reg_value = {
+struct cam_cre_bus_wr_reg_val bus_wr_reg_value = {
 	.hw_version                   = 0x30000000,
 	.cgc_override                 = 0x1,
 	.irq_mask_0                   = 0xd0000101,
@@ -137,7 +137,7 @@ struct cam_cre_bus_wr_reg_val cre100_bus_wr_reg_value = {
 	},
 };
 
-struct cam_cre_bus_rd_reg_val cre100_bus_rd_reg_value = {
+struct cam_cre_bus_rd_reg_val bus_rd_reg_value = {
 	.hw_version              = 0x30000000,
 	.irq_mask                = 0x1, /* INFO_CONS_VIOLATION */
 	.rd_buf_done             = 0x4,
@@ -183,7 +183,7 @@ struct cam_cre_bus_rd_reg_val cre100_bus_rd_reg_value = {
 	},
 };
 
-struct cam_cre_bus_wr_reg cre100_bus_wr_reg = {
+struct cam_cre_bus_wr_reg bus_wr_reg = {
 	.hw_version                   = 0x00,
 	.cgc_override                 = 0x08,
 	.irq_mask_0                   = 0x18,
@@ -230,11 +230,11 @@ struct cam_cre_bus_wr_reg cre100_bus_wr_reg = {
 };
 
 static struct cam_cre_hw cre_hw_100 = {
-	.top_reg_offset    = &cre100_top_reg,
-	.top_reg_val       = &cre100_top_reg_value,
-	.bus_wr_reg_offset = &cre100_bus_wr_reg,
-	.bus_wr_reg_val    = &cre100_bus_wr_reg_value,
-	.bus_rd_reg_offset = &cre100_bus_rd_reg,
-	.bus_rd_reg_val    = &cre100_bus_rd_reg_value,
+	.top_reg_offset    = &top_reg,
+	.top_reg_val       = &top_reg_value,
+	.bus_wr_reg_offset = &bus_wr_reg,
+	.bus_wr_reg_val    = &bus_wr_reg_value,
+	.bus_rd_reg_offset = &bus_rd_reg,
+	.bus_rd_reg_val    = &bus_rd_reg_value,
 };
 #endif // CAM_CRE_HW_100_H

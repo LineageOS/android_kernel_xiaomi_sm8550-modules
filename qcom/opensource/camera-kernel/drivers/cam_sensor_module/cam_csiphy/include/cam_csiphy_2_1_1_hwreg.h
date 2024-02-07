@@ -801,8 +801,6 @@ static struct data_rate_reg_info_t data_rate_settings_2_1_1[] = {
 
 struct data_rate_settings_t data_rate_delta_table_2_1_1 = {
 	.num_data_rate_settings = ARRAY_SIZE(data_rate_settings_2_1_1),
-	.min_supported_datarate = 684000000,				/* 300 MSpS */
-	.max_supported_datarate = 11400000000,				/* 5000 MSpS */
 	.data_rate_settings = data_rate_settings_2_1_1,
 };
 

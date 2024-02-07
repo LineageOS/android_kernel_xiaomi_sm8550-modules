@@ -355,31 +355,6 @@ int cam_context_dump_pf_info(void *data, void *args)
 	return rc;
 }
 
-int cam_context_handle_message(struct cam_context *ctx,
-	uint32_t msg_type, void *data)
-{
-	int rc = 0;
-
-	if (!ctx->state_machine) {
-		CAM_ERR(CAM_CORE, "Context is not ready");
-		return -EINVAL;
-	}
-
-	if ((ctx->state > CAM_CTX_AVAILABLE) &&
-		(ctx->state < CAM_CTX_STATE_MAX)) {
-		if (ctx->state_machine[ctx->state].msg_cb_ops) {
-			rc = ctx->state_machine[ctx->state].msg_cb_ops(
-				ctx, msg_type, data);
-		} else {
-			CAM_WARN(CAM_CORE,
-				"No message handler for ctx %d, state %d msg_type :%d",
-				ctx->dev_hdl, ctx->state, msg_type);
-		}
-	}
-
-	return rc;
-}
-
 int cam_context_handle_acquire_dev(struct cam_context *ctx,
 	struct cam_acquire_dev_cmd *cmd)
 {
@@ -766,6 +741,11 @@ int cam_context_init(struct cam_context *ctx,
 	ctx->ctx_priv = NULL;
 	ctx->img_iommu_hdl = img_iommu_hdl;
 
+	/*xiaomi added */
+	ctx->dbg_timestamp = 0;
+	ctx->dbg_frame     = 0;
+	ctx->exlink        =-1;
+	ctx->batchsize     = 1;
 	return 0;
 }
 

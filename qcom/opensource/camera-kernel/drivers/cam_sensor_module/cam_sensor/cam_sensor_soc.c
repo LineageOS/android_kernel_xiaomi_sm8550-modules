@@ -268,11 +268,6 @@ static int32_t cam_sensor_driver_get_dt_data(struct cam_sensor_ctrl_t *s_ctrl)
 		goto FREE_SENSOR_DATA;
 	}
 
-	if (!of_property_read_bool(of_node, "hw-no-ops"))
-		s_ctrl->hw_no_ops = false;
-	else
-		s_ctrl->hw_no_ops = true;
-
 	return rc;
 
 FREE_SENSOR_DATA:
@@ -296,6 +291,9 @@ int32_t cam_sensor_parse_dt(struct cam_sensor_ctrl_t *s_ctrl)
 
 	/* Initialize mutex */
 	mutex_init(&(s_ctrl->cam_sensor_mutex));
+//xiaomi add
+	init_power_sync_mutex(s_ctrl->io_master_info.cci_client->cci_device, s_ctrl->cci_i2c_master);
+//xiaomi add
 
 	/* Initialize default parameters */
 	for (i = 0; i < soc_info->num_clk; i++) {

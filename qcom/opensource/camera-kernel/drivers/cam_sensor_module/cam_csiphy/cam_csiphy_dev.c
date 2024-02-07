@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "cam_csiphy_dev.h"
@@ -150,6 +150,7 @@ static void cam_csiphy_subdev_handle_message(struct v4l2_subdev *sd,
 	switch (message_type) {
 	case CAM_SUBDEV_MESSAGE_REG_DUMP: {
 		cam_csiphy_trigger_reg_dump(csiphy_dev);
+
 		break;
 	}
 	case CAM_SUBDEV_MESSAGE_APPLY_CSIPHY_AUX: {
@@ -428,6 +429,7 @@ static int cam_csiphy_component_bind(struct device *dev,
 		new_csiphy_dev->csiphy_info[i].lane_assign = 0;
 		new_csiphy_dev->csiphy_info[i].lane_enable = 0;
 		new_csiphy_dev->csiphy_info[i].mipi_flags = 0;
+		new_csiphy_dev->csiphy_info[i].is_modify_onthego = false;  ///*add by xiaomi for M11 crc device*/
 	}
 
 	new_csiphy_dev->ops.get_dev_info = NULL;

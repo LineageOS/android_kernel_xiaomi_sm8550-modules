@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "cam_tpg_dev.h"
@@ -192,13 +192,7 @@ static int tpg_soc_info_init(struct cam_tpg_device *tpg_dev,
 		return rc;
 	}
 
-	if (!of_property_read_bool(of_node, "hw-no-ops"))
-		tpg_dev->hw_no_ops = false;
-	else
-		tpg_dev->hw_no_ops = true;
-
-	if (!tpg_dev->hw_no_ops)
-		rc = cam_soc_util_request_platform_resource(
+	rc = cam_soc_util_request_platform_resource(
 			&tpg_dev->soc_info,
 			cam_tpg_irq_handler,
 			tpg_dev);

@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_ISP_HW_PARSER_H_
@@ -255,27 +254,6 @@ int cam_isp_add_io_buffers(
 	enum cam_isp_hw_type                     hw_type,
 	struct cam_isp_frame_header_info        *frame_header_info,
 	struct cam_isp_check_io_cfg_for_scratch *scratch_check_cfg);
-
-/*
- * cam_isp_add_disable_wm_update()
- *
- * @brief                  Add disable wm command
- *
- * @prepare:               Contain the  packet and HW update variables
- * @isp_hw_res:            Resource list for IFE/VFE out resource
- * @base_idx:              Base or dev index of the IFE/VFE HW instance
- * @kmd_buf_info:          Kmd buffer to store the change base command
- * @wm_mask                Bit mask of unconfigured resource
- * @io_cfg_used_bytes      IO cfg size used in bytes
- *
- */
-int cam_isp_add_disable_wm_update(
-	struct cam_hw_prepare_update_args    *prepare,
-	struct cam_isp_hw_mgr_res            *isp_hw_res,
-	uint32_t                              base_idx,
-	struct cam_kmd_buf_info              *kmd_buf_info,
-	uint64_t                              wm_mask,
-	uint32_t                             *io_cfg_used_bytes);
 
 /*
  * cam_isp_add_reg_update()

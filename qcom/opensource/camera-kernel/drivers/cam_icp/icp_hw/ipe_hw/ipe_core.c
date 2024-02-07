@@ -465,10 +465,6 @@ int cam_ipe_process_cmd(void *device_priv, uint32_t cmd_type,
 	case CAM_ICP_IPE_CMD_RESET:
 		rc = cam_ipe_cmd_reset(soc_info, core_info);
 		break;
-	case CAM_ICP_IPE_CMD_DUMP_CLK: {
-		rc = cam_soc_util_dump_clk(soc_info);
-		break;
-	}
 	default:
 		CAM_ERR(CAM_ICP, "Invalid Cmd Type:%u", cmd_type);
 		rc = -EINVAL;

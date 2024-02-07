@@ -49,9 +49,6 @@
 #define CAM_REQ_MGR_MAX_HANDLES_V2        256
 #define MAX_LINKS_PER_SESSION             2
 
-/* Interval for cam_info_rate_limit_custom() */
-#define CAM_RATE_LIMIT_INTERVAL_5SEC 5
-
 /* V4L event type which user space will subscribe to */
 #define V4L_EVENT_CAM_REQ_MGR_EVENT       (V4L2_EVENT_PRIVATE_START + 0)
 
@@ -878,6 +875,12 @@ struct cam_req_mgr_pf_err_msg {
 	__u16 mid;
 	__u32 reserved[3];
 };
+
+// xiaomi add
+#define V4L_EVENT_CAM_MQS_EVENT           (V4L2_EVENT_PRIVATE_START + 1)
+#define V4L_EVENT_CAM_MQS_ISP             1
+#define V4L_EVENT_CAM_MQS_BUBBLE          (V4L_EVENT_CAM_MQS_ISP << 16) + 1
+// xiaomi add
 
 /**
  * struct cam_req_mgr_message - 64 bytes is the max size that can be sent as v4l2 evt

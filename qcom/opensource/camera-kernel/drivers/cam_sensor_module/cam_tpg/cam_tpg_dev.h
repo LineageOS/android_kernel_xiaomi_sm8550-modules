@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __CAM_TPG_DEV_H__
@@ -112,7 +111,6 @@ struct tpg_crm_intf_params {
  * @state   : state machine states
  * @slot_id : slot index of this tpg
  * @phy_id  : phy index mapped to this tpg
- * @hw_no_ops: To determine whether HW operations need to be disabled
  */
 struct cam_tpg_device {
 	char device_name[CAM_CTX_DEV_NAME_MAX_LENGTH];
@@ -126,7 +124,6 @@ struct cam_tpg_device {
 	int state;
 	int slot_id;
 	int phy_id;
-	bool hw_no_ops;
 };
 
 

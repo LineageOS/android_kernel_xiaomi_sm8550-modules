@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/dma-mapping.h>
@@ -15,10 +15,6 @@
 #include "cam_debug_util.h"
 #include "cam_cpas_api.h"
 #include "camera_main.h"
-
-#if KERNEL_VERSION(5, 10, 0) <= LINUX_VERSION_CODE
-#include <soc/qcom/socinfo.h>
-#endif
 
 #if IS_ENABLED(CONFIG_USE_RPMH_DRV_API)
 #define CAM_RSC_DRV_IDENTIFIER "cam_rsc"
@@ -530,33 +526,6 @@ long cam_dma_buf_set_name(struct dma_buf *dmabuf, const char *name)
 }
 #else
 long cam_dma_buf_set_name(struct dma_buf *dmabuf, const char *name)
-{
-	return 0;
-}
-#endif
-
-#if KERNEL_VERSION(5, 10, 0) <= LINUX_VERSION_CODE
-int cam_get_subpart_info(uint32_t *part_info, int *num_cam)
-{
-	int rc = 0;
-
-	*num_cam = socinfo_get_part_count(PART_CAMERA);
-	CAM_DBG(CAM_CPAS, "number of cameras: %d", *num_cam);
-
-	/*
-	 * If bit value in part_info is "0" then HW is available.
-	 * If bit value in part_info is "1" then HW is unavailable.
-	 */
-	rc = socinfo_get_subpart_info(PART_CAMERA, part_info, *num_cam);
-	if (rc) {
-		CAM_ERR(CAM_CPAS, "Failed while getting subpart_info, rc = %d.", rc);
-		return rc;
-	}
-
-	return 0;
-}
-#else
-int cam_get_subpart_info(uint32_t *part_info, int *num_cam)
 {
 	return 0;
 }

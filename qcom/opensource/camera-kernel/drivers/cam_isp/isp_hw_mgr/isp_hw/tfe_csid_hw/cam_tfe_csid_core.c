@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/iopoll.h>
@@ -23,7 +23,6 @@
 #include "cam_common_util.h"
 #include "cam_tfe_csid_hw_intf.h"
 #include <dt-bindings/msm-camera.h>
-#include "cam_cpas_hw_intf.h"
 
 /* Timeout value in msec */
 #define TFE_CSID_TIMEOUT                               1000
@@ -47,7 +46,7 @@
 /* Max CSI Rx irq error count threshold value */
 #define CAM_TFE_CSID_MAX_IRQ_ERROR_COUNT               5
 
-static int cam_tfe_csid_is_ipp_ppp_format_supported(
+static int cam_tfe_csid_is_ipp_format_supported(
 	uint32_t in_format)
 {
 	int rc = -EINVAL;
@@ -170,7 +169,7 @@ static int cam_tfe_csid_get_format_rdi(
 	return rc;
 }
 
-static int cam_tfe_csid_get_format_ipp_ppp(
+static int cam_tfe_csid_get_format_ipp(
 	uint32_t in_format,
 	uint32_t *decode_fmt, uint32_t *plain_fmt)
 {
@@ -251,9 +250,6 @@ static void cam_tfe_csid_enable_path_for_init_frame_drop(
 	if (res_id == CAM_TFE_CSID_PATH_RES_IPP) {
 		res = &csid_hw->ipp_res;
 		pxl_reg = csid_reg->ipp_reg;
-	} else if (res_id == CAM_TFE_CSID_PATH_RES_PPP) {
-		res = &csid_hw->ppp_res;
-		pxl_reg = csid_reg->ppp_reg;
 	} else if (res_id >= CAM_TFE_CSID_PATH_RES_RDI_0 &&
 			res_id <= CAM_TFE_CSID_PATH_RES_RDI_2) {
 		res = &csid_hw->rdi_res[res_id];
@@ -285,9 +281,8 @@ static void cam_tfe_csid_enable_path_for_init_frame_drop(
 	if ((path_data->res_sof_cnt ==
 		path_data->init_frame_drop) &&
 		pxl_reg) {
-		CAM_DBG(CAM_ISP, "CSID:%d Enabling pixel %s Path",
-			csid_hw->hw_intf->hw_idx,
-			(res_id == CAM_TFE_CSID_PATH_RES_IPP) ? "IPP" : "PPP");
+		CAM_DBG(CAM_ISP, "CSID:%d Enabling pixel IPP Path",
+			csid_hw->hw_intf->hw_idx);
 		if (path_data->sync_mode !=
 			CAM_ISP_HW_SYNC_SLAVE) {
 			val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
@@ -345,17 +340,6 @@ static bool cam_tfe_csid_check_path_active(struct cam_tfe_csid_hw   *csid_hw)
 			goto end;
 	}
 
-	/* check the PPP path status */
-	if (csid_reg->cmn_reg->num_ppp) {
-		path_status = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-			csid_reg->ppp_reg->csid_pxl_status_addr);
-		CAM_DBG(CAM_ISP, "CSID:%d PPP path status:%d",
-			csid_hw->hw_intf->hw_idx, path_status);
-		/* if status is 0 then it is active */
-		if (!path_status)
-			goto end;
-	}
-
 	/* Check the RDI path status */
 	for (i = 0; i < csid_reg->cmn_reg->num_rdis; i++) {
 		path_status = cam_io_r_mb(soc_info->reg_map[0].mem_base +
@@ -407,12 +391,6 @@ static int cam_tfe_csid_cid_get(struct cam_tfe_csid_hw *csid_hw,
 				return 0;
 			}
 		}
-	}
-
-	if (num_valid_vc_dt == 0 || num_valid_vc_dt > CAM_ISP_TFE_VC_DT_CFG) {
-		CAM_ERR(CAM_ISP, "CSID:%d invalid num_valid_vc_dt: %d",
-			csid_hw->hw_intf->hw_idx, num_valid_vc_dt);
-		return -EINVAL;
 	}
 
 	for (i = 0; i < CAM_TFE_CSID_CID_MAX; i++) {
@@ -475,10 +453,6 @@ static int cam_tfe_csid_global_reset(struct cam_tfe_csid_hw *csid_hw)
 		cam_io_w_mb(0, soc_info->reg_map[0].mem_base +
 			csid_reg->ipp_reg->csid_pxl_irq_mask_addr);
 
-	if (csid_reg->cmn_reg->num_ppp)
-		cam_io_w_mb(0, soc_info->reg_map[0].mem_base +
-			csid_reg->ppp_reg->csid_pxl_irq_mask_addr);
-
 	for (i = 0; i < csid_reg->cmn_reg->num_rdis; i++)
 		cam_io_w_mb(0, soc_info->reg_map[0].mem_base +
 			csid_reg->rdi_reg[i]->csid_rdi_irq_mask_addr);
@@ -495,11 +469,6 @@ static int cam_tfe_csid_global_reset(struct cam_tfe_csid_hw *csid_hw)
 		cam_io_w_mb(csid_reg->cmn_reg->ipp_irq_mask_all,
 			soc_info->reg_map[0].mem_base +
 			csid_reg->ipp_reg->csid_pxl_irq_clear_addr);
-
-	if (csid_reg->cmn_reg->num_ppp)
-		cam_io_w_mb(csid_reg->cmn_reg->ppp_irq_mask_all,
-			soc_info->reg_map[0].mem_base +
-			csid_reg->ppp_reg->csid_pxl_irq_clear_addr);
 
 	for (i = 0 ; i < csid_reg->cmn_reg->num_rdis; i++)
 		cam_io_w_mb(csid_reg->cmn_reg->rdi_irq_mask_all,
@@ -549,6 +518,7 @@ static int cam_tfe_csid_global_reset(struct cam_tfe_csid_hw *csid_hw)
 	} else
 		rc = 0;
 
+	usleep_range(3000, 3010);
 	val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
 		csid_reg->csi2_reg->csid_csi2_rx_irq_mask_addr);
 	if (val != 0)
@@ -560,12 +530,6 @@ static int cam_tfe_csid_global_reset(struct cam_tfe_csid_hw *csid_hw)
 	if (csid_hw->pxl_pipe_enable) {
 		path_data = (struct cam_tfe_csid_path_cfg *)
 			csid_hw->ipp_res.res_priv;
-		path_data->res_sof_cnt = 0;
-	}
-
-	if (csid_reg->cmn_reg->num_ppp) {
-		path_data = (struct cam_tfe_csid_path_cfg *)
-			csid_hw->ppp_res.res_priv;
 		path_data->res_sof_cnt = 0;
 	}
 
@@ -627,24 +591,6 @@ static int cam_tfe_csid_path_reset(struct cam_tfe_csid_hw *csid_hw,
 		val |= TFE_CSID_PATH_INFO_RST_DONE;
 		cam_io_w_mb(val, soc_info->reg_map[0].mem_base +
 			 csid_reg->ipp_reg->csid_pxl_irq_mask_addr);
-	} else if (res->res_id == CAM_TFE_CSID_PATH_RES_PPP) {
-		if (!csid_reg->ppp_reg) {
-			CAM_ERR(CAM_ISP, "CSID:%d PPP not supported :%d",
-				 csid_hw->hw_intf->hw_idx,
-				res->res_id);
-			return -EINVAL;
-		}
-
-		reset_strb_addr = csid_reg->ppp_reg->csid_pxl_rst_strobes_addr;
-		complete = &csid_hw->csid_ppp_complete;
-		reset_strb_val = csid_reg->cmn_reg->ppp_path_rst_stb_all;
-
-		/* Enable path reset done interrupt */
-		val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-			csid_reg->ppp_reg->csid_pxl_irq_mask_addr);
-		val |= TFE_CSID_PATH_INFO_RST_DONE;
-		cam_io_w_mb(val, soc_info->reg_map[0].mem_base +
-			 csid_reg->ppp_reg->csid_pxl_irq_mask_addr);
 	} else {
 		id = res->res_id;
 		if (!csid_reg->rdi_reg[id]) {
@@ -738,10 +684,11 @@ static int cam_tfe_csid_cid_reserve(struct cam_tfe_csid_hw *csid_hw,
 		rc = -EINVAL;
 		goto end;
 	}
+
 	/* CSID  CSI2 v1.1 supports 4 vc  */
 	for (i = 0; i < cid_reserv->in_port->num_valid_vc_dt; i++) {
 		if (cid_reserv->in_port->dt[i] > 0x3f ||
-			cid_reserv->in_port->vc[i] > 0x1f) {
+			cid_reserv->in_port->vc[i] > 0x3) {
 			CAM_ERR(CAM_ISP, "CSID:%d Invalid vc:%d dt %d",
 				csid_hw->hw_intf->hw_idx,
 				cid_reserv->in_port->vc[i],
@@ -822,11 +769,9 @@ static int cam_tfe_csid_cid_reserve(struct cam_tfe_csid_hw *csid_hw,
 	}
 
 	csid_hw->csi2_reserve_cnt++;
-	CAM_DBG(CAM_ISP, "CSID:%d CID:%d acquired reserv cnt:%d phy_sel: %d res_id: %d",
+	CAM_DBG(CAM_ISP, "CSID:%d CID:%d acquired reserv cnt:%d",
 		csid_hw->hw_intf->hw_idx, *cid_value,
-		csid_hw->csi2_reserve_cnt,
-		csid_hw->csi2_rx_cfg.phy_sel,
-		cid_reserv->in_port->res_id);
+		csid_hw->csi2_reserve_cnt);
 
 end:
 	return rc;
@@ -840,19 +785,10 @@ static int cam_tfe_csid_path_reserve(struct cam_tfe_csid_hw *csid_hw,
 	struct cam_isp_resource_node    *res;
 	uint32_t          cid_value;
 
-	if (reserve->in_port->num_valid_vc_dt == 0 ||
-		reserve->in_port->num_valid_vc_dt > CAM_ISP_TFE_VC_DT_CFG) {
-		CAM_ERR(CAM_ISP, "CSID:%d invalid num_valid_vc_dt: %d",
-			csid_hw->hw_intf->hw_idx,
-			reserve->in_port->num_valid_vc_dt);
-		rc = -EINVAL;
-		goto end;
-	}
-
 	/* CSID  CSI2 v2.0 supports 4 vc */
 	for (i = 0; i < reserve->in_port->num_valid_vc_dt; i++) {
 		if (reserve->in_port->dt[i] > 0x3f ||
-			reserve->in_port->vc[i] > 0x1f ||
+			reserve->in_port->vc[i] > 0x3 ||
 			(reserve->sync_mode >= CAM_ISP_HW_SYNC_MAX)) {
 			CAM_ERR(CAM_ISP, "CSID:%d Invalid vc:%d dt %d mode:%d",
 				csid_hw->hw_intf->hw_idx,
@@ -876,7 +812,7 @@ static int cam_tfe_csid_path_reserve(struct cam_tfe_csid_hw *csid_hw,
 			goto end;
 		}
 
-		if (cam_tfe_csid_is_ipp_ppp_format_supported(
+		if (cam_tfe_csid_is_ipp_format_supported(
 				reserve->in_port->format)) {
 			CAM_ERR(CAM_ISP,
 				"CSID:%d res id:%d un support format %d",
@@ -893,43 +829,6 @@ static int cam_tfe_csid_path_reserve(struct cam_tfe_csid_hw *csid_hw,
 		res = &csid_hw->ipp_res;
 		CAM_DBG(CAM_ISP,
 			"CSID:%d IPP resource:%d acquired successfully",
-			csid_hw->hw_intf->hw_idx, res->res_id);
-
-		break;
-
-	case CAM_TFE_CSID_PATH_RES_PPP:
-		if (csid_hw->ppp_res.res_state !=
-			CAM_ISP_RESOURCE_STATE_AVAILABLE) {
-			CAM_DBG(CAM_ISP,
-				"CSID:%d PPP resource not available %d",
-				csid_hw->hw_intf->hw_idx,
-				csid_hw->ppp_res.res_state);
-			rc = -EINVAL;
-			goto end;
-		}
-
-		if (cam_tfe_csid_is_ipp_ppp_format_supported(
-				reserve->in_port->format)) {
-			CAM_ERR(CAM_ISP,
-				"CSID:%d res id:%d un support format %d",
-				csid_hw->hw_intf->hw_idx, reserve->res_id,
-				reserve->in_port->format);
-			rc = -EINVAL;
-			goto end;
-		}
-
-		rc = cam_tfe_csid_cid_reserve(csid_hw, reserve, &cid_value);
-		if (rc) {
-			CAM_ERR(CAM_ISP,
-				"CSID:%d res id:%d invalid cid %d",
-			       csid_hw->hw_intf->hw_idx, reserve->res_id, cid_value);
-			goto end;
-		}
-
-		/* assign the PPP resource */
-		res = &csid_hw->ppp_res;
-		CAM_DBG(CAM_ISP,
-			"CSID:%d PPP resource:%d acquired successfully",
 			csid_hw->hw_intf->hw_idx, res->res_id);
 
 		break;
@@ -992,7 +891,6 @@ static int cam_tfe_csid_path_reserve(struct cam_tfe_csid_hw *csid_hw,
 
 	path_data->bayer_bin = reserve->in_port->bayer_bin;
 	path_data->qcfa_bin = reserve->in_port->qcfa_bin;
-	path_data->crop_enable = reserve->crop_enable;
 
 	csid_hw->event_cb = reserve->event_cb;
 	csid_hw->event_cb_priv = reserve->event_cb_prv;
@@ -1005,6 +903,10 @@ static int cam_tfe_csid_path_reserve(struct cam_tfe_csid_hw *csid_hw,
 			goto end;
 		}
 	}
+
+	/* Enable crop only for ipp */
+	if (reserve->res_id == CAM_TFE_CSID_PATH_RES_IPP)
+		path_data->crop_enable = true;
 
 	CAM_DBG(CAM_ISP,
 		"Res id: %d height:%d line_start %d line_end %d crop_en %d",
@@ -1085,18 +987,8 @@ static int cam_tfe_csid_enable_csi2(
 	cam_io_w_mb(val, soc_info->reg_map[0].mem_base +
 		csid_reg->csi2_reg->csid_csi2_rx_cfg0_addr);
 
-	if (csid_hw->in_res_id >= CAM_ISP_TFE_IN_RES_CPHY_TPG_0 &&
-		csid_hw->in_res_id <= CAM_ISP_TFE_IN_RES_CPHY_TPG_2 &&
-		csid_reg->csi2_reg->need_to_sel_tpg_mux) {
-		cam_cpas_enable_tpg_mux_sel(csid_hw->in_res_id -
-			CAM_ISP_TFE_IN_RES_CPHY_TPG_0);
-	}
-
 	/* rx cfg1 */
 	val = (1 << csid_reg->csi2_reg->csi2_misr_enable_shift_val);
-
-	/* enable vc mode to configure vc with value more than 3 */
-	val |= (1 << csid_reg->csi2_reg->csi2_vc_mode_shift_val);
 
 	/* enable packet ecc correction */
 	val |= 1;
@@ -1149,7 +1041,7 @@ static int cam_tfe_csid_enable_csi2(
 	 */
 	ppi_index = csid_hw->csi2_rx_cfg.phy_sel - csid_reg->csi2_reg->phy_sel_base;
 
-	if (csid_hw->ppi_enable && csid_hw->ppi_hw_intf[ppi_index]) {
+	if (csid_hw->ppi_hw_intf[ppi_index] && csid_hw->ppi_enable) {
 		ppi_lane_cfg.lane_type = csid_hw->csi2_rx_cfg.lane_type;
 		ppi_lane_cfg.lane_num  = csid_hw->csi2_rx_cfg.lane_num;
 		ppi_lane_cfg.lane_cfg  = csid_hw->csi2_rx_cfg.lane_cfg;
@@ -1193,7 +1085,7 @@ static int cam_tfe_csid_disable_csi2(
 		csid_reg->csi2_reg->csid_csi2_rx_cfg1_addr);
 
 	ppi_index = csid_hw->csi2_rx_cfg.phy_sel - csid_reg->csi2_reg->phy_sel_base;
-	if (csid_hw->ppi_enable && csid_hw->ppi_hw_intf[ppi_index]) {
+	if (csid_hw->ppi_hw_intf[ppi_index] && csid_hw->ppi_enable) {
 		/* De-Initialize the PPI bridge */
 		CAM_DBG(CAM_ISP, "ppi_index to de-init %d\n", ppi_index);
 		rc = csid_hw->ppi_hw_intf[ppi_index]->hw_ops.deinit(
@@ -1270,11 +1162,6 @@ static int cam_tfe_csid_enable_hw(struct cam_tfe_csid_hw  *csid_hw)
 			soc_info->reg_map[0].mem_base +
 			csid_reg->ipp_reg->csid_pxl_irq_clear_addr);
 
-	if (csid_reg->cmn_reg->num_ppp)
-		cam_io_w_mb(csid_reg->cmn_reg->ipp_irq_mask_all,
-			soc_info->reg_map[0].mem_base +
-			csid_reg->ppp_reg->csid_pxl_irq_clear_addr);
-
 	for (i = 0; i < csid_reg->cmn_reg->num_rdis; i++)
 		cam_io_w_mb(csid_reg->cmn_reg->rdi_irq_mask_all,
 			soc_info->reg_map[0].mem_base +
@@ -1302,12 +1189,6 @@ static int cam_tfe_csid_enable_hw(struct cam_tfe_csid_hw  *csid_hw)
 	if (csid_hw->pxl_pipe_enable ) {
 		path_data = (struct cam_tfe_csid_path_cfg  *)
 			csid_hw->ipp_res.res_priv;
-		path_data->res_sof_cnt = 0;
-	}
-
-	if (csid_reg->cmn_reg->num_ppp) {
-		path_data = (struct cam_tfe_csid_path_cfg  *)
-			csid_hw->ppp_res.res_priv;
 		path_data->res_sof_cnt = 0;
 	}
 
@@ -1398,22 +1279,15 @@ static int cam_tfe_csid_init_config_pxl_path(
 	csid_reg = csid_hw->csid_info->csid_reg;
 	soc_info = &csid_hw->hw_info->soc_info;
 
-	if (res->res_id == CAM_TFE_CSID_PATH_RES_IPP)
-		pxl_reg = csid_reg->ipp_reg;
-	else
-		pxl_reg = csid_reg->ppp_reg;
-
+	pxl_reg = csid_reg->ipp_reg;
 	if (!pxl_reg) {
-		CAM_ERR(CAM_ISP, "CSID:%d %s :%d is not supported on HW",
-			csid_hw->hw_intf->hw_idx,
-			(res->res_id == CAM_TFE_CSID_PATH_RES_IPP) ? "IPP" : "PPP",
-			res->res_id);
+		CAM_ERR(CAM_ISP, "CSID:%d IPP :%d is not supported on HW",
+			csid_hw->hw_intf->hw_idx, res->res_id);
 		return -EINVAL;
 	}
 
-	CAM_DBG(CAM_ISP, "Config %s Path",
-			(res->res_id == CAM_TFE_CSID_PATH_RES_IPP) ? "IPP" : "PPP");
-	rc = cam_tfe_csid_get_format_ipp_ppp(path_data->in_format,
+	CAM_DBG(CAM_ISP, "Config IPP Path");
+	rc = cam_tfe_csid_get_format_ipp(path_data->in_format,
 		&decode_format, &plain_format);
 	if (rc)
 		return rc;
@@ -1471,8 +1345,8 @@ static int cam_tfe_csid_init_config_pxl_path(
 		}
 	}
 
-	if ((csid_reg->cmn_reg->format_measure_support && res->res_id == CAM_TFE_CSID_PATH_RES_IPP)
-		|| (csid_hw->csid_debug & TFE_CSID_DEBUG_ENABLE_HBI_VBI_INFO))
+	if (csid_reg->cmn_reg->format_measure_support &&
+		(csid_hw->csid_debug & TFE_CSID_DEBUG_ENABLE_HBI_VBI_INFO))
 		val |= (1 << pxl_reg->format_measure_en_shift_val);
 
 	val |= (1 << pxl_reg->pix_store_en_shift_val);
@@ -1592,25 +1466,18 @@ static int cam_tfe_csid_deinit_pxl_path(
 	csid_reg = csid_hw->csid_info->csid_reg;
 	soc_info = &csid_hw->hw_info->soc_info;
 
-	if (res->res_id == CAM_TFE_CSID_PATH_RES_IPP)
-		pxl_reg = csid_reg->ipp_reg;
-	else
-		pxl_reg = csid_reg->ppp_reg;
-
+	pxl_reg = csid_reg->ipp_reg;
 	if (res->res_state != CAM_ISP_RESOURCE_STATE_INIT_HW) {
 		CAM_ERR(CAM_ISP,
-			"CSID:%d %s Res type %d res_id:%d in wrong state %d",
+			"CSID:%d IPP Res type %d res_id:%d in wrong state %d",
 			csid_hw->hw_intf->hw_idx,
-			(res->res_id == CAM_TFE_CSID_PATH_RES_IPP) ? "IPP" : "PPP",
 			res->res_type, res->res_id, res->res_state);
 		rc = -EINVAL;
 	}
 
 	if (!pxl_reg) {
-		CAM_ERR(CAM_ISP, "CSID:%d %s %d is not supported on HW",
-			csid_hw->hw_intf->hw_idx,
-			(res->res_id == CAM_TFE_CSID_PATH_RES_IPP) ? "IPP" : "PPP",
-			res->res_id);
+		CAM_ERR(CAM_ISP, "CSID:%d IPP %d is not supported on HW",
+			csid_hw->hw_intf->hw_idx, res->res_id);
 		rc = -EINVAL;
 		goto end;
 	}
@@ -1667,21 +1534,21 @@ static int cam_tfe_csid_enable_pxl_path(
 		val = (TFE_CSID_HALT_MODE_SLAVE << pxl_reg->halt_mode_shift);
 	else
 		/* Default is internal halt mode */
-		val = 1 << pxl_reg->halt_master_sel_shift;
+		val = 0;
 
 	/*
 	 * Resume at frame boundary if Master or No Sync.
 	 * Slave will get resume command from Master.
 	 */
-	if ((path_data->sync_mode == CAM_ISP_HW_SYNC_MASTER ||
-		path_data->sync_mode == CAM_ISP_HW_SYNC_NONE) && !path_data->init_frame_drop)
+	if (path_data->sync_mode == CAM_ISP_HW_SYNC_MASTER ||
+		path_data->sync_mode == CAM_ISP_HW_SYNC_NONE)
 		val |= CAM_TFE_CSID_RESUME_AT_FRAME_BOUNDARY;
 
 	cam_io_w_mb(val, soc_info->reg_map[0].mem_base +
 		pxl_reg->csid_pxl_ctrl_addr);
 
 	CAM_DBG(CAM_ISP, "CSID:%d IPP Ctrl val: 0x%x",
-		csid_hw->hw_intf->hw_idx, val);
+			csid_hw->hw_intf->hw_idx, val);
 
 	/* Enable the required pxl path interrupts */
 	val = TFE_CSID_PATH_INFO_RST_DONE |
@@ -1694,7 +1561,7 @@ static int cam_tfe_csid_enable_pxl_path(
 			TFE_CSID_PATH_ERROR_LINE_COUNT;
 	}
 
-	if (csid_hw->csid_debug & TFE_CSID_DEBUG_ENABLE_SOF_IRQ || path_data->init_frame_drop)
+	if (csid_hw->csid_debug & TFE_CSID_DEBUG_ENABLE_SOF_IRQ)
 		val |= TFE_CSID_PATH_INFO_INPUT_SOF;
 	if (csid_hw->csid_debug & TFE_CSID_DEBUG_ENABLE_EOF_IRQ)
 		val |= TFE_CSID_PATH_INFO_INPUT_EOF;
@@ -1784,7 +1651,6 @@ static int cam_tfe_csid_disable_pxl_path(
 	}
 
 	pxl_reg = csid_reg->ipp_reg;
-
 	if (res->res_state != CAM_ISP_RESOURCE_STATE_STREAMING) {
 		CAM_DBG(CAM_ISP, "CSID:%d IPP path Res:%d Invalid state%d",
 			csid_hw->hw_intf->hw_idx, res->res_id, res->res_state);
@@ -1834,180 +1700,6 @@ static int cam_tfe_csid_disable_pxl_path(
 			pxl_reg->csid_pxl_ctrl_addr);
 	}
 
-	path_data->init_frame_drop = 0;
-	path_data->res_sof_cnt     = 0;
-
-	return rc;
-}
-
-static int cam_tfe_csid_enable_ppp_path(
-	struct cam_tfe_csid_hw          *csid_hw,
-	struct cam_isp_resource_node    *res)
-{
-	const struct cam_tfe_csid_reg_offset     *csid_reg;
-	struct cam_hw_soc_info                   *soc_info;
-	struct cam_tfe_csid_path_cfg             *path_data;
-	const struct cam_tfe_csid_pxl_reg_offset *ppp_reg = NULL;
-	uint32_t                                  val = 0;
-
-	path_data = (struct cam_tfe_csid_path_cfg   *) res->res_priv;
-	csid_reg = csid_hw->csid_info->csid_reg;
-	soc_info = &csid_hw->hw_info->soc_info;
-	ppp_reg = csid_reg->ppp_reg;
-
-	if (res->res_state != CAM_ISP_RESOURCE_STATE_INIT_HW) {
-		CAM_ERR(CAM_ISP,
-			"CSID:%d PPP path res type:%d res_id:%d Invalid state%d",
-			csid_hw->hw_intf->hw_idx,
-			res->res_type, res->res_id, res->res_state);
-		return -EINVAL;
-	}
-
-	if (!ppp_reg) {
-		CAM_ERR(CAM_ISP, "CSID:%d PPP resid: %d not supported on HW",
-			csid_hw->hw_intf->hw_idx, res->res_id);
-		return -EINVAL;
-	}
-
-	CAM_DBG(CAM_ISP, "CSID:%d Enable PPP path", csid_hw->hw_intf->hw_idx);
-
-	/* Set master or slave path */
-	if (path_data->sync_mode == CAM_ISP_HW_SYNC_MASTER)
-		/* Set halt mode as master */
-		val = (TFE_CSID_HALT_MODE_SLAVE  << ppp_reg->halt_mode_shift) |
-			(ppp_reg->halt_master_sel_master_val <<
-			ppp_reg->halt_master_sel_shift);
-	else if (path_data->sync_mode == CAM_ISP_HW_SYNC_SLAVE)
-		/* Set halt mode as slave and set master idx */
-		val = (TFE_CSID_HALT_MODE_SLAVE  << ppp_reg->halt_mode_shift) |
-			(ppp_reg->halt_master_sel_slave_val <<
-			ppp_reg->halt_master_sel_shift);
-	else
-		/* Default is internal halt mode */
-		val = (TFE_CSID_HALT_MODE_SLAVE  << ppp_reg->halt_mode_shift) |
-			(ppp_reg->halt_master_sel_master_val <<
-			ppp_reg->halt_master_sel_shift);
-
-	/*
-	 * Resume at frame boundary if Master or No Sync.
-	 * Slave will get resume command from Master.
-	 */
-	if ((path_data->sync_mode == CAM_ISP_HW_SYNC_MASTER ||
-		path_data->sync_mode == CAM_ISP_HW_SYNC_NONE) && !path_data->init_frame_drop)
-		val |= CAM_TFE_CSID_RESUME_AT_FRAME_BOUNDARY;
-
-	cam_io_w_mb(val, soc_info->reg_map[0].mem_base + ppp_reg->csid_pxl_ctrl_addr);
-
-	CAM_DBG(CAM_ISP, "CSID:%d PPP Ctrl val: 0x%x", csid_hw->hw_intf->hw_idx, val);
-
-	/* Enable the required ppp path interrupts */
-	val = TFE_CSID_PATH_INFO_RST_DONE | TFE_CSID_PATH_ERROR_FIFO_OVERFLOW |
-		TFE_CSID_PATH_PPP_ERROR_CCIF_VIOLATION | TFE_CSID_PATH_PPP_OVERFLOW_IRQ;
-
-	if (csid_reg->cmn_reg->format_measure_support)
-		val |= TFE_CSID_PATH_ERROR_PIX_COUNT | TFE_CSID_PATH_ERROR_LINE_COUNT;
-
-	if (csid_hw->csid_debug & TFE_CSID_DEBUG_ENABLE_SOF_IRQ || path_data->init_frame_drop)
-		val |= TFE_CSID_PATH_INFO_INPUT_SOF;
-	if (csid_hw->csid_debug & TFE_CSID_DEBUG_ENABLE_EOF_IRQ)
-		val |= TFE_CSID_PATH_INFO_INPUT_EOF;
-
-	cam_io_w_mb(val, soc_info->reg_map[0].mem_base + ppp_reg->csid_pxl_irq_mask_addr);
-
-	CAM_DBG(CAM_ISP, "CSID:%d Enable PPP IRQ mask 0x%x", csid_hw->hw_intf->hw_idx, val);
-
-	res->res_state = CAM_ISP_RESOURCE_STATE_STREAMING;
-
-	return 0;
-}
-
-static int cam_tfe_csid_disable_ppp_path(
-	struct cam_tfe_csid_hw          *csid_hw,
-	struct cam_isp_resource_node    *res,
-	enum cam_tfe_csid_halt_cmd       stop_cmd)
-{
-	int rc = 0;
-	uint32_t val = 0;
-	const struct cam_tfe_csid_reg_offset       *csid_reg;
-	struct cam_hw_soc_info                     *soc_info;
-	struct cam_tfe_csid_path_cfg               *path_data;
-	const struct cam_tfe_csid_pxl_reg_offset   *ppp_reg;
-
-	path_data = (struct cam_tfe_csid_path_cfg   *) res->res_priv;
-	csid_reg = csid_hw->csid_info->csid_reg;
-	soc_info = &csid_hw->hw_info->soc_info;
-
-	if (res->res_id >= CAM_TFE_CSID_PATH_RES_MAX) {
-		CAM_DBG(CAM_ISP, "CSID:%d Invalid res id%d",
-			csid_hw->hw_intf->hw_idx, res->res_id);
-		return -EINVAL;
-	}
-
-	if (res->res_state == CAM_ISP_RESOURCE_STATE_INIT_HW ||
-		res->res_state == CAM_ISP_RESOURCE_STATE_RESERVED) {
-		CAM_DBG(CAM_ISP, "CSID:%d Res:%d already in stopped state:%d",
-			csid_hw->hw_intf->hw_idx, res->res_id, res->res_state);
-		return rc;
-	}
-
-	ppp_reg = csid_reg->ppp_reg;
-	if (res->res_state != CAM_ISP_RESOURCE_STATE_STREAMING) {
-		CAM_DBG(CAM_ISP, "CSID:%d IPP path Res:%d Invalid state%d",
-			csid_hw->hw_intf->hw_idx, res->res_id, res->res_state);
-		return -EINVAL;
-	}
-
-	if (!ppp_reg) {
-		CAM_ERR(CAM_ISP, "CSID:%d PPP %d is not supported on HW",
-			csid_hw->hw_intf->hw_idx, res->res_id);
-		return -EINVAL;
-	}
-
-	if (stop_cmd != CAM_TFE_CSID_HALT_AT_FRAME_BOUNDARY &&
-		stop_cmd != CAM_TFE_CSID_HALT_IMMEDIATELY) {
-		CAM_ERR(CAM_ISP,
-			"CSID:%d PPP path un supported stop command:%d",
-			csid_hw->hw_intf->hw_idx, stop_cmd);
-		return -EINVAL;
-	}
-
-	CAM_DBG(CAM_ISP, "CSID:%d res_id:%d PPP path",
-		csid_hw->hw_intf->hw_idx, res->res_id);
-
-	cam_io_w_mb(0, soc_info->reg_map[0].mem_base +
-		ppp_reg->csid_pxl_irq_mask_addr);
-
-	if (path_data->sync_mode == CAM_ISP_HW_SYNC_MASTER ||
-		path_data->sync_mode == CAM_ISP_HW_SYNC_NONE) {
-		/* configure Halt */
-		val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-		ppp_reg->csid_pxl_ctrl_addr);
-		val &= ~0x3F;
-		val |= (TFE_CSID_HALT_MODE_SLAVE << ppp_reg->halt_mode_shift);
-		val |= (ppp_reg->halt_master_sel_master_val <<
-			ppp_reg->halt_master_sel_shift);
-		val |= stop_cmd;
-		cam_io_w_mb(val, soc_info->reg_map[0].mem_base +
-			ppp_reg->csid_pxl_ctrl_addr);
-	}
-
-	if (path_data->sync_mode == CAM_ISP_HW_SYNC_SLAVE &&
-		stop_cmd == CAM_TFE_CSID_HALT_IMMEDIATELY) {
-		/* configure Halt for slave */
-		val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-			ppp_reg->csid_pxl_ctrl_addr);
-		val &= ~0x3F;
-		val |= (TFE_CSID_HALT_MODE_SLAVE << ppp_reg->halt_mode_shift);
-		val |= (ppp_reg->halt_master_sel_slave_val <<
-			ppp_reg->halt_master_sel_shift);
-		val |= stop_cmd;
-		cam_io_w_mb(val, soc_info->reg_map[0].mem_base +
-			ppp_reg->csid_pxl_ctrl_addr);
-	}
-
-	path_data->init_frame_drop = 0;
-	path_data->res_sof_cnt     = 0;
-
 	return rc;
 }
 
@@ -2050,7 +1742,8 @@ static int cam_tfe_csid_init_config_rdi_path(
 		(plain_fmt << csid_reg->cmn_reg->plain_fmt_shit_val) |
 		(1 << 2) | 1;
 
-	if (csid_reg->cmn_reg->format_measure_support)
+	if (csid_reg->cmn_reg->format_measure_support &&
+		(csid_hw->csid_debug & TFE_CSID_DEBUG_ENABLE_HBI_VBI_INFO))
 		val |= (1 << rdi_reg->format_measure_en_shift_val);
 
 	cam_io_w_mb(val, soc_info->reg_map[0].mem_base +
@@ -2324,14 +2017,6 @@ static int cam_tfe_csid_poll_stop_status(
 				CAM_ISP_RESOURCE_STATE_STREAMING)
 				continue;
 
-		} else if (res_id == CAM_TFE_CSID_PATH_RES_PPP) {
-			csid_status_addr =
-			csid_reg->ppp_reg->csid_pxl_status_addr;
-
-			if (csid_hw->ppp_res.res_state !=
-				CAM_ISP_RESOURCE_STATE_STREAMING)
-				continue;
-
 		} else {
 			csid_status_addr =
 				csid_reg->rdi_reg[res_id]->csid_rdi_status_addr;
@@ -2393,7 +2078,7 @@ static int cam_tfe_csid_get_time_stamp(
 	struct cam_hw_soc_info                     *soc_info;
 	const struct cam_tfe_csid_rdi_reg_offset   *rdi_reg;
 	struct timespec64 ts;
-	uint32_t  id, torn, prev_torn;
+	uint32_t  id, torn;
 	uint64_t  time_delta;
 
 	time_stamp = (struct cam_tfe_csid_get_time_stamp_args  *)cmd_args;
@@ -2422,26 +2107,6 @@ static int cam_tfe_csid_get_time_stamp(
 			csid_reg->ipp_reg->csid_pxl_timestamp_curr1_sof_addr,
 			csid_reg->ipp_reg->csid_pxl_timestamp_curr0_sof_addr,
 			&time_stamp->time_stamp_val);
-		if (time_stamp->get_prev_timestamp) {
-			prev_torn = __cam_tfe_csid_read_timestamp(
-				soc_info->reg_map[0].mem_base,
-				csid_reg->ipp_reg->csid_pxl_timestamp_perv1_sof_addr,
-				csid_reg->ipp_reg->csid_pxl_timestamp_perv0_sof_addr,
-				&time_stamp->prev_time_stamp_val);
-		}
-	} else if (res->res_id == CAM_TFE_CSID_PATH_RES_PPP) {
-		torn = __cam_tfe_csid_read_timestamp(
-			soc_info->reg_map[0].mem_base,
-			csid_reg->ppp_reg->csid_pxl_timestamp_curr1_sof_addr,
-			csid_reg->ppp_reg->csid_pxl_timestamp_curr0_sof_addr,
-			&time_stamp->time_stamp_val);
-		if (time_stamp->get_prev_timestamp) {
-			prev_torn = __cam_tfe_csid_read_timestamp(
-				soc_info->reg_map[0].mem_base,
-				csid_reg->ppp_reg->csid_pxl_timestamp_perv1_sof_addr,
-				csid_reg->ppp_reg->csid_pxl_timestamp_perv0_sof_addr,
-				&time_stamp->prev_time_stamp_val);
-		}
 	} else {
 		id = res->res_id;
 		rdi_reg = csid_reg->rdi_reg[id];
@@ -2450,26 +2115,12 @@ static int cam_tfe_csid_get_time_stamp(
 			rdi_reg->csid_rdi_timestamp_curr1_sof_addr,
 			rdi_reg->csid_rdi_timestamp_curr0_sof_addr,
 			&time_stamp->time_stamp_val);
-		if (time_stamp->get_prev_timestamp) {
-			prev_torn = __cam_tfe_csid_read_timestamp(
-				soc_info->reg_map[0].mem_base,
-				rdi_reg->csid_rdi_timestamp_prev1_sof_addr,
-				rdi_reg->csid_rdi_timestamp_prev0_sof_addr,
-				&time_stamp->prev_time_stamp_val);
-		}
 	}
 
 	time_stamp->time_stamp_val = mul_u64_u32_div(
 		time_stamp->time_stamp_val,
 		CAM_TFE_CSID_QTIMER_MUL_FACTOR,
 		CAM_TFE_CSID_QTIMER_DIV_FACTOR);
-
-	if (time_stamp->get_prev_timestamp) {
-		time_stamp->prev_time_stamp_val = mul_u64_u32_div(
-			time_stamp->prev_time_stamp_val,
-			CAM_TFE_CSID_QTIMER_MUL_FACTOR,
-			CAM_TFE_CSID_QTIMER_DIV_FACTOR);
-	}
 
 	if (!csid_hw->prev_boot_timestamp) {
 		ktime_get_boottime_ts64(&ts);
@@ -2510,64 +2161,6 @@ static int cam_tfe_csid_get_time_stamp(
 	return 0;
 }
 
-static int cam_tfe_csid_print_hbi_vbi(
-	struct cam_tfe_csid_hw  *csid_hw,
-	struct cam_isp_resource_node *res)
-{
-	const struct cam_tfe_csid_reg_offset       *csid_reg;
-	struct cam_hw_soc_info                     *soc_info;
-	const struct cam_tfe_csid_rdi_reg_offset   *rdi_reg;
-	uint32_t  hbi = 0, vbi = 0;
-
-	csid_reg = csid_hw->csid_info->csid_reg;
-	soc_info = &csid_hw->hw_info->soc_info;
-
-	if (res->res_type != CAM_ISP_RESOURCE_PIX_PATH ||
-		res->res_id >= CAM_TFE_CSID_PATH_RES_MAX) {
-		CAM_DBG(CAM_ISP, "CSID:%d Invalid res_type:%d res id%d",
-			csid_hw->hw_intf->hw_idx, res->res_type,
-			res->res_id);
-		return -EINVAL;
-	}
-
-	if (csid_hw->hw_info->hw_state != CAM_HW_STATE_POWER_UP) {
-		CAM_ERR(CAM_ISP, "CSID:%d Invalid dev state :%d",
-			csid_hw->hw_intf->hw_idx,
-			csid_hw->hw_info->hw_state);
-		return -EINVAL;
-	}
-
-	if (res->res_id == CAM_TFE_CSID_PATH_RES_IPP) {
-		hbi = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-			csid_reg->ipp_reg->csid_pxl_format_measure1_addr);
-		vbi = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-			csid_reg->ipp_reg->csid_pxl_format_measure2_addr);
-	} else if (res->res_id == CAM_TFE_CSID_PATH_RES_PPP) {
-		hbi = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-			csid_reg->ppp_reg->csid_pxl_format_measure1_addr);
-		vbi = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-			csid_reg->ppp_reg->csid_pxl_format_measure2_addr);
-	} else if ((res->res_id >= CAM_TFE_CSID_PATH_RES_RDI_0) &&
-		(res->res_id <= CAM_TFE_CSID_PATH_RES_RDI_2)) {
-		rdi_reg = csid_reg->rdi_reg[res->res_id];
-
-		hbi = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-			rdi_reg->csid_rdi_format_measure1_addr);
-		vbi = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-			rdi_reg->csid_rdi_format_measure2_addr);
-	} else {
-		CAM_ERR(CAM_ISP, "CSID:%d Invalid res_type:%d res id%d",
-			csid_hw->hw_intf->hw_idx, res->res_type, res->res_id);
-		return -EINVAL;
-	}
-
-	CAM_INFO(CAM_ISP,
-		"CSID[%u] Resource[id:%d name:%s hbi 0x%x vbi 0x%x]",
-		csid_hw->hw_intf->hw_idx, res->res_id, res->res_name, hbi, vbi);
-
-	return 0;
-}
-
 static int cam_tfe_csid_set_csid_debug(struct cam_tfe_csid_hw   *csid_hw,
 	void *cmd_args)
 {
@@ -2589,7 +2182,6 @@ static int cam_tfe_csid_get_hw_caps(void *hw_priv,
 	struct cam_tfe_csid_hw                *csid_hw;
 	struct cam_hw_info                    *csid_hw_info;
 	const struct cam_tfe_csid_reg_offset  *csid_reg;
-	struct cam_tfe_csid_soc_private       *soc_private;
 
 	if (!hw_priv || !get_hw_cap_args) {
 		CAM_ERR(CAM_ISP, "CSID: Invalid args");
@@ -2600,16 +2192,12 @@ static int cam_tfe_csid_get_hw_caps(void *hw_priv,
 	csid_hw = (struct cam_tfe_csid_hw   *)csid_hw_info->core_info;
 	csid_reg = csid_hw->csid_info->csid_reg;
 	hw_caps = (struct cam_tfe_csid_hw_caps *) get_hw_cap_args;
-	soc_private = (struct cam_tfe_csid_soc_private *) csid_hw_info->soc_info.soc_private;
 
 	hw_caps->num_rdis = csid_reg->cmn_reg->num_rdis;
 	hw_caps->num_pix = csid_hw->pxl_pipe_enable;
-	hw_caps->num_ppp = csid_reg->cmn_reg->num_ppp;
 	hw_caps->major_version = csid_reg->cmn_reg->major_version;
 	hw_caps->minor_version = csid_reg->cmn_reg->minor_version;
 	hw_caps->version_incr = csid_reg->cmn_reg->version_incr;
-	hw_caps->sync_clk = csid_reg->cmn_reg->sync_clk;
-	hw_caps->is_lite = soc_private->is_tfe_csid_lite;
 
 	CAM_DBG(CAM_ISP,
 		"CSID:%d No rdis:%d, no pix:%d, major:%d minor:%d ver :%d",
@@ -2870,8 +2458,7 @@ static int cam_tfe_csid_init_hw(void *hw_priv,
 	if (rc)
 		goto end;
 
-	if ((res->res_id == CAM_TFE_CSID_PATH_RES_IPP) ||
-		(res->res_id == CAM_TFE_CSID_PATH_RES_PPP))
+	if (res->res_id == CAM_TFE_CSID_PATH_RES_IPP)
 		rc = cam_tfe_csid_init_config_pxl_path(csid_hw, res);
 	else
 		rc = cam_tfe_csid_init_config_rdi_path(csid_hw, res);
@@ -2879,6 +2466,9 @@ static int cam_tfe_csid_init_hw(void *hw_priv,
 	rc = cam_tfe_csid_reset_retain_sw_reg(csid_hw);
 	if (rc < 0)
 		CAM_ERR(CAM_ISP, "CSID: Failed in SW reset");
+
+	if (rc)
+		cam_tfe_csid_disable_hw(csid_hw);
 
 	spin_lock_irqsave(&csid_hw->spin_lock, flags);
 	csid_hw->device_enabled = 1;
@@ -2924,8 +2514,7 @@ static int cam_tfe_csid_deinit_hw(void *hw_priv,
 
 	CAM_DBG(CAM_ISP, "De-Init IPP Path: %d", res->res_id);
 
-	if ((res->res_id == CAM_TFE_CSID_PATH_RES_IPP) ||
-		(res->res_id == CAM_TFE_CSID_PATH_RES_PPP))
+	if (res->res_id == CAM_TFE_CSID_PATH_RES_IPP)
 		rc = cam_tfe_csid_deinit_pxl_path(csid_hw, res);
 	else
 		rc = cam_tfe_csid_deinit_rdi_path(csid_hw, res);
@@ -2980,8 +2569,6 @@ static int cam_tfe_csid_start(void *hw_priv, void *start_args,
 	case CAM_ISP_RESOURCE_PIX_PATH:
 		if (res->res_id == CAM_TFE_CSID_PATH_RES_IPP)
 			rc = cam_tfe_csid_enable_pxl_path(csid_hw, res);
-		else if (res->res_id == CAM_TFE_CSID_PATH_RES_PPP)
-			rc = cam_tfe_csid_enable_ppp_path(csid_hw, res);
 		else
 			rc = cam_tfe_csid_enable_rdi_path(csid_hw, res);
 		break;
@@ -3076,9 +2663,6 @@ static int cam_tfe_csid_stop(void *hw_priv,
 			if (res->res_id == CAM_TFE_CSID_PATH_RES_IPP)
 				rc = cam_tfe_csid_disable_pxl_path(csid_hw,
 					res, csid_stop->stop_cmd);
-			else if (res->res_id == CAM_TFE_CSID_PATH_RES_PPP)
-				rc = cam_tfe_csid_disable_ppp_path(csid_hw,
-					res, csid_stop->stop_cmd);
 			else
 				rc = cam_tfe_csid_disable_rdi_path(csid_hw,
 					res, csid_stop->stop_cmd);
@@ -3158,22 +2742,6 @@ static int cam_tfe_csid_sof_irq_debug(
 		}
 	}
 
-	if (csid_reg->ppp_reg) {
-		val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-			csid_reg->ppp_reg->csid_pxl_irq_mask_addr);
-
-		if (val) {
-			if (sof_irq_enable)
-				val |= TFE_CSID_PATH_INFO_INPUT_SOF;
-			else
-				val &= ~TFE_CSID_PATH_INFO_INPUT_SOF;
-
-			cam_io_w_mb(val, soc_info->reg_map[0].mem_base +
-				csid_reg->ppp_reg->csid_pxl_irq_mask_addr);
-			val = 0;
-		}
-	}
-
 	for (i = 0; i < csid_reg->cmn_reg->num_rdis; i++) {
 		val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
 			csid_reg->rdi_reg[i]->csid_rdi_irq_mask_addr);
@@ -3218,81 +2786,6 @@ static int cam_tfe_csid_set_csid_clock(
 
 	csid_hw->clk_rate = clk_update->clk_rate;
 	CAM_DBG(CAM_ISP, "CSID clock rate %llu", csid_hw->clk_rate);
-
-	return 0;
-}
-
-static int cam_tfe_csid_dump_csid_clock(
-	struct cam_tfe_csid_hw *csid_hw, void *cmd_args)
-{
-	if (!csid_hw)
-		return -EINVAL;
-
-	CAM_INFO(CAM_ISP, "CSID:%d clock rate %llu",
-		csid_hw->hw_intf->hw_idx,
-		csid_hw->clk_rate);
-
-	return 0;
-}
-
-static int cam_tfe_csid_set_csid_clock_dynamically(
-	struct cam_tfe_csid_hw *csid_hw, void *cmd_args)
-{
-	struct cam_hw_soc_info   *soc_info;
-	unsigned long            *clk_rate;
-	int rc = 0;
-
-	soc_info = &csid_hw->hw_info->soc_info;
-	clk_rate = (unsigned long *)cmd_args;
-
-	CAM_DBG(CAM_ISP, "CSID[%u] clock rate requested: %llu curr: %llu",
-		csid_hw->hw_intf->hw_idx, *clk_rate, soc_info->applied_src_clk_rate);
-
-	if (*clk_rate <= soc_info->applied_src_clk_rate)
-		goto end;
-
-	rc = cam_soc_util_set_src_clk_rate(soc_info, *clk_rate);
-	if (rc) {
-		CAM_ERR(CAM_ISP,
-			"unable to set clock dynamically rate:%llu", *clk_rate);
-		return rc;
-	}
-end:
-	*clk_rate = soc_info->applied_src_clk_rate;
-	CAM_DBG(CAM_ISP, "CSID[%u] new clock rate %llu",
-		csid_hw->hw_intf->hw_idx, soc_info->applied_src_clk_rate);
-
-	return rc;
-}
-
-static int cam_tfe_csid_set_discard_frame_cfg(
-	struct cam_tfe_csid_hw *csid_hw, void *cmd_args)
-{
-	struct cam_isp_resource_node                 *res;
-	struct cam_tfe_csid_path_cfg                 *path_cfg;
-	struct cam_tfe_csid_discard_init_frame_args  *discard_config = NULL;
-
-	if (!csid_hw)
-		return -EINVAL;
-
-	discard_config = (struct cam_tfe_csid_discard_init_frame_args *)cmd_args;
-
-	res = discard_config->res;
-	if (res->res_type != CAM_ISP_RESOURCE_PIX_PATH ||
-		res->res_id >= CAM_TFE_CSID_PATH_RES_MAX) {
-		CAM_ERR(CAM_ISP, "CSID[%u] Invalid res_type: %d res id: %d",
-			csid_hw->hw_intf->hw_idx, res->res_type, res->res_id);
-		return -EINVAL;
-	}
-
-	if ((res->res_state == CAM_ISP_RESOURCE_STATE_RESERVED) ||
-		(res->res_state == CAM_ISP_RESOURCE_STATE_INIT_HW)) {
-
-		path_cfg = (struct cam_tfe_csid_path_cfg *)res->res_priv;
-
-		path_cfg->init_frame_drop = discard_config->num_frames;
-		path_cfg->res_sof_cnt = 0;
-	}
 
 	return 0;
 }
@@ -3351,29 +2844,6 @@ static int cam_tfe_csid_get_regdump(struct cam_tfe_csid_hw *csid_hw,
 			csid_reg->ipp_reg->csid_pxl_vcrop_addr);
 		CAM_INFO(CAM_ISP, "offset 0x%x=0x08%x",
 			csid_reg->ipp_reg->csid_pxl_vcrop_addr, val);
-	} else if (res->res_id == CAM_TFE_CSID_PATH_RES_PPP) {
-		CAM_INFO(CAM_ISP, "Dumping CSID:%d PPP registers ",
-			csid_hw->hw_intf->hw_idx);
-		val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-			csid_reg->ppp_reg->csid_pxl_cfg0_addr);
-		CAM_INFO(CAM_ISP, "offset 0x%x=0x08%x",
-			csid_reg->ppp_reg->csid_pxl_cfg0_addr, val);
-		val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-			csid_reg->ppp_reg->csid_pxl_cfg1_addr);
-		CAM_INFO(CAM_ISP, "offset 0x%x=0x08%x",
-			csid_reg->ppp_reg->csid_pxl_cfg1_addr, val);
-		val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-			csid_reg->ppp_reg->csid_pxl_ctrl_addr);
-		CAM_INFO(CAM_ISP, "offset 0x%x=0x08%x",
-			csid_reg->ppp_reg->csid_pxl_ctrl_addr, val);
-		val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-			csid_reg->ppp_reg->csid_pxl_hcrop_addr);
-		CAM_INFO(CAM_ISP, "offset 0x%x=0x08%x",
-			csid_reg->ppp_reg->csid_pxl_hcrop_addr, val);
-		val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-			csid_reg->ppp_reg->csid_pxl_vcrop_addr);
-		CAM_INFO(CAM_ISP, "offset 0x%x=0x08%x",
-			csid_reg->ppp_reg->csid_pxl_vcrop_addr, val);
 	} else {
 		id = res->res_id;
 		CAM_INFO(CAM_ISP, "Dumping CSID:%d RDI:%d registers ",
@@ -3562,7 +3032,6 @@ static int cam_tfe_csid_process_cmd(void *hw_priv,
 	int rc = 0;
 	struct cam_tfe_csid_hw               *csid_hw;
 	struct cam_hw_info                   *csid_hw_info;
-	struct cam_isp_resource_node         *res = NULL;
 
 	if (!hw_priv || !cmd_args) {
 		CAM_ERR(CAM_ISP, "CSID: Invalid arguments");
@@ -3575,11 +3044,6 @@ static int cam_tfe_csid_process_cmd(void *hw_priv,
 	switch (cmd_type) {
 	case CAM_TFE_CSID_CMD_GET_TIME_STAMP:
 		rc = cam_tfe_csid_get_time_stamp(csid_hw, cmd_args);
-
-		if (csid_hw->csid_debug & TFE_CSID_DEBUG_ENABLE_HBI_VBI_INFO) {
-			res = ((struct cam_tfe_csid_get_time_stamp_args *)cmd_args)->node_res;
-			cam_tfe_csid_print_hbi_vbi(csid_hw, res);
-		}
 		break;
 	case CAM_TFE_CSID_SET_CSID_DEBUG:
 		rc = cam_tfe_csid_set_csid_debug(csid_hw, cmd_args);
@@ -3589,9 +3053,6 @@ static int cam_tfe_csid_process_cmd(void *hw_priv,
 		break;
 	case CAM_ISP_HW_CMD_CSID_CLOCK_UPDATE:
 		rc = cam_tfe_csid_set_csid_clock(csid_hw, cmd_args);
-		break;
-	case CAM_ISP_HW_CMD_CSID_CLOCK_DUMP:
-		rc = cam_tfe_csid_dump_csid_clock(csid_hw, cmd_args);
 		break;
 	case CAM_TFE_CSID_CMD_GET_REG_DUMP:
 		rc = cam_tfe_csid_get_regdump(csid_hw, cmd_args);
@@ -3604,12 +3065,6 @@ static int cam_tfe_csid_process_cmd(void *hw_priv,
 		break;
 	case CAM_TFE_CSID_LOG_ACQUIRE_DATA:
 		rc = cam_tfe_csid_log_acquire_data(csid_hw, cmd_args);
-		break;
-	case CAM_ISP_HW_CMD_DYNAMIC_CLOCK_UPDATE:
-		rc = cam_tfe_csid_set_csid_clock_dynamically(csid_hw, cmd_args);
-		break;
-	case CAM_ISP_HW_CMD_CSID_DISCARD_INIT_FRAMES:
-		rc = cam_tfe_csid_set_discard_frame_cfg(csid_hw, cmd_args);
 		break;
 	default:
 		CAM_ERR(CAM_ISP, "CSID:%d unsupported cmd:%d",
@@ -3675,7 +3130,6 @@ static int cam_tfe_csid_evt_bottom_half_handler(
 	struct cam_isp_hw_event_info event_info;
 	int i;
 	int rc = 0;
-	uint32_t data_idx;
 
 	if (!handler_priv || !evt_payload_priv) {
 		CAM_ERR(CAM_ISP,
@@ -3687,7 +3141,6 @@ static int cam_tfe_csid_evt_bottom_half_handler(
 	csid_hw = (struct cam_tfe_csid_hw *)handler_priv;
 	evt_payload = (struct cam_csid_evt_payload *)evt_payload_priv;
 	csid_reg = csid_hw->csid_info->csid_reg;
-	data_idx = csid_hw->csi2_rx_cfg.phy_sel - 1;
 
 	if (!csid_hw->event_cb || !csid_hw->event_cb_priv) {
 		CAM_ERR_RATE_LIMIT(CAM_ISP,
@@ -3716,13 +3169,6 @@ static int cam_tfe_csid_evt_bottom_half_handler(
 				csid_hw->hw_intf->hw_idx);
 		}
 
-		if (evt_payload->irq_status[TFE_CSID_IRQ_REG_PPP] &
-			TFE_CSID_PATH_INFO_INPUT_SOF) {
-			CAM_INFO_RATE_LIMIT(CAM_ISP,
-				"CSID:%d PPP SOF received",
-				csid_hw->hw_intf->hw_idx);
-		}
-
 		for (i = 0; i < csid_reg->cmn_reg->num_rdis; i++) {
 			if (evt_payload->irq_status[i] &
 				TFE_CSID_PATH_INFO_INPUT_SOF)
@@ -3732,14 +3178,13 @@ static int cam_tfe_csid_evt_bottom_half_handler(
 		}
 	} else {
 		CAM_ERR_RATE_LIMIT(CAM_ISP,
-			"CSID %d err %d phy %d irq status TOP: 0x%x RX: 0x%x IPP: 0x%x PPP: 0x%x RDI0: 0x%x RDI1: 0x%x RDI2: 0x%x",
+			"CSID %d err %d phy %d irq status TOP: 0x%x RX: 0x%x IPP: 0x%x RDI0: 0x%x RDI1: 0x%x RDI2: 0x%x",
 			csid_hw->hw_intf->hw_idx,
 			evt_payload->evt_type,
 			csid_hw->csi2_rx_cfg.phy_sel,
 			evt_payload->irq_status[TFE_CSID_IRQ_REG_TOP],
 			evt_payload->irq_status[TFE_CSID_IRQ_REG_RX],
 			evt_payload->irq_status[TFE_CSID_IRQ_REG_IPP],
-			evt_payload->irq_status[TFE_CSID_IRQ_REG_PPP],
 			evt_payload->irq_status[TFE_CSID_IRQ_REG_RDI0],
 			evt_payload->irq_status[TFE_CSID_IRQ_REG_RDI1],
 			evt_payload->irq_status[TFE_CSID_IRQ_REG_RDI2]);
@@ -3750,23 +3195,14 @@ static int cam_tfe_csid_evt_bottom_half_handler(
 	 */
 	err_evt_info.err_type = evt_payload->evt_type;
 	event_info.hw_idx = evt_payload->hw_idx;
-	event_info.res_type = CAM_ISP_RESOURCE_PIX_PATH;
-	event_info.hw_type = CAM_ISP_HW_TYPE_TFE_CSID;
 
 	switch (evt_payload->evt_type) {
-	case CAM_ISP_HW_ERROR_CSID_FRAME_SIZE:
-			break;
 	case CAM_ISP_HW_ERROR_CSID_FATAL:
-		/* phy_sel starts from 1 and should never be zero*/
-		if (csid_hw->csi2_rx_cfg.phy_sel > 0) {
-			cam_subdev_notify_message(CAM_CSIPHY_DEVICE_TYPE,
-				CAM_SUBDEV_MESSAGE_REG_DUMP, (void *)&data_idx);
-		}
-		csid_hw->fatal_err_detected = true;
-		break;
-	case CAM_ISP_HW_ERROR_CSID_OUTPUT_FIFO_OVERFLOW:
+		if (csid_hw->fatal_err_detected)
+			break;
 		event_info.event_data = (void *)&err_evt_info;
-		rc = csid_hw->event_cb(csid_hw->event_cb_priv,
+		csid_hw->fatal_err_detected = true;
+		rc = csid_hw->event_cb(NULL,
 			CAM_ISP_HW_EVENT_ERROR, (void *)&event_info);
 		break;
 
@@ -3833,17 +3269,15 @@ irqreturn_t cam_tfe_csid_irq(int irq_num, void *data)
 	struct cam_hw_soc_info                         *soc_info;
 	const struct cam_tfe_csid_reg_offset           *csid_reg;
 	const struct cam_tfe_csid_pxl_reg_offset       *ipp_reg;
-	const struct cam_tfe_csid_pxl_reg_offset       *ppp_reg;
 	const struct cam_tfe_csid_rdi_reg_offset       *rdi_reg;
 	const struct cam_tfe_csid_common_reg_offset    *cmn_reg;
 	const struct cam_tfe_csid_csi2_rx_reg_offset   *csi2_reg;
-	uint32_t                   irq_status[TFE_CSID_IRQ_REG_MAX] = {0};
+	uint32_t                   irq_status[TFE_CSID_IRQ_REG_MAX];
 	bool fatal_err_detected = false, is_error_irq = false;
 	uint32_t sof_irq_debug_en = 0, log_en = 0;
 	unsigned long flags;
 	uint32_t i, val, val1;
 	uint32_t data_idx;
-	uint32_t report_err_type = CAM_ISP_HW_ERROR_NONE;
 
 	if (!data) {
 		CAM_ERR(CAM_ISP, "CSID: Invalid arguments");
@@ -3872,11 +3306,6 @@ irqreturn_t cam_tfe_csid_irq(int irq_num, void *data)
 			cam_io_r_mb(soc_info->reg_map[0].mem_base +
 				csid_reg->ipp_reg->csid_pxl_irq_status_addr);
 
-	if (csid_reg->cmn_reg->num_ppp)
-		irq_status[TFE_CSID_IRQ_REG_PPP] =
-			cam_io_r_mb(soc_info->reg_map[0].mem_base +
-				csid_reg->ppp_reg->csid_pxl_irq_status_addr);
-
 	for (i = 0; i < csid_reg->cmn_reg->num_rdis; i++)
 		irq_status[i] =
 		cam_io_r_mb(soc_info->reg_map[0].mem_base +
@@ -3896,11 +3325,6 @@ irqreturn_t cam_tfe_csid_irq(int irq_num, void *data)
 			soc_info->reg_map[0].mem_base +
 			csid_reg->ipp_reg->csid_pxl_irq_clear_addr);
 
-	if (csid_reg->cmn_reg->num_ppp)
-		cam_io_w_mb(irq_status[TFE_CSID_IRQ_REG_PPP],
-			soc_info->reg_map[0].mem_base +
-			csid_reg->ppp_reg->csid_pxl_irq_clear_addr);
-
 	for (i = 0; i < csid_reg->cmn_reg->num_rdis; i++) {
 		cam_io_w_mb(irq_status[i],
 			soc_info->reg_map[0].mem_base +
@@ -3908,6 +3332,7 @@ irqreturn_t cam_tfe_csid_irq(int irq_num, void *data)
 	}
 	cam_io_w_mb(1, soc_info->reg_map[0].mem_base +
 		csid_reg->cmn_reg->csid_irq_cmd_addr);
+
 
 	/* Software register reset complete*/
 	if (irq_status[TFE_CSID_IRQ_REG_TOP])
@@ -3969,7 +3394,6 @@ irqreturn_t cam_tfe_csid_irq(int irq_num, void *data)
 		if (irq_status[TFE_CSID_IRQ_REG_RX] &
 			TFE_CSID_CSI2_RX_ERROR_MMAPPED_VC_DT)
 			is_error_irq = true;
-
 	}
 handle_fatal_error:
 	spin_unlock_irqrestore(&csid_hw->spin_lock, flags);
@@ -3991,10 +3415,13 @@ handle_fatal_error:
 			csid_reg->csi2_reg->csid_csi2_rx_cfg1_addr);
 		cam_io_w_mb(0, soc_info->reg_map[0].mem_base +
 			csid_reg->csi2_reg->csid_csi2_rx_irq_mask_addr);
-
-		report_err_type = CAM_ISP_HW_ERROR_CSID_FATAL;
+		/* phy_sel starts from 1 and should never be zero*/
+		if (csid_hw->csi2_rx_cfg.phy_sel > 0) {
+			cam_subdev_notify_message(CAM_CSIPHY_DEVICE_TYPE,
+				CAM_SUBDEV_MESSAGE_REG_DUMP, (void *)&data_idx);
+		}
 		cam_tfe_csid_handle_hw_err_irq(csid_hw,
-			report_err_type, irq_status);
+			CAM_ISP_HW_ERROR_CSID_FATAL, irq_status);
 	}
 
 	if (csid_hw->csid_debug & TFE_CSID_DEBUG_ENABLE_EOT_IRQ) {
@@ -4121,11 +3548,6 @@ handle_fatal_error:
 			CAM_INFO_RATE_LIMIT(CAM_ISP,
 				"CSID IPP reset complete");
 
-		if (irq_status[TFE_CSID_IRQ_REG_PPP] &
-			BIT(csid_reg->cmn_reg->path_rst_done_shift_val))
-			CAM_INFO_RATE_LIMIT(CAM_ISP,
-				"CSID PPP reset complete");
-
 		if (irq_status[TFE_CSID_IRQ_REG_TOP])
 			CAM_INFO_RATE_LIMIT(CAM_ISP,
 				"CSID TOP reset complete");
@@ -4143,12 +3565,6 @@ handle_fatal_error:
 			BIT(csid_reg->cmn_reg->path_rst_done_shift_val)) {
 			CAM_DBG(CAM_ISP, "CSID IPP reset complete");
 			complete(&csid_hw->csid_ipp_complete);
-		}
-
-		if (irq_status[TFE_CSID_IRQ_REG_IPP] & TFE_CSID_PATH_INFO_INPUT_SOF) {
-			CAM_DBG(CAM_ISP, "CSID:%d IPP SOF received", csid_hw->hw_intf->hw_idx);
-			cam_tfe_csid_enable_path_for_init_frame_drop(csid_hw,
-				CAM_TFE_CSID_PATH_RES_IPP);
 		}
 
 		if ((irq_status[TFE_CSID_IRQ_REG_IPP] &
@@ -4179,15 +3595,16 @@ handle_fatal_error:
 				soc_info->reg_map[0].mem_base +
 				csid_reg->ipp_reg->csid_pxl_ctrl_addr);
 			is_error_irq = true;
-			report_err_type = CAM_ISP_HW_ERROR_CSID_OUTPUT_FIFO_OVERFLOW;
 		}
 
 		if (irq_status[TFE_CSID_IRQ_REG_IPP] &
 			TFE_CSID_PATH_IPP_ERROR_CCIF_VIOLATION)
 			is_error_irq = true;
 
-		if (irq_status[TFE_CSID_IRQ_REG_IPP] &
-			(TFE_CSID_PATH_ERROR_PIX_COUNT | TFE_CSID_PATH_ERROR_LINE_COUNT)) {
+		if ((irq_status[TFE_CSID_IRQ_REG_IPP] &
+			TFE_CSID_PATH_ERROR_PIX_COUNT) ||
+			(irq_status[TFE_CSID_IRQ_REG_IPP] &
+			TFE_CSID_PATH_ERROR_LINE_COUNT)) {
 			ipp_reg = csid_reg->ipp_reg;
 			cmn_reg = csid_reg->cmn_reg;
 			val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
@@ -4208,86 +3625,6 @@ handle_fatal_error:
 				cmn_reg->format_measure_height_mask_val),
 				val &
 				cmn_reg->format_measure_width_mask_val);
-			is_error_irq = true;
-			report_err_type = CAM_ISP_HW_ERROR_CSID_FRAME_SIZE;
-		}
-
-	}
-
-	/* read the PPP errors */
-	if (csid_reg->cmn_reg->num_ppp) {
-		/* PPP reset done bit */
-		if (irq_status[TFE_CSID_IRQ_REG_PPP] &
-			BIT(csid_reg->cmn_reg->path_rst_done_shift_val)) {
-			CAM_DBG(CAM_ISP, "CSID PPP reset complete");
-			complete(&csid_hw->csid_ppp_complete);
-		}
-
-		if (irq_status[TFE_CSID_IRQ_REG_PPP] & TFE_CSID_PATH_INFO_INPUT_SOF) {
-			CAM_DBG(CAM_ISP, "CSID:%d PPP SOF received", csid_hw->hw_intf->hw_idx);
-			cam_tfe_csid_enable_path_for_init_frame_drop(csid_hw,
-				CAM_TFE_CSID_PATH_RES_PPP);
-		}
-
-		if ((irq_status[TFE_CSID_IRQ_REG_PPP] &
-			TFE_CSID_PATH_INFO_INPUT_SOF) &&
-			(csid_hw->csid_debug & TFE_CSID_DEBUG_ENABLE_SOF_IRQ)) {
-			if (!csid_hw->sof_irq_triggered)
-				CAM_INFO_RATE_LIMIT(CAM_ISP,
-				"CSID:%d PPP SOF received",
-					csid_hw->hw_intf->hw_idx);
-			else
-				log_en = 1;
-
-			if (csid_hw->sof_irq_triggered)
-				csid_hw->irq_debug_cnt++;
-		}
-
-		if ((irq_status[TFE_CSID_IRQ_REG_PPP] &
-			TFE_CSID_PATH_INFO_INPUT_EOF) &&
-			(csid_hw->csid_debug & TFE_CSID_DEBUG_ENABLE_EOF_IRQ)) {
-			CAM_INFO_RATE_LIMIT(CAM_ISP, "CSID:%d PPP EOF received",
-				csid_hw->hw_intf->hw_idx);
-		}
-
-		if (irq_status[TFE_CSID_IRQ_REG_PPP] &
-			TFE_CSID_PATH_ERROR_FIFO_OVERFLOW) {
-			/* Stop PPP path immediately */
-			cam_io_w_mb(CAM_TFE_CSID_HALT_IMMEDIATELY,
-				soc_info->reg_map[0].mem_base +
-				csid_reg->ppp_reg->csid_pxl_ctrl_addr);
-			is_error_irq = true;
-			report_err_type = CAM_ISP_HW_ERROR_CSID_OUTPUT_FIFO_OVERFLOW;
-		}
-
-		if (irq_status[TFE_CSID_IRQ_REG_PPP] &
-			TFE_CSID_PATH_PPP_ERROR_CCIF_VIOLATION)
-			is_error_irq = true;
-
-		if (irq_status[TFE_CSID_IRQ_REG_PPP] &
-			(TFE_CSID_PATH_ERROR_PIX_COUNT | TFE_CSID_PATH_ERROR_LINE_COUNT)) {
-			ppp_reg = csid_reg->ppp_reg;
-			cmn_reg = csid_reg->cmn_reg;
-			val = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-				ppp_reg->csid_pxl_format_measure0_addr);
-			val1 = cam_io_r_mb(soc_info->reg_map[0].mem_base +
-				ppp_reg->csid_pxl_format_measure_cfg1_addr);
-
-			CAM_ERR(CAM_ISP,
-				"Pix/Line count error for CSID: %d PPP path, Expected:: height: %d, width: %d and  Actual:: height: %d width %d",
-				csid_hw->hw_intf->hw_idx,
-				((val1 >>
-				cmn_reg->format_measure_height_shift_val) &
-				cmn_reg->format_measure_height_mask_val),
-				val1 &
-				cmn_reg->format_measure_width_mask_val,
-				((val >>
-				cmn_reg->format_measure_height_shift_val) &
-				cmn_reg->format_measure_height_mask_val),
-				val &
-				cmn_reg->format_measure_width_mask_val);
-			is_error_irq = true;
-			report_err_type = CAM_ISP_HW_ERROR_CSID_FRAME_SIZE;
 		}
 
 	}
@@ -4309,11 +3646,8 @@ handle_fatal_error:
 			complete(&csid_hw->csid_rdin_complete[i]);
 		}
 
-		if (irq_status[i] & TFE_CSID_PATH_INFO_INPUT_SOF) {
-			CAM_DBG(CAM_ISP, "CSID:%d RDI:%d SOF received",
-				csid_hw->hw_intf->hw_idx);
+		if (irq_status[i] & TFE_CSID_PATH_INFO_INPUT_SOF)
 			cam_tfe_csid_enable_path_for_init_frame_drop(csid_hw, i);
-		}
 
 		if ((irq_status[i] & TFE_CSID_PATH_INFO_INPUT_SOF) &&
 			(csid_hw->csid_debug & TFE_CSID_DEBUG_ENABLE_SOF_IRQ)) {
@@ -4341,7 +3675,6 @@ handle_fatal_error:
 			cam_io_w_mb(CAM_TFE_CSID_HALT_IMMEDIATELY,
 				soc_info->reg_map[0].mem_base +
 				csid_reg->rdi_reg[i]->csid_rdi_ctrl_addr);
-			report_err_type = CAM_ISP_HW_ERROR_CSID_OUTPUT_FIFO_OVERFLOW;
 		}
 
 		if ((irq_status[i] & TFE_CSID_PATH_RDI_OVERFLOW_IRQ) ||
@@ -4371,30 +3704,12 @@ handle_fatal_error:
 				cmn_reg->format_measure_height_mask_val),
 				val &
 				cmn_reg->format_measure_width_mask_val);
-
-			is_error_irq = true;
-			report_err_type = CAM_ISP_HW_ERROR_CSID_FRAME_SIZE;
 		}
 	}
 
-	if (is_error_irq || log_en) {
-		CAM_ERR(CAM_ISP,
-			"CSID %d irq status TOP: 0x%x RX: 0x%x IPP: 0x%x PPP: 0x%x",
-			csid_hw->hw_intf->hw_idx,
-			irq_status[TFE_CSID_IRQ_REG_TOP],
-			irq_status[TFE_CSID_IRQ_REG_RX],
-			irq_status[TFE_CSID_IRQ_REG_IPP],
-			irq_status[TFE_CSID_IRQ_REG_PPP]);
-		CAM_ERR(CAM_ISP,
-			"RDI0: 0x%x RDI1: 0x%x RDI2: 0x%x CSID clk:%d",
-			irq_status[TFE_CSID_IRQ_REG_RDI0],
-			irq_status[TFE_CSID_IRQ_REG_RDI1],
-			irq_status[TFE_CSID_IRQ_REG_RDI2],
-			csid_hw->clk_rate);
-
+	if (is_error_irq || log_en)
 		cam_tfe_csid_handle_hw_err_irq(csid_hw,
-			report_err_type, irq_status);
-	}
+			CAM_ISP_HW_ERROR_NONE, irq_status);
 
 	if (csid_hw->irq_debug_cnt >= CAM_TFE_CSID_IRQ_SOF_DEBUG_CNT_MAX) {
 		cam_tfe_csid_sof_irq_debug(csid_hw, &sof_irq_debug_en);
@@ -4409,11 +3724,10 @@ int cam_tfe_csid_hw_probe_init(struct cam_hw_intf  *csid_hw_intf,
 	uint32_t csid_idx)
 {
 	int rc = -EINVAL;
-	uint32_t i, j, val = 0, clk_lvl;
+	uint32_t i, j, val, clk_lvl;
 	struct cam_tfe_csid_path_cfg         *path_data;
 	struct cam_hw_info                   *csid_hw_info;
 	struct cam_tfe_csid_hw               *tfe_csid_hw = NULL;
-	struct cam_tfe_csid_soc_private      *soc_private = NULL;
 	const struct cam_tfe_csid_reg_offset *csid_reg;
 
 	if (csid_idx >= CAM_TFE_CSID_HW_NUM_MAX) {
@@ -4441,7 +3755,6 @@ int cam_tfe_csid_hw_probe_init(struct cam_hw_intf  *csid_hw_intf,
 	init_completion(&tfe_csid_hw->csid_top_complete);
 	init_completion(&tfe_csid_hw->csid_csi2_complete);
 	init_completion(&tfe_csid_hw->csid_ipp_complete);
-	init_completion(&tfe_csid_hw->csid_ppp_complete);
 	for (i = 0; i < CAM_TFE_CSID_RDI_MAX; i++)
 		init_completion(&tfe_csid_hw->csid_rdin_complete[i]);
 
@@ -4463,8 +3776,6 @@ int cam_tfe_csid_hw_probe_init(struct cam_hw_intf  *csid_hw_intf,
 			tfe_csid_hw->hw_intf->hw_idx);
 		goto err;
 	}
-
-	soc_private = (struct cam_tfe_csid_soc_private *) csid_hw_info->soc_info.soc_private;
 
 	tfe_csid_hw->hw_intf->hw_ops.get_hw_caps = cam_tfe_csid_get_hw_caps;
 	tfe_csid_hw->hw_intf->hw_ops.init        = cam_tfe_csid_init_hw;
@@ -4488,13 +3799,13 @@ int cam_tfe_csid_hw_probe_init(struct cam_hw_intf  *csid_hw_intf,
 		tfe_csid_hw->cid_res[i].cnt = 0;
 	}
 
-	if (tfe_csid_hw->hw_intf->hw_idx == csid_reg->cmn_reg->disable_pix_tfe_idx &&
-		csid_reg->cmn_reg->tfe_pix_fuse_en) {
+	if (tfe_csid_hw->hw_intf->hw_idx == 2) {
 		val = cam_io_r_mb(
 			tfe_csid_hw->hw_info->soc_info.reg_map[1].mem_base +
 			csid_reg->cmn_reg->top_tfe2_fuse_reg);
 		if (val) {
 			CAM_INFO(CAM_ISP, "TFE 2 is not supported by hardware");
+
 			rc = cam_tfe_csid_disable_soc_resources(
 				&tfe_csid_hw->hw_info->soc_info);
 			if (rc)
@@ -4505,15 +3816,14 @@ int cam_tfe_csid_hw_probe_init(struct cam_hw_intf  *csid_hw_intf,
 				rc = -EINVAL;
 			goto err;
 		}
-
-		val = cam_io_r_mb(
-			tfe_csid_hw->hw_info->soc_info.reg_map[1].mem_base +
-			csid_reg->cmn_reg->top_tfe2_pix_pipe_fuse_reg);
 	}
 
+	val = cam_io_r_mb(
+		tfe_csid_hw->hw_info->soc_info.reg_map[1].mem_base +
+		csid_reg->cmn_reg->top_tfe2_pix_pipe_fuse_reg);
+
 	/* Initialize the IPP resources */
-	if (!soc_private->is_tfe_csid_lite && !(val &&
-		(tfe_csid_hw->hw_intf->hw_idx == csid_reg->cmn_reg->disable_pix_tfe_idx))) {
+	if (!(val && (tfe_csid_hw->hw_intf->hw_idx == 2))) {
 		CAM_DBG(CAM_ISP, "initializing the pix path");
 
 		tfe_csid_hw->ipp_res.res_type = CAM_ISP_RESOURCE_PIX_PATH;
@@ -4529,24 +3839,6 @@ int cam_tfe_csid_hw_probe_init(struct cam_hw_intf  *csid_hw_intf,
 		}
 		tfe_csid_hw->ipp_res.res_priv = path_data;
 		tfe_csid_hw->pxl_pipe_enable = 1;
-	}
-
-	/* Initialize the PPP resources */
-	if (tfe_csid_hw->csid_info->csid_reg->cmn_reg->num_ppp) {
-		CAM_DBG(CAM_ISP, "initializing the ppp path");
-
-		tfe_csid_hw->ppp_res.res_type = CAM_ISP_RESOURCE_PIX_PATH;
-		tfe_csid_hw->ppp_res.res_id = CAM_TFE_CSID_PATH_RES_PPP;
-		tfe_csid_hw->ppp_res.res_state =
-			CAM_ISP_RESOURCE_STATE_AVAILABLE;
-		tfe_csid_hw->ppp_res.hw_intf = tfe_csid_hw->hw_intf;
-		path_data = kzalloc(sizeof(*path_data),
-					GFP_KERNEL);
-		if (!path_data) {
-			rc = -ENOMEM;
-			goto err;
-		}
-		tfe_csid_hw->ppp_res.res_priv = path_data;
 	}
 
 	/* Initialize the RDI resource */
@@ -4616,8 +3908,6 @@ int cam_tfe_csid_hw_probe_init(struct cam_hw_intf  *csid_hw_intf,
 err:
 	if (rc) {
 		kfree(tfe_csid_hw->ipp_res.res_priv);
-		if (tfe_csid_hw->csid_info->csid_reg->cmn_reg->num_ppp)
-			kfree(tfe_csid_hw->ppp_res.res_priv);
 		for (i = 0; i <
 			tfe_csid_hw->csid_info->csid_reg->cmn_reg->num_rdis;
 			i++)
@@ -4640,9 +3930,6 @@ int cam_tfe_csid_hw_deinit(struct cam_tfe_csid_hw *tfe_csid_hw)
 
 	/* release the privdate data memory from resources */
 	kfree(tfe_csid_hw->ipp_res.res_priv);
-
-	if (tfe_csid_hw->csid_info->csid_reg->cmn_reg->num_ppp)
-		kfree(tfe_csid_hw->ppp_res.res_priv);
 
 	for (i = 0; i <
 		tfe_csid_hw->csid_info->csid_reg->cmn_reg->num_rdis;

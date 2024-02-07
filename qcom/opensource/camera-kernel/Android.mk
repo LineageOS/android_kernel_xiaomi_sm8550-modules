@@ -1,3 +1,4 @@
+ifeq ($(XIAOMI_CAMERA_ODM_ISHTAR_SERIES_UPGRADE), true)
 CAMERA_DLKM_ENABLED := true
 ifeq ($(TARGET_KERNEL_DLKM_DISABLE), true)
 	ifeq ($(TARGET_KERNEL_DLKM_CAMERA_OVERRIDE), false)
@@ -13,7 +14,7 @@ LOCAL_PATH := $(call my-dir)
 # Path to DLKM make scripts
 DLKM_DIR := $(TOP)/device/qcom/common/dlkm
 # List of board platforms for which MMRM driver API should be enabled
-MMRM_BOARDS := taro parrot kalama crow
+MMRM_BOARDS := taro parrot kalama
 
 # Kbuild options
 KBUILD_OPTIONS := CAMERA_KERNEL_ROOT=$(shell pwd)/$(LOCAL_PATH)
@@ -54,6 +55,23 @@ include $(LOCAL_PATH)/include/uapi/Android.mk
 else
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
+include $(CLEAR_VARS)
+# For incremental compilation support.
+LOCAL_SRC_FILES             :=  \
+                                $(shell find $(LOCAL_PATH)/config -L -type f)      \
+                                $(shell find $(LOCAL_PATH)/drivers -L -type f)     \
+                                $(shell find $(LOCAL_PATH)/dt-bindings -L -type f) \
+                                $(shell find $(LOCAL_PATH)/include -L -type f)     \
+                                $(LOCAL_PATH)/Android.mk \
+                                $(LOCAL_PATH)/board.mk   \
+                                $(LOCAL_PATH)/product.mk \
+                                $(LOCAL_PATH)/Kbuild
+LOCAL_MODULE_PATH           := $(KERNEL_MODULES_OUT)
+LOCAL_MODULE                := cameralog.ko
+LOCAL_MODULE_TAGS           := optional
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+
 
 endif # End of check for board platform
 endif # ifeq ($(CAMERA_DLKM_ENABLED),true)
+endif

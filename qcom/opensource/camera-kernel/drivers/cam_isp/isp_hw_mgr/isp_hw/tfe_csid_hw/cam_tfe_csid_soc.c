@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/slab.h>
 #include "cam_tfe_csid_soc.h"
@@ -24,13 +22,10 @@ int cam_tfe_csid_init_soc_resources(struct cam_hw_soc_info *soc_info,
 
 	soc_info->soc_private = soc_private;
 
+
 	rc = cam_soc_util_get_dt_properties(soc_info);
 	if (rc < 0)
 		return rc;
-
-	soc_private->is_tfe_csid_lite = false;
-	if (strnstr(soc_info->compatible, "lite", strlen(soc_info->compatible)) != NULL)
-		soc_private->is_tfe_csid_lite = true;
 
 	/* Need to see if we want post process the clock list */
 	rc = cam_soc_util_request_platform_resource(soc_info, csid_irq_handler,

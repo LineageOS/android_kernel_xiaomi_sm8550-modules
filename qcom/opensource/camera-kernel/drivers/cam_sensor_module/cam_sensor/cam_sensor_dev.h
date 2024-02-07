@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_SENSOR_DEV_H_
@@ -25,6 +25,9 @@
 #include <cam_sensor_io.h>
 #include "cam_debug_util.h"
 #include "cam_context.h"
+/* xiaomi add for cci debug start */
+#include "cam_cci_debug_util.h"
+/* xiaomi add for cci debug end */
 
 #define NUM_MASTERS 2
 #define NUM_QUEUES 2
@@ -60,18 +63,16 @@ struct sensor_intf_params {
  *
  * @res_index        : The resolution index that gets updated
  *                     during a mode switch
- * @feature_mask     : Feature mask
  * @fps              : Frame rate
  * @width            : Pixel width to output to csiphy
  * @height           : Pixel height to output to csiphy
- * request_id        : Request Id
+ * @num_exposures    : For sHDR, etc purposes, 1, or more
  * @caps             : Specifies capability sensor is configured
  *                     for, (eg, XCFA, HFR), num_exposures and
  *                     PDAF type
  */
 struct cam_sensor_dev_res_info {
 	uint16_t   res_index;
-	uint16_t   feature_mask;
 	uint32_t   fps;
 	uint32_t   width;
 	uint32_t   height;
@@ -106,16 +107,12 @@ struct cam_sensor_dev_res_info {
  * @bob_pwm_switch: Boolean flag to switch into PWM mode for BoB regulator
  * @last_flush_req: Last request to flush
  * @pipeline_delay: Sensor pipeline delay
- * @modeswitch_delay: Mode switch delay
  * @sensor_name: Sensor name
  * @aon_camera_id: AON Camera ID associated with this sensor
- * @last_applied_req: Last updated request id
  * @last_applied_req: Last applied request id
- * @num_batched_frames: Number batched frames
  * @is_stopped_by_user: Indicate if sensor has been stopped by userland
  * @stream_off_after_eof: Indicates if sensor needs to stream off after eof
- * @hw_no_ops: To determine whether HW operations need to be disabled
- * @is_res_info_updated: Indicate if resolution info is updated
+ * @cci_debug: Sensor debugfs info and entry
  */
 struct cam_sensor_ctrl_t {
 	char                           device_name[CAM_CTX_DEV_NAME_MAX_LENGTH];
@@ -123,7 +120,7 @@ struct cam_sensor_ctrl_t {
 	struct cam_hw_soc_info         soc_info;
 	struct mutex                   cam_sensor_mutex;
 	struct cam_sensor_board_info  *sensordata;
-	struct cam_sensor_dev_res_info sensor_res[MAX_PER_FRAME_ARRAY];
+	struct cam_sensor_dev_res_info sensor_res;
 	enum cci_i2c_master_t          cci_i2c_master;
 	enum cci_device_num            cci_num;
 	struct camera_io_master        io_master_info;
@@ -144,16 +141,14 @@ struct cam_sensor_ctrl_t {
 	bool                           bob_pwm_switch;
 	uint32_t                       last_flush_req;
 	uint16_t                       pipeline_delay;
-	uint16_t                       modeswitch_delay;
 	char                           sensor_name[CAM_SENSOR_NAME_MAX_SIZE];
 	uint8_t                        aon_camera_id;
-	int64_t                        last_updated_req;
 	int64_t                        last_applied_req;
-	uint32_t                       num_batched_frames;
 	bool                           is_stopped_by_user;
 	bool                           stream_off_after_eof;
-	bool                           hw_no_ops;
-	bool                           is_res_info_updated;
+	/* xiaomi add for cci debug start */
+	void                          *cci_debug;
+	/* xiaomi add for cci debug end */
 };
 
 /**

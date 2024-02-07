@@ -860,7 +860,6 @@ static struct cam_sfe_bus_rd_hw_info sfe880_bus_rd_hw_info = {
 	},
 	.top_irq_shift          = 0x1,
 	.latency_buf_allocation = 2048,
-	.sys_cache_default_val  = 0x20,
 	.irq_err_mask           = 0x80000001,
 	.fs_sync_shift          = 0x14,
 	.constraint_error_info  = &sfe880_bus_rd_constraint_error_info,
@@ -1765,9 +1764,8 @@ static struct cam_sfe_bus_wr_hw_info sfe880_bus_wr_hw_info = {
 		},
 	},
 	.constraint_error_info = &sfe880_bus_wr_constraint_error_info,
-	.comp_done_mask = {
-		BIT(17), BIT(18), BIT(19), BIT(20), BIT(21),  BIT(23),
-		BIT(24), BIT(25), BIT(26), BIT(27), BIT(22),
+	.comp_done_shift = {
+		17, 18, 19, 20, 21, 23, 24, 25, 26, 27, 22,
 	},
 	.num_comp_grp           = 11,
 	.line_done_cfg          = 0x11,
@@ -1775,7 +1773,6 @@ static struct cam_sfe_bus_wr_hw_info sfe880_bus_wr_hw_info = {
 	.max_out_res            = CAM_ISP_SFE_OUT_RES_BASE + 18,
 	.pack_align_shift       = 5,
 	.max_bw_counter_limit   = 0xFF,
-	.sys_cache_default_val  = 0x20,
 	.irq_err_mask           = 0xD0000000,
 };
 

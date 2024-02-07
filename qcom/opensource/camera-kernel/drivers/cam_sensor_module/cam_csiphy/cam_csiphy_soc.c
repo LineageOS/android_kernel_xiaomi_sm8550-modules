@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "cam_csiphy_soc.h"
 #include "cam_csiphy_core.h"
-#include "include/cam_csiphy_1_2_3_hwreg.h"
 #include "include/cam_csiphy_2_1_0_hwreg.h"
 #include "include/cam_csiphy_2_1_1_hwreg.h"
 #include "include/cam_csiphy_2_1_2_hwreg.h"
@@ -21,6 +20,12 @@
 #define CSIPHY_DIVISOR_8                     8
 #define CSIPHY_LOG_BUFFER_SIZE_IN_BYTES      250
 #define ONE_LOG_LINE_MAX_SIZE                20
+
+/* xiaomi add for mipi phy backup setting begin*/
+extern uint64_t xm_mipi_kmd_setting;
+static struct kobject csiphy_umd_paras_kobject;
+static void csiphy_umd_paras_kobj_init(void);
+/* xiaomi add for mipi phy backup setting end*/
 
 static int cam_csiphy_io_dump(void __iomem *base_addr, uint16_t num_regs, int csiphy_idx)
 {
@@ -163,8 +168,7 @@ enum cam_vote_level get_clk_voting_dynamic(
 		if (soc_info->clk_rate[cam_vote_level]
 			[csiphy_dev->rx_clk_src_idx] > phy_data_rate) {
 			CAM_DBG(CAM_CSIPHY,
-				"Found match PHY:%d clk_name:%s data_rate:%llu clk_rate:%d level:%d",
-				soc_info->index,
+				"match detected %s : %llu:%d level : %d",
 				soc_info->clk_name[csiphy_dev->rx_clk_src_idx],
 				phy_data_rate,
 				soc_info->clk_rate[cam_vote_level]
@@ -182,8 +186,6 @@ int32_t cam_csiphy_enable_hw(struct csiphy_device *csiphy_dev, int32_t index)
 	int32_t rc = 0;
 	struct cam_hw_soc_info   *soc_info;
 	enum cam_vote_level vote_level = CAM_SVS_VOTE;
-	unsigned long clk_rate = 0;
-	int i;
 
 	soc_info = &csiphy_dev->soc_info;
 
@@ -194,14 +196,6 @@ int32_t cam_csiphy_enable_hw(struct csiphy_device *csiphy_dev, int32_t index)
 	}
 
 	vote_level = csiphy_dev->ctrl_reg->getclockvoting(csiphy_dev, index);
-
-	for (i = 0; i < soc_info->num_clk; i++) {
-		CAM_DBG(CAM_CSIPHY, "PHY:%d %s:%d",
-			soc_info->index,
-			soc_info->clk_name[i],
-			soc_info->clk_rate[vote_level][i]);
-	}
-
 	rc = cam_soc_util_enable_platform_resource(soc_info, true,
 		vote_level, true);
 	if (rc < 0) {
@@ -212,21 +206,6 @@ int32_t cam_csiphy_enable_hw(struct csiphy_device *csiphy_dev, int32_t index)
 
 	rc = cam_soc_util_set_src_clk_rate(soc_info,
 		soc_info->clk_rate[0][soc_info->src_clk_idx]);
-
-	for (i = 0; i < csiphy_dev->soc_info.num_clk; i++) {
-		if (i == csiphy_dev->soc_info.src_clk_idx) {
-			CAM_DBG(CAM_CSIPHY, "Skipping call back for src clk %s",
-					csiphy_dev->soc_info.clk_name[i]);
-			continue;
-		}
-		clk_rate = cam_soc_util_get_clk_rate_applied(
-				&csiphy_dev->soc_info, i, false, vote_level);
-		if (clk_rate > 0) {
-			cam_subdev_notify_message(CAM_TFE_DEVICE_TYPE,
-					CAM_SUBDEV_MESSAGE_CLOCK_UPDATE,
-					(void *)(&clk_rate));
-		}
-	}
 
 	if (rc < 0) {
 		CAM_ERR(CAM_CSIPHY, "csiphy_clk_set_rate failed rc: %d", rc);
@@ -276,6 +255,9 @@ int32_t cam_csiphy_parse_dt_info(struct platform_device *pdev,
 	char      *csi_3p_clk_name = "csi_phy_3p_clk";
 	char      *csi_3p_clk_src_name = "csiphy_3p_clk_src";
 	struct cam_hw_soc_info   *soc_info;
+	/* xiaomi add for mipi phy backup setting begin*/
+	static uint8_t init_once;
+	/* xiaomi add for mipi phy backup setting end*/
 
 	soc_info = &csiphy_dev->soc_info;
 
@@ -294,12 +276,7 @@ int32_t cam_csiphy_parse_dt_info(struct platform_device *pdev,
 
 	csiphy_dev->prgm_cmn_reg_across_csiphy = (bool) is_regulator_enable_sync;
 
-	if (of_device_is_compatible(soc_info->dev->of_node, "qcom,csiphy-v1.2.3")) {
-		csiphy_dev->ctrl_reg = &ctrl_reg_1_2_3;
-		csiphy_dev->hw_version = CSIPHY_VERSION_V123;
-		csiphy_dev->is_divisor_32_comp = true;
-		csiphy_dev->clk_lane = 0;
-	} else if (of_device_is_compatible(soc_info->dev->of_node, "qcom,csiphy-v2.1.0")) {
+	if (of_device_is_compatible(soc_info->dev->of_node, "qcom,csiphy-v2.1.0")) {
 		csiphy_dev->ctrl_reg = &ctrl_reg_2_1_0;
 		csiphy_dev->hw_version = CSIPHY_VERSION_V210;
 		csiphy_dev->is_divisor_32_comp = true;
@@ -324,7 +301,35 @@ int32_t cam_csiphy_parse_dt_info(struct platform_device *pdev,
 		csiphy_dev->hw_version = CSIPHY_VERSION_V220;
 		csiphy_dev->is_divisor_32_comp = true;
 		csiphy_dev->clk_lane = 0;
-	} else {
+		/* xiaomi add cphy reg - begin */
+	} else if (of_device_is_compatible(soc_info->dev->of_node, "qcom,csiphy-v2.1.2-m11")) {
+		csiphy_dev->ctrl_reg = &ctrl_reg_2_1_2_m11;
+		csiphy_dev->hw_version = CSIPHY_VERSION_V212;
+		csiphy_dev->is_divisor_32_comp = true;
+		csiphy_dev->clk_lane = 0;
+	} else if (of_device_is_compatible(soc_info->dev->of_node, "qcom,csiphy-v2.1.2-m1")) {
+		csiphy_dev->ctrl_reg = &ctrl_reg_2_1_2_m1;
+		csiphy_dev->hw_version = CSIPHY_VERSION_V212;
+		csiphy_dev->is_divisor_32_comp = true;
+		csiphy_dev->clk_lane = 0;
+	} else if (of_device_is_compatible(soc_info->dev->of_node, "qcom,csiphy-v2.1.2-n11")) {
+		csiphy_dev->ctrl_reg = &ctrl_reg_2_1_2_n11;
+		csiphy_dev->hw_version = CSIPHY_VERSION_V212;
+		csiphy_dev->is_divisor_32_comp = true;
+		csiphy_dev->clk_lane = 0;
+	} else if (of_device_is_compatible(soc_info->dev->of_node, "qcom,csiphy-v2.1.2-m18")) {
+		if (init_once == 0) {
+			csiphy_umd_paras_kobj_init();
+			init_once = 1;
+		}
+		csiphy_dev->device_has_customized = 1;
+		strncpy(csiphy_dev->phy_dts_name, "qcom,csiphy-v2.1.2-m18", strlen("qcom,csiphy-v2.1.2-m18"));
+		csiphy_dev->ctrl_reg = &ctrl_reg_2_1_2_m18;
+		csiphy_dev->hw_version = CSIPHY_VERSION_V212;
+		csiphy_dev->is_divisor_32_comp = true;
+		csiphy_dev->clk_lane = 0;
+		/* xiaomi add hw trigger - end   */
+	}else {
 		CAM_ERR(CAM_CSIPHY, "invalid hw version : 0x%x",
 			csiphy_dev->hw_version);
 		rc =  -EINVAL;
@@ -387,3 +392,94 @@ int32_t cam_csiphy_soc_release(struct csiphy_device *csiphy_dev)
 
 	return 0;
 }
+
+
+/* xiaomi add for mipi phy backup setting begin*/
+static ssize_t csiphy_umd_paras_show(struct kobject *kobj, struct kobj_attribute *attr,
+	char *buf)
+{
+	CAM_INFO(CAM_CSIPHY, "xm_mipi_kmd_setting[0x%lx]", xm_mipi_kmd_setting);
+
+	return snprintf(buf, 64, "%lx", xm_mipi_kmd_setting);
+}
+
+static ssize_t csiphy_umd_paras_store(struct kobject *kobj, struct kobj_attribute *attr,
+	const char *buf, size_t count)
+{
+	int rc;
+	const char *p = NULL;
+
+	p = buf;
+	rc = kstrtou64(p, 16, &xm_mipi_kmd_setting);
+	if (rc < 0) {
+		CAM_ERR(CAM_CSIPHY, "error converting buf:[%s]", buf);
+	} else {
+		CAM_INFO(CAM_CSIPHY, "xm_mipi_kmd_setting:[0x%lx]", xm_mipi_kmd_setting);
+	}
+
+	return count;
+}
+
+
+static ssize_t csiphy_umd_paras_object_show(struct kobject *k, struct attribute *attr, char *buf)
+{
+	struct kobj_attribute *kobj_attr;
+	int ret = -EIO;
+
+	kobj_attr = container_of(attr, struct kobj_attribute, attr);
+
+	if (kobj_attr->show)
+		ret = kobj_attr->show(k, kobj_attr, buf);
+
+	return ret;
+}
+
+static ssize_t csiphy_umd_paras_object_store(struct kobject *k, struct attribute *attr, const char *buf, size_t size)
+{
+	struct kobj_attribute *kobj_attr;
+	int ret = -EIO;
+
+	kobj_attr = container_of(attr, struct kobj_attribute, attr);
+
+	if (kobj_attr->store)
+		ret = kobj_attr->store(k, kobj_attr, buf, sizeof(buf));
+
+	return ret;
+}
+
+static struct kobj_attribute csiphy_umd_paras_attribute =
+__ATTR(csiphy_umd_paras, 0644, csiphy_umd_paras_show, csiphy_umd_paras_store);
+
+static const struct sysfs_ops csiphy_umd_paras_sysfs_ops = {
+	.show = csiphy_umd_paras_object_show,
+	.store = csiphy_umd_paras_object_store,
+};
+
+static struct kobj_type csiphy_umd_paras_object_type = {
+	.sysfs_ops = &csiphy_umd_paras_sysfs_ops,
+	.release	= NULL,
+};
+
+static void csiphy_umd_paras_kobj_init(void)
+{
+	int rc = 0;
+	memset(&csiphy_umd_paras_kobject, 0x00, sizeof(csiphy_umd_paras_kobject));
+
+	if (kobject_init_and_add(&csiphy_umd_paras_kobject, &csiphy_umd_paras_object_type, NULL, "csiphy_umd_paras")) {
+		kobject_put(&csiphy_umd_paras_kobject);
+		return;
+	}
+
+	kobject_uevent(&csiphy_umd_paras_kobject, KOBJ_ADD);
+	rc = sysfs_create_file(&csiphy_umd_paras_kobject, &csiphy_umd_paras_attribute.attr);
+	if (rc < 0) {
+		CAM_ERR(CAM_CPAS,
+			"Failed to create debug attribute, rc=%d\n", rc);
+		sysfs_remove_file(&csiphy_umd_paras_kobject, &csiphy_umd_paras_attribute.attr);
+	}
+
+	return ;
+}
+/* xiaomi add for mipi phy backup setting end*/
+
+

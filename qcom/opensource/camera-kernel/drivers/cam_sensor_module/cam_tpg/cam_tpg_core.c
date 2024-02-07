@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "cam_tpg_core.h"
@@ -14,8 +13,7 @@ int cam_tpg_shutdown(struct cam_tpg_device *tpg_dev)
 	if (tpg_dev != NULL) {
 		CAM_INFO(CAM_TPG, "TPG[%d] shutdown cleanup.",
 				tpg_dev->soc_info.index);
-		if (!tpg_dev->hw_no_ops)
-			tpg_hw_reset(&tpg_dev->tpg_hw);
+		tpg_hw_reset(&tpg_dev->tpg_hw);
 		tpg_dev->state = CAM_TPG_STATE_INIT;
 	}
 	return 0;
@@ -119,12 +117,7 @@ static int cam_tpg_process_crm_evt(
 
 	switch(event->evt_type) {
 	case CAM_REQ_MGR_LINK_EVT_SOF_FREEZE:
-		if (tpg_dev->hw_no_ops) {
-			CAM_DBG(CAM_TPG, "TPG[%d] SOF Freeze hw_no_ops: %d",
-				tpg_dev->soc_info.index, tpg_dev->hw_no_ops);
-		} else
-			tpg_hw_dump_status(&tpg_dev->tpg_hw);
-
+		tpg_hw_dump_status(&tpg_dev->tpg_hw);
 		break;
 	default:
 		CAM_DBG(CAM_TPG, "Got crm event notification: %d", event->evt_type);
@@ -261,13 +254,11 @@ static int __cam_tpg_handle_release_dev(
 	if (tpg_dev->state == CAM_TPG_STATE_START) {
 		CAM_DBG(CAM_TPG, "TPG[%d] release from start state",
 						tpg_dev->soc_info.index);
-		if (!tpg_dev->hw_no_ops) {
-			rc = tpg_hw_stop(&tpg_dev->tpg_hw);
-			if (rc < 0) {
-				CAM_ERR(CAM_TPG, "TPG[%d] unable to stop tpg",
+		rc = tpg_hw_stop(&tpg_dev->tpg_hw);
+		if (rc < 0) {
+			CAM_ERR(CAM_TPG, "TPG[%d] unable to stop tpg",
 						tpg_dev->soc_info.index);
-				return rc;
-			}
+			return rc;
 		}
 	}
 	rc = tpg_hw_release(&tpg_dev->tpg_hw);
@@ -307,15 +298,12 @@ static int __cam_tpg_handle_start_dev(
 				tpg_dev->soc_info.index, tpg_dev->state);
 		return -EINVAL;
 	}
-	if (!tpg_dev->hw_no_ops)
-		rc = tpg_hw_start(&tpg_dev->tpg_hw);
+	rc = tpg_hw_start(&tpg_dev->tpg_hw);
 	if (rc) {
-		CAM_ERR(CAM_TPG, "TPG[%d] START_DEV failed hw_no_ops: %d",
-				tpg_dev->soc_info.index, tpg_dev->hw_no_ops);
+		CAM_ERR(CAM_TPG, "TPG[%d] START_DEV failed", tpg_dev->soc_info.index);
 	} else {
 		tpg_dev->state = CAM_TPG_STATE_START;
-		CAM_INFO(CAM_TPG, "TPG[%d] START_DEV done hw_no_ops: %d.",
-				tpg_dev->soc_info.index, tpg_dev->hw_no_ops);
+		CAM_INFO(CAM_TPG, "TPG[%d] START_DEV done.", tpg_dev->soc_info.index);
 	}
 
 	return rc;
@@ -342,18 +330,14 @@ static int __cam_tpg_handle_stop_dev(
 		CAM_WARN(CAM_TPG, "TPG[%d] not in right state[%d] to stop",
 				tpg_dev->soc_info.index, tpg_dev->state);
 	}
-	if (!tpg_dev->hw_no_ops)
-		rc = tpg_hw_stop(&tpg_dev->tpg_hw);
+	rc = tpg_hw_stop(&tpg_dev->tpg_hw);
 	if (rc) {
-		CAM_ERR(CAM_TPG, "TPG[%d] STOP_DEV failed hw_no_ops: %d",
-				tpg_dev->soc_info.index, tpg_dev->hw_no_ops);
+		CAM_ERR(CAM_TPG, "TPG[%d] STOP_DEV failed", tpg_dev->soc_info.index);
 	} else {
 		/* Free all allocated streams during stop dev */
-		if (!tpg_dev->hw_no_ops)
-			tpg_hw_free_streams(&tpg_dev->tpg_hw);
+		tpg_hw_free_streams(&tpg_dev->tpg_hw);
 		tpg_dev->state = CAM_TPG_STATE_ACQUIRE;
-		CAM_INFO(CAM_TPG, "TPG[%d] STOP_DEV done hw_no_ops: %d.",
-				tpg_dev->soc_info.index, tpg_dev->hw_no_ops);
+		CAM_INFO(CAM_TPG, "TPG[%d] STOP_DEV done.", tpg_dev->soc_info.index);
 	}
 
 	return rc;
@@ -437,7 +421,6 @@ static int cam_tpg_validate_cmd_descriptor(
 
 	*cmd_addr = (uintptr_t)cmd_header;
 end:
-	cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 	return rc;
 }
 
@@ -450,12 +433,6 @@ static int cam_tpg_cmd_buf_parse(
 
 	if (!tpg_dev || !packet)
 		return -EINVAL;
-
-	if (!packet->num_cmd_buf) {
-		CAM_ERR(CAM_TPG, "Invalid num_cmd_buffer = %d",
-			packet->num_cmd_buf);
-		return -EINVAL;
-	}
 
 	for (i = 0; i < packet->num_cmd_buf; i++) {
 		uint32_t cmd_type = TPG_CMD_TYPE_INVALID;
@@ -473,14 +450,11 @@ static int cam_tpg_cmd_buf_parse(
 
 		switch (cmd_type) {
 		case TPG_CMD_TYPE_GLOBAL_CONFIG:
-			if (!tpg_dev->hw_no_ops)
-				rc = tpg_hw_copy_global_config(
-					&tpg_dev->tpg_hw,
+			rc = tpg_hw_copy_global_config(&tpg_dev->tpg_hw,
 				(struct tpg_global_config_t *)cmd_addr);
 			break;
 		case TPG_CMD_TYPE_STREAM_CONFIG: {
-			if (!tpg_dev->hw_no_ops)
-				rc = tpg_hw_add_stream(&tpg_dev->tpg_hw,
+			rc = tpg_hw_add_stream(&tpg_dev->tpg_hw,
 				(struct tpg_stream_config_t *)cmd_addr);
 			break;
 		}
@@ -544,7 +518,6 @@ static int cam_tpg_packet_parse(
 			csl_packet->num_cmd_buf,
 			csl_packet->num_io_configs,
 			csl_packet->num_patches);
-
 	switch ((csl_packet->header.op_code & 0xFF)) {
 	case CAM_TPG_PACKET_OPCODE_INITIAL_CONFIG: {
 		if (csl_packet->num_cmd_buf <= 0) {
@@ -557,8 +530,7 @@ static int cam_tpg_packet_parse(
 			CAM_ERR(CAM_TPG, "CMD buffer parse failed");
 			goto end;
 		}
-		if (!tpg_dev->hw_no_ops)
-			tpg_hw_config(&tpg_dev->tpg_hw, TPG_HW_CMD_INIT_CONFIG, NULL);
+		tpg_hw_config(&tpg_dev->tpg_hw, TPG_HW_CMD_INIT_CONFIG, NULL);
 		break;
 	}
 	case CAM_TPG_PACKET_OPCODE_NOP: {
@@ -589,7 +561,6 @@ static int cam_tpg_packet_parse(
 		break;
 	}
 end:
-	cam_mem_put_cpu_buf(config->packet_handle);
 	return rc;
 }
 

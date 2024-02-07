@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/module.h>
 #include <linux/of_device.h>
@@ -18,7 +17,6 @@
 #include "cam_cpas_api.h"
 #include "cam_debug_util.h"
 #include "cre_hw_100.h"
-#include "cre_hw_110.h"
 #include "cre_dev_intf.h"
 #include "cam_smmu_api.h"
 #include "camera_main.h"
@@ -59,17 +57,6 @@ static int cam_cre_init_hw_version(struct cam_hw_soc_info *soc_info,
 	switch (core_info->hw_version) {
 	case CRE_HW_VER_1_0_0:
 		core_info->cre_hw_info->cre_hw = &cre_hw_100;
-
-		cre_hw_100.top_reg_offset->base = core_info->cre_hw_info->cre_top_base;
-		cre_hw_100.bus_rd_reg_offset->base = core_info->cre_hw_info->cre_bus_rd_base;
-		cre_hw_100.bus_wr_reg_offset->base = core_info->cre_hw_info->cre_bus_wr_base;
-		break;
-	case CRE_HW_VER_1_1_0:
-		core_info->cre_hw_info->cre_hw = &cre_hw_110;
-
-		cre_hw_110.top_reg_offset->base = core_info->cre_hw_info->cre_top_base;
-		cre_hw_110.bus_rd_reg_offset->base = core_info->cre_hw_info->cre_bus_rd_base;
-		cre_hw_110.bus_wr_reg_offset->base = core_info->cre_hw_info->cre_bus_wr_base;
 		break;
 	default:
 		CAM_ERR(CAM_CRE, "Unsupported version : %u",
@@ -78,6 +65,9 @@ static int cam_cre_init_hw_version(struct cam_hw_soc_info *soc_info,
 		break;
 	}
 
+	cre_hw_100.top_reg_offset->base = core_info->cre_hw_info->cre_top_base;
+	cre_hw_100.bus_rd_reg_offset->base = core_info->cre_hw_info->cre_bus_rd_base;
+	cre_hw_100.bus_wr_reg_offset->base = core_info->cre_hw_info->cre_bus_wr_base;
 
 	return rc;
 }
@@ -208,6 +198,10 @@ static int cam_cre_component_bind(struct device *dev,
 	cpas_vote.axi_vote.axi_path[0].mnoc_ab_bw =
 		CAM_CPAS_DEFAULT_AXI_BW;
 	cpas_vote.axi_vote.axi_path[0].mnoc_ib_bw =
+		CAM_CPAS_DEFAULT_AXI_BW;
+	cpas_vote.axi_vote.axi_path[0].ddr_ab_bw =
+		CAM_CPAS_DEFAULT_AXI_BW;
+	cpas_vote.axi_vote.axi_path[0].ddr_ib_bw =
 		CAM_CPAS_DEFAULT_AXI_BW;
 
 	rc = cam_cpas_start(core_info->cpas_handle,

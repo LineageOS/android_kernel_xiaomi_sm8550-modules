@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_CCI_DEV_H_
@@ -55,6 +55,10 @@
 #define CCI_I2C_MAX_READ 20480
 #define CCI_I2C_MAX_WRITE 20480
 #define CCI_I2C_MAX_BYTE_COUNT 65535
+
+/* xiaomi add for cci cmds dump start */
+#define CCI_I2C_CMDS_SNAPSHOT_MAX_COUNT 128
+/* xiaomi add for cci cmds dump end */
 
 #define CAMX_CCI_DEV_NAME "cam-cci-driver"
 
@@ -141,6 +145,12 @@ struct cam_cci_master_info {
 	struct mutex freq_cnt_lock;
 	uint16_t freq_ref_cnt;
 	bool is_initilized;
+	struct mutex master_mutex;
+	/* xiaomi add for cci cmds dump start */
+	uint32_t cci_write_cmds_pos_start;
+	uint32_t cci_write_cmds_pos_current;
+	uint32_t *cci_write_cmds;
+	/* xiaomi add for cci cmds dump end */
 };
 
 struct cam_cci_clk_params_t {
@@ -321,4 +331,7 @@ int cam_cci_init_module(void);
  * @brief : API to remove CCI Hw from platform framework.
  */
 void cam_cci_exit_module(void);
+#define VIDIOC_MSM_CCI_CFG \
+	_IOWR('V', BASE_VIDIOC_PRIVATE + 23, struct cam_cci_ctrl)
+
 #endif /* _CAM_CCI_DEV_H_ */

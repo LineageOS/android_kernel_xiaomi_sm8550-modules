@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_VFE_HW_INTF_H_
@@ -389,24 +389,6 @@ struct cam_vfe_generic_debug_config {
 	uint32_t  vfe_perf_counter_val[CAM_VFE_PERF_CNT_MAX];
 	bool      disable_ife_mmu_prefetch;
 };
-
-/*
- * cam_vfe_get_num_ifes()
- *
- * @brief:         Gets number of IFEs
- *
- * @num_ifes:      Fills number of IFES in the address passed
- */
-void cam_vfe_get_num_ifes(uint32_t *num_ifes);
-
-/*
- * cam_vfe_get_num_ife_lites()
- *
- * @brief:         Gets number of IFE-LITEs
- *
- * @num_ifes:      Fills number of IFE-LITES in the address passed
- */
-void cam_vfe_get_num_ife_lites(uint32_t *num_ife_lites);
 
 /*
  * cam_vfe_hw_init()

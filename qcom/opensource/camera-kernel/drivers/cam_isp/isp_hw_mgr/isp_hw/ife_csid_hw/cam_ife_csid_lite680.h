@@ -421,7 +421,6 @@ static struct cam_ife_csid_ver2_common_reg_info
 	.global_reset                                 = 1,
 	.rup_supported                                = 1,
 	.only_master_rup                              = 1,
-	.phy_sel_base_idx                             = 1,
 	.camif_irq_support                            = true,
 };
 
@@ -500,7 +499,6 @@ static struct cam_ife_csid_csi2_rx_reg_info
 		.fatal_err_mask                       = 0x19FA800,
 		.part_fatal_err_mask                  = 0x0001000,
 		.non_fatal_err_mask                   = 0x0200000,
-		.top_irq_mask                         = 0x4,
 };
 
 static struct cam_ife_csid_ver2_path_reg_info

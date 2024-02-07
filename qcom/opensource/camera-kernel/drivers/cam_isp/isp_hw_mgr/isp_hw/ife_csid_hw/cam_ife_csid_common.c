@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/iopoll.h>
@@ -480,16 +480,6 @@ int cam_ife_csid_cid_reserve(struct cam_ife_csid_cid_data *cid_data,
 {
 	int i, j, rc = 0;
 
-	for (i = 0; i < reserve->in_port->num_valid_vc_dt; i++)
-		CAM_DBG(CAM_ISP,
-			"CSID:%d res_:0x%x Lane type:%d lane_num:%d dt:%d vc:%d",
-			hw_idx,
-			reserve->in_port->res_type,
-			reserve->in_port->lane_type,
-			reserve->in_port->lane_num,
-			reserve->in_port->dt[i],
-			reserve->in_port->vc[i]);
-
 	for (i = 0; i < CAM_IFE_CSID_CID_MAX; i++) {
 		rc = cam_ife_csid_get_cid(&cid_data[i], reserve);
 		if (!rc)
@@ -497,13 +487,13 @@ int cam_ife_csid_cid_reserve(struct cam_ife_csid_cid_data *cid_data,
 	}
 
 	if (i == CAM_IFE_CSID_CID_MAX) {
-		for (j = 0; j < reserve->in_port->num_valid_vc_dt; j++)
+		for (j = 0; j < reserve->in_port->num_valid_vc_dt; j++) {
 			CAM_ERR(CAM_ISP,
 				"CSID[%d] reserve fail vc[%d] dt[%d]",
 				hw_idx, reserve->in_port->vc[j],
 				reserve->in_port->dt[j]);
-
-		return -EINVAL;
+			return -EINVAL;
+		}
 	}
 
 	cid_data[i].cid_cnt++;
@@ -543,7 +533,7 @@ int cam_ife_csid_check_in_port_args(
 	uint32_t hw_idx)
 {
 
-	if (reserve->in_port->res_type >= CAM_IFE_CSID_IN_RES_MAX) {
+	if (reserve->in_port->res_type >= CAM_ISP_IFE_IN_RES_MAX) {
 
 		CAM_ERR(CAM_ISP, "CSID:%d  Invalid phy sel %d",
 			hw_idx, reserve->in_port->res_type);

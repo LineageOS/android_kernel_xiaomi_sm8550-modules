@@ -6,6 +6,10 @@ $(info "KERNEL_ROOT is: $(KERNEL_ROOT)")
 endif
 
 # Include Architecture configurations
+ifeq ($(CONFIG_ARCH_KALAMA), y)
+include $(CAMERA_KERNEL_ROOT)/config/kalama.mk
+endif
+
 ifeq ($(CONFIG_ARCH_WAIPIO), y)
 include $(CAMERA_KERNEL_ROOT)/config/waipio.mk
 endif
@@ -46,16 +50,6 @@ ifeq ($(CONFIG_ARCH_PARROT), y)
 include $(CAMERA_KERNEL_ROOT)/config/parrot.mk
 endif
 
-# For some targets which have binary compatible gki kernel with another one,
-# we cannot rely on CONFIG_ARCH_* symbol which is defined in Kernel defconfig
-ifeq ($(BOARD_PLATFORM), kalama)
-include $(CAMERA_KERNEL_ROOT)/config/kalama.mk
-endif
-
-ifeq ($(BOARD_PLATFORM), crow)
-include $(CAMERA_KERNEL_ROOT)/config/crow.mk
-endif
-
 # List of all camera-kernel headers
 cam_include_dirs := $(shell dirname `find $(CAMERA_KERNEL_ROOT) -name '*.h'` | uniq)
 
@@ -70,6 +64,7 @@ LINUXINCLUDE +=                                 \
 	-I$(CAMERA_KERNEL_ROOT)/
 # Optional include directories
 ccflags-$(CONFIG_MSM_GLOBAL_SYNX) += -I$(KERNEL_ROOT)/drivers/media/platform/msm/synx
+ccflags-$(CONFIG_MI_HARDWARE_ID) += -I$(KERNEL_ROOT)/drivers/misc/hwid
 
 # After creating lists, add content of 'ccflags-m' variable to 'ccflags-y' one.
 ccflags-y += ${ccflags-m}
@@ -214,6 +209,8 @@ camera-$(CONFIG_SPECTRA_SENSOR) += \
 	drivers/cam_sensor_module/cam_actuator/cam_actuator_dev.o \
 	drivers/cam_sensor_module/cam_actuator/cam_actuator_core.o \
 	drivers/cam_sensor_module/cam_actuator/cam_actuator_soc.o \
+	drivers/cam_sensor_module/cam_cci/cam_cci_debug_util.o \
+	drivers/cam_sensor_module/cam_sensor_utils/cam_parklens_thread.o \
 	drivers/cam_sensor_module/cam_cci/cam_cci_dev.o \
 	drivers/cam_sensor_module/cam_cci/cam_cci_core.o \
 	drivers/cam_sensor_module/cam_cci/cam_cci_soc.o \
@@ -232,6 +229,7 @@ camera-$(CONFIG_SPECTRA_SENSOR) += \
 	drivers/cam_sensor_module/cam_ois/cam_ois_dev.o \
 	drivers/cam_sensor_module/cam_ois/cam_ois_core.o \
 	drivers/cam_sensor_module/cam_ois/cam_ois_soc.o \
+	drivers/cam_sensor_module/cam_ois/sem1217s.o \
 	drivers/cam_sensor_module/cam_sensor/cam_sensor_dev.o \
 	drivers/cam_sensor_module/cam_sensor/cam_sensor_core.o \
 	drivers/cam_sensor_module/cam_sensor/cam_sensor_soc.o \
@@ -296,3 +294,7 @@ camera-y += drivers/camera_main.o
 
 obj-m += camera.o
 BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/camera.ko
+
+cameralog-y := drivers/cam_log/cam_log.o
+obj-m+= cameralog.o
+BOARD_VENDOR_KERNEL_MODULES +=  $(KERNEL_MODULES_OUT)/cameralog.ko

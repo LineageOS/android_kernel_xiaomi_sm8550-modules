@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of.h>
@@ -21,7 +21,6 @@
 #include "cam_cpas_hw_intf.h"
 #include "cam_cpas_soc.h"
 #include "camera_main.h"
-#include "cam_cpastop_hw.h"
 
 #define CAM_CPAS_DEV_NAME    "cam-cpas"
 #define CAM_CPAS_INTF_INITIALIZED() (g_cpas_intf && g_cpas_intf->probe_done)
@@ -264,37 +263,6 @@ int cam_cpas_dump_camnoc_buff_fill_info(uint32_t client_handle)
 }
 EXPORT_SYMBOL(cam_cpas_dump_camnoc_buff_fill_info);
 
-bool cam_cpas_is_part_supported(uint32_t flag, uint32_t hw_map, uint32_t part_info)
-{
-	int32_t i;
-	struct cam_hw_info *cpas_hw = g_cpas_intf->hw_intf->hw_priv;
-	struct cam_cpas *cpas_core = cpas_hw->core_info;
-	struct cam_camnoc_info *camnoc_info = cpas_core->camnoc_info;
-	struct cam_cpas_subpart_info *cam_subpart_info = NULL;
-
-	if (!camnoc_info) {
-		CAM_ERR(CAM_CPAS, "Invalid camnoc info for hw_version: 0x%x",
-				cpas_hw->soc_info.hw_version);
-		return false;
-	}
-	cam_subpart_info = camnoc_info->cam_subpart_info;
-
-	if (!cam_subpart_info) {
-		CAM_DBG(CAM_CPAS, "Invalid address of cam_subpart_info");
-		return true;
-	}
-
-	for (i = 0; i < cam_subpart_info->num_bits; i++) {
-		if ((cam_subpart_info->hw_bitmap_mask[i][0] == flag) &&
-				(cam_subpart_info->hw_bitmap_mask[i][1] == hw_map)) {
-			CAM_DBG(CAM_CPAS, "flag: %u hw_map: %u part_info:0x%x",
-					flag, hw_map, part_info);
-			return ((part_info & BIT(i)) == 0);
-		}
-	}
-	return true;
-}
-
 bool cam_cpas_is_feature_supported(uint32_t flag, uint32_t hw_map,
 	uint32_t *fuse_val)
 {
@@ -317,8 +285,6 @@ bool cam_cpas_is_feature_supported(uint32_t flag, uint32_t hw_map,
 		return false;
 	}
 
-	supported = cam_cpas_is_part_supported(flag, hw_map, soc_private->part_info);
-
 	for (i = 0; i < soc_private->num_feature_info; i++)
 		if (soc_private->feature_info[i].feature == flag)
 			break;
@@ -329,10 +295,8 @@ bool cam_cpas_is_feature_supported(uint32_t flag, uint32_t hw_map,
 	if (soc_private->feature_info[i].type == CAM_CPAS_FEATURE_TYPE_DISABLE
 		|| (soc_private->feature_info[i].type ==
 		CAM_CPAS_FEATURE_TYPE_ENABLE)) {
-		if ((soc_private->feature_info[i].hw_map & hw_map) == hw_map) {
-			if (!(supported && soc_private->feature_info[i].enable))
-				supported = false;
-		}
+		if ((soc_private->feature_info[i].hw_map & hw_map) == hw_map)
+			supported = soc_private->feature_info[i].enable;
 	} else {
 		if (!fuse_val) {
 			CAM_ERR(CAM_CPAS,
@@ -663,31 +627,6 @@ int cam_cpas_select_qos_settings(uint32_t selection_mask)
 }
 EXPORT_SYMBOL(cam_cpas_select_qos_settings);
 
-int cam_cpas_enable_tpg_mux_sel(uint32_t tpg_mux_sel)
-{
-	int rc = 0;
-
-	if (!CAM_CPAS_INTF_INITIALIZED()) {
-		CAM_ERR(CAM_CPAS, "cpas intf not initialized");
-		return -EBADR;
-	}
-
-	if (g_cpas_intf->hw_intf->hw_ops.process_cmd) {
-		rc = g_cpas_intf->hw_intf->hw_ops.process_cmd(
-			g_cpas_intf->hw_intf->hw_priv,
-			CAM_CPAS_HW_CMD_TPG_MUX_SEL, &tpg_mux_sel,
-			sizeof(tpg_mux_sel));
-		if (rc)
-			CAM_ERR(CAM_CPAS, "Failed in process_cmd, rc=%d", rc);
-	} else {
-		CAM_ERR(CAM_CPAS, "Invalid process_cmd ops");
-		rc = -EBADR;
-	}
-
-	return rc;
-}
-EXPORT_SYMBOL(cam_cpas_enable_tpg_mux_sel);
-
 int cam_cpas_notify_event(const char *identifier_string,
 	int32_t identifier_value)
 {
@@ -793,46 +732,6 @@ int cam_cpas_get_scid(
 	return rc;
 }
 EXPORT_SYMBOL(cam_cpas_get_scid);
-
-int cam_cpas_prepare_subpart_info(uint32_t subpart_type, uint32_t subpart_count)
-{
-	struct cam_hw_info *cpas_hw = NULL;
-	struct cam_cpas_private_soc *soc_private = NULL;
-
-	cpas_hw = (struct cam_hw_info *) g_cpas_intf->hw_intf->hw_priv;
-
-	mutex_lock(&cpas_hw->hw_mutex);
-	soc_private = (struct cam_cpas_private_soc *)cpas_hw->soc_info.soc_private;
-
-	if (!soc_private) {
-		CAM_ERR(CAM_CPAS, "Invalid soc_private: 0x%x", soc_private);
-		mutex_unlock(&cpas_hw->hw_mutex);
-		return -EINVAL;
-	}
-
-	switch (subpart_type) {
-	case CAM_SYSFS_IFE_HW_IDX:
-		soc_private->sysfs_info.num_ifes = subpart_count;
-		break;
-	case CAM_SYSFS_IFE_LITE_HW_IDX:
-		soc_private->sysfs_info.num_ife_lites = subpart_count;
-		break;
-	case CAM_SYSFS_SFE_HW_IDX:
-		soc_private->sysfs_info.num_sfes = subpart_count;
-		break;
-	case CAM_SYSFS_CUSTOM_HW_IDX:
-		soc_private->sysfs_info.num_custom = subpart_count;
-		break;
-	default:
-		CAM_ERR(CAM_CPAS, "Invalid camera subpart type : %d", subpart_type);
-		mutex_unlock(&cpas_hw->hw_mutex);
-		return -EINVAL;
-	}
-
-	mutex_unlock(&cpas_hw->hw_mutex);
-	return 0;
-}
-EXPORT_SYMBOL(cam_cpas_prepare_subpart_info);
 
 int cam_cpas_activate_llcc(
 	enum cam_sys_cache_config_types type)

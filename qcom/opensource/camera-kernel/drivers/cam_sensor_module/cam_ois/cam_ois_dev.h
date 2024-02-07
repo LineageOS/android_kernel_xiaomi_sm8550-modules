@@ -22,6 +22,7 @@
 #include <cam_subdev.h>
 #include "cam_soc_util.h"
 #include "cam_context.h"
+#include "cam_parklens_thread.h" //xiaomi add
 
 #define DEFINE_MSM_MUTEX(mutexname) \
 	static struct mutex mutexname = __MUTEX_INITIALIZER(mutexname)
@@ -34,6 +35,12 @@ enum cam_ois_state {
 	CAM_OIS_ACQUIRE,
 	CAM_OIS_CONFIG,
 	CAM_OIS_START,
+};
+
+// xiaomi add
+enum cam_ois_apply_state_t {
+	OIS_APPLY_SETTINGS_NOW,
+	OIS_APPLY_SETTINGS_LATER,
 };
 
 /**
@@ -97,6 +104,7 @@ struct cam_ois_intf_params {
  * @is_ois_calib    :   flag for Calibration data
  * @opcode          :   ois opcode
  * @device_name     :   Device name
+ * @cci_debug       :   OIS debugfs info and entry
  *
  */
 struct cam_ois_ctrl_t {
@@ -111,6 +119,7 @@ struct cam_ois_ctrl_t {
 	bool is_i3c_device;
 	struct cam_ois_intf_params bridge_intf;
 	struct i2c_settings_array i2c_fwinit_data;
+	struct i2c_settings_array i2c_postinit_data;
 	struct i2c_settings_array i2c_init_data;
 	struct i2c_settings_array i2c_calib_data;
 	struct i2c_settings_array i2c_mode_data;
@@ -121,6 +130,15 @@ struct cam_ois_ctrl_t {
 	uint8_t ois_fw_flag;
 	uint8_t is_ois_calib;
 	struct cam_ois_opcode opcode;
+	/* xiaomi add for cci debug start */
+	void *cci_debug;
+	/* xiaomi add for cci debug end */
+	struct i2c_data_settings i2c_data;  // xiaomi add
+	uint64_t last_flush_req;  // xiaomi add
+	enum cam_ois_apply_state_t setting_apply_state;  // xiaomi add
+	struct skip_frame skip_frame_queue[MAX_PER_FRAME_ARRAY]; // xiaomi add
+	bool is_second_init; //xiaomi_add
+	struct cam_ois_parklens_ctrl_t parklens_ctrl; //xiaomi add
 };
 
 /**

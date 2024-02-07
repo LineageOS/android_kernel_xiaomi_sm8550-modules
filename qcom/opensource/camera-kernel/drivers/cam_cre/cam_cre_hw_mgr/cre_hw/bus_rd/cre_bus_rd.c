@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/delay.h>
 #include "cam_hw.h"
@@ -67,7 +66,7 @@ static void cam_cre_update_read_reg_val(struct plane_info p_info,
 		p_info.alignment);
 
 	/* Fetch engine width has to be updated in number of bytes */
-	rd_client_reg_val->img_width  = p_info.width;
+	rd_client_reg_val->img_width  = p_info.stride;
 	rd_client_reg_val->stride     = p_info.stride;
 	rd_client_reg_val->img_height = p_info.height;
 	rd_client_reg_val->alignment  = p_info.alignment;
@@ -138,10 +137,6 @@ static int cam_cre_bus_rd_update(struct cam_cre_hw *cam_cre_hw_info,
 
 	in_port_idx =
 	cam_cre_bus_rd_in_port_idx(io_buf->resource_type);
-	if (in_port_idx < 0) {
-		CAM_ERR(CAM_CRE, "Invalid in_port_idx for resource %d", io_buf->resource_type);
-		return -EINVAL;
-	}
 
 	CAM_DBG(CAM_CRE, "in_port_idx %d", in_port_idx);
 	for (k = 0; k < io_buf->num_planes; k++) {
@@ -184,7 +179,7 @@ static int cam_cre_bus_rd_update(struct cam_cre_hw *cam_cre_hw_info,
 		/* Buffer size */
 		update_cre_reg_set(cre_reg_buf,
 			rd_reg->offset + rd_reg_client->rd_width,
-			ctx_data->cre_acquire.in_res[in_port_idx].width);
+			rd_client_reg_val->img_width);
 		update_cre_reg_set(cre_reg_buf,
 			rd_reg->offset + rd_reg_client->rd_height,
 			rd_client_reg_val->img_height);
@@ -228,7 +223,7 @@ static int cam_cre_bus_rd_prepare(struct cam_cre_hw *cam_cre_hw_info,
 	struct cre_io_buf *io_buf;
 	struct cam_cre_bus_rd_reg *rd_reg;
 	struct cam_cre_bus_rd_reg_val *rd_reg_val;
-	struct cre_reg_buffer *cre_reg_buf = NULL;
+	struct cre_reg_buffer *cre_reg_buf;
 
 	int val;
 
@@ -272,12 +267,11 @@ static int cam_cre_bus_rd_prepare(struct cam_cre_hw *cam_cre_hw_info,
 			rd_reg->offset + rd_reg->input_if_cmd,
 			val);
 	}
-	if (cre_reg_buf) {
-		for (i = 0; i < cre_reg_buf->num_rd_reg_set; i++) {
-			CAM_DBG(CAM_CRE, "CRE value 0x%x offset 0x%x",
-					cre_reg_buf->rd_reg_set[i].value,
-					cre_reg_buf->rd_reg_set[i].offset);
-		}
+
+	for (i = 0; i < cre_reg_buf->num_rd_reg_set; i++) {
+		CAM_DBG(CAM_CRE, "CRE value 0x%x offset 0x%x",
+				cre_reg_buf->rd_reg_set[i].value,
+				cre_reg_buf->rd_reg_set[i].offset);
 	}
 end:
 	return 0;
@@ -447,8 +441,7 @@ static int cam_cre_bus_rd_isr(struct cam_cre_hw *cam_cre_hw_info,
 	int32_t ctx_id, void *data)
 {
 	uint32_t irq_status;
-	uint32_t const_violation_status;
-	uint32_t ccif_violation_status;
+	uint32_t violation_status;
 	uint32_t debug_status_0;
 	uint32_t debug_status_1;
 	struct cam_cre_bus_rd_reg *bus_rd_reg;
@@ -471,30 +464,24 @@ static int cam_cre_bus_rd_isr(struct cam_cre_hw *cam_cre_hw_info,
 	cam_io_w_mb(bus_rd_reg_val->irq_cmd_clear,
 		bus_rd_reg->base + bus_rd_reg->irq_cmd);
 
-	CAM_DBG(CAM_CRE, "BUS irq_status 0x%x", irq_status);
-
 	if (irq_status & bus_rd_reg_val->rup_done)
 		CAM_DBG(CAM_CRE, "CRE Read Bus RUP done");
 
 	if (irq_status & bus_rd_reg_val->rd_buf_done)
 		CAM_DBG(CAM_CRE, "CRE Read Bus Buff done");
 
-	if ((irq_status & bus_rd_reg_val->cons_violation) ||
-		(irq_status & bus_rd_reg_val->ccif_violation)) {
+	if (irq_status & bus_rd_reg_val->cons_violation) {
 		irq_data->error = 1;
-		const_violation_status = cam_io_r_mb(bus_rd_reg->base +
-			bus_rd_reg->cons_violation);
-		ccif_violation_status = cam_io_r_mb(bus_rd_reg->base +
-			bus_rd_reg->ccif_violation);
+		violation_status = cam_io_r_mb(bus_rd_reg->base +
+			bus_rd_reg->rd_clients[0].cons_violation_status);
 		debug_status_0 = cam_io_r_mb(bus_rd_reg->base +
 			bus_rd_reg->rd_clients[0].debug_status_0);
 		debug_status_1 = cam_io_r_mb(bus_rd_reg->base +
 			bus_rd_reg->rd_clients[0].debug_status_1);
 		CAM_DBG(CAM_CRE, "CRE Read Bus Violation");
 		CAM_DBG(CAM_CRE,
-			"violation status 0x%x 0x%x debug status 0/1 0x%x/0x%x",
-			const_violation_status, ccif_violation_status,
-			debug_status_0, debug_status_1);
+			"violation status 0x%x debug status 0/1 0x%x/0x%x",
+			violation_status, debug_status_0, debug_status_1);
 	}
 
 	return 0;

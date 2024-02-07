@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_IFE_CSID_COMMON_H_
@@ -75,7 +75,6 @@
 #define CAM_IFE_CSID_BIN_VERTICAL                         BIT(2)
 
 #define CAM_IFE_CSID_WIDTH_FUSE_VAL_MAX			  4
-#define CAM_IFE_CSID_IN_RES_MAX				  (CAM_ISP_IFE_IN_RES_PHY_7 + 1)
 
 /* factor to conver qtime to boottime */
 extern int64_t qtime_to_boottime;

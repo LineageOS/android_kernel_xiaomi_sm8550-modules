@@ -1,22 +1,18 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
 #include <linux/mod_devicetable.h>
 #include <linux/of_device.h>
-#include <dt-bindings/msm-camera.h>
 #include "cam_tfe_dev.h"
 #include "cam_tfe_core.h"
 #include "cam_tfe_soc.h"
 #include "cam_debug_util.h"
 #include "camera_main.h"
-#include "cam_cpas_api.h"
 
 static struct cam_isp_hw_intf_data  cam_tfe_hw_list[CAM_TFE_HW_NUM_MAX];
-static uint32_t g_num_tfe_hws, g_num_tfe_lite_hws;
 
 static int cam_tfe_component_bind(struct device *dev,
 	struct device *master_dev, void *data)
@@ -29,28 +25,16 @@ static int cam_tfe_component_bind(struct device *dev,
 	struct cam_tfe_soc_private        *tfe_soc_priv;
 	int                                rc = 0;
 	struct platform_device *pdev = to_platform_device(dev);
-	uint32_t tfe_hw_idx = 0;
 	uint32_t  i;
-
-	CAM_DBG(CAM_ISP, "probe called");
-
-	rc = of_property_read_u32(pdev->dev.of_node, "cell-index", &tfe_hw_idx);
-	if (rc) {
-		CAM_ERR(CAM_ISP, "Failed to read cell-index of TFE HW, rc: %d", rc);
-		goto end;
-	}
-
-	if (!cam_cpas_is_feature_supported(CAM_CPAS_ISP_FUSE, BIT(tfe_hw_idx), NULL) ||
-		!cam_cpas_is_feature_supported(CAM_CPAS_ISP_LITE_FUSE, BIT(tfe_hw_idx), NULL)) {
-		CAM_DBG(CAM_ISP, "TFE[%d] not supported based on fuse", tfe_hw_idx);
-		goto end;
-	}
 
 	tfe_hw_intf = kzalloc(sizeof(struct cam_hw_intf), GFP_KERNEL);
 	if (!tfe_hw_intf) {
 		rc = -ENOMEM;
 		goto end;
 	}
+
+	of_property_read_u32(pdev->dev.of_node,
+		"cell-index", &tfe_hw_intf->hw_idx);
 
 	tfe_hw = kzalloc(sizeof(struct cam_hw_info), GFP_KERNEL);
 	if (!tfe_hw) {
@@ -62,7 +46,6 @@ static int cam_tfe_component_bind(struct device *dev,
 	tfe_hw->soc_info.dev = &pdev->dev;
 	tfe_hw->soc_info.dev_name = pdev->name;
 	tfe_hw_intf->hw_priv = tfe_hw;
-	tfe_hw_intf->hw_idx = tfe_hw_idx;
 	tfe_hw_intf->hw_ops.get_hw_caps = cam_tfe_get_hw_caps;
 	tfe_hw_intf->hw_ops.init = cam_tfe_init_hw;
 	tfe_hw_intf->hw_ops.deinit = cam_tfe_deinit_hw;
@@ -212,44 +195,11 @@ const static struct component_ops cam_tfe_component_ops = {
 	.unbind = cam_tfe_component_unbind,
 };
 
-void cam_tfe_get_num_tfe_hws(uint32_t *num_tfes)
-{
-	if (num_tfes)
-		*num_tfes = g_num_tfe_hws;
-	else
-		CAM_ERR(CAM_ISP, "Invalid argument, g_num_tfe_hws: %u", g_num_tfe_hws);
-}
-
-void cam_tfe_get_num_tfe_lite_hws(uint32_t *num_tfe_lites)
-{
-	if (num_tfe_lites)
-		*num_tfe_lites = g_num_tfe_lite_hws;
-	else
-		CAM_ERR(CAM_ISP, "Invalid argument, g_num_tfe_lite_hws: %u", g_num_tfe_lite_hws);
-}
-
 int cam_tfe_probe(struct platform_device *pdev)
 {
 	int rc = 0;
-	const char *compatible_name;
-	struct device_node *of_node = NULL;
 
 	CAM_DBG(CAM_ISP, "Adding TFE component");
-
-	of_node = pdev->dev.of_node;
-
-	rc = of_property_read_string_index(of_node, "compatible", 0,
-		(const char **)&compatible_name);
-	if (rc)
-		CAM_ERR(CAM_ISP, "No compatible string present for: %s, rc: %d", pdev->name, rc);
-
-	if (strnstr(compatible_name, "lite", strlen(compatible_name)) != NULL)
-		g_num_tfe_lite_hws++;
-	else if (strnstr(compatible_name, "tfe", strlen(compatible_name)) != NULL)
-		g_num_tfe_hws++;
-	else
-		CAM_ERR(CAM_ISP, "Failed to increement number of TFEs/TFE-LITEs");
-
 	rc = component_add(&pdev->dev, &cam_tfe_component_ops);
 	if (rc)
 		CAM_ERR(CAM_ISP, "failed to add component rc: %d", rc);

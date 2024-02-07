@@ -1,17 +1,24 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
 #include <clocksource/arm_arch_timer.h>
+#include <hwid.h>
 #include "cam_sensor_util.h"
 #include "cam_mem_mgr.h"
 #include "cam_res_mgr_api.h"
 
 #define CAM_SENSOR_PINCTRL_STATE_SLEEP "cam_suspend"
 #define CAM_SENSOR_PINCTRL_STATE_DEFAULT "cam_default"
+
+/*add by xiaomi*/
+#define CAM_SENSOR_VERSION_PINCTRL_STATE_SLEEP "cam_version_suspend"
+#define CAM_SENSOR_VERSION_PINCTRL_STATE_DEFAULT "cam_version_default"
+static struct mutex     cam_power_up_sync_mutex[MAX_CCI_DEV][MAX_MASTER_DEV];
+/*end by xiaomi*/
 
 #define VALIDATE_VOLTAGE(min, max, config_val) ((config_val) && \
 	(config_val >= min) && (config_val <= max))
@@ -146,7 +153,7 @@ int32_t cam_sensor_util_get_current_qtimer_ns(uint64_t *qtime_ns)
 	if (qtime_ns != NULL) {
 		*qtime_ns = mul_u64_u32_div(ticks,
 			QTIMER_MUL_FACTOR, QTIMER_DIV_FACTOR);
-		CAM_DBG(CAM_SENSOR, "Qtimer time: 0x%lx", *qtime_ns);
+		CAM_DBG(CAM_SENSOR, "Qtimer time: 0x%x", *qtime_ns);
 	} else {
 		CAM_ERR(CAM_SENSOR, "NULL pointer passed");
 		return -EINVAL;
@@ -378,7 +385,6 @@ static int32_t cam_sensor_get_io_buffer(
 			CAM_ERR(CAM_SENSOR,
 				"invalid size:io_cfg->offsets[0]: %d, buf_size: %d",
 				io_cfg->offsets[0], buf_size);
-			cam_mem_put_cpu_buf(io_cfg->mem_handle[0]);
 			return -EINVAL;
 		}
 		i2c_settings->read_buff =
@@ -390,7 +396,6 @@ static int32_t cam_sensor_get_io_buffer(
 			io_cfg->direction);
 		rc = -EINVAL;
 	}
-	cam_mem_put_cpu_buf(io_cfg->mem_handle[0]);
 	return rc;
 }
 
@@ -423,7 +428,6 @@ int32_t cam_sensor_util_write_qtimer_to_io_buffer(
 			CAM_ERR(CAM_SENSOR,
 				"invalid size:io_cfg->offsets[0]: %d, buf_size: %d",
 				io_cfg->offsets[0], buf_size);
-			cam_mem_put_cpu_buf(io_cfg->mem_handle[0]);
 			return -EINVAL;
 		}
 
@@ -434,12 +438,10 @@ int32_t cam_sensor_util_write_qtimer_to_io_buffer(
 			CAM_ERR(CAM_SENSOR,
 				"not enough size for qtimer, target_size:%d",
 				target_size);
-			cam_mem_put_cpu_buf(io_cfg->mem_handle[0]);
 			return -EINVAL;
 		}
 
 		memcpy((void *)target_buf, &qtime_ns, sizeof(uint64_t));
-		cam_mem_put_cpu_buf(io_cfg->mem_handle[0]);
 	} else {
 		CAM_ERR(CAM_SENSOR, "Invalid direction: %d",
 			io_cfg->direction);
@@ -633,7 +635,6 @@ int cam_sensor_i2c_command_parser(
 			(cmd_desc[i].offset >
 			(len_of_buff - sizeof(struct common_header)))) {
 			CAM_ERR(CAM_SENSOR, "buffer provided too small");
-			cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
 			return -EINVAL;
 		}
 		cmd_buf = (uint32_t *)generic_ptr;
@@ -642,7 +643,6 @@ int cam_sensor_i2c_command_parser(
 		remain_len -= cmd_desc[i].offset;
 		if (remain_len < cmd_desc[i].length) {
 			CAM_ERR(CAM_SENSOR, "buffer provided too small");
-			cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
 			return -EINVAL;
 		}
 
@@ -900,12 +900,9 @@ int cam_sensor_i2c_command_parser(
 			}
 		}
 		i2c_reg_settings->is_settings_valid = 1;
-		cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
 	}
-	return rc;
 
 end:
-	cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
 	return rc;
 }
 
@@ -1062,6 +1059,107 @@ int32_t cam_sensor_i2c_read_data(
 
 	return rc;
 }
+
+int32_t cam_sensor_i2c_read_write_ois_data(
+	struct i2c_settings_array *i2c_settings,
+	struct camera_io_master *io_master_info)
+{
+	int32_t                   rc = 0;
+	struct i2c_settings_list  *i2c_list = NULL;
+	uint32_t                  cnt = 0;
+	uint8_t                   *read_buff = NULL;
+	uint32_t                  buff_length = 0;
+	uint32_t                  read_length = 0;
+	uint32_t                  last_read_buff_size = 0;
+
+	list_for_each_entry(i2c_list,
+		&(i2c_settings->list_head), list) {
+
+		if (i2c_list->op_code != CAM_SENSOR_I2C_WRITE_RANDOM){
+			read_buff = i2c_list->i2c_settings.read_buff;
+			buff_length = i2c_list->i2c_settings.read_buff_len;
+			if ((read_buff == NULL) || (buff_length == 0)) {
+				CAM_ERR(CAM_SENSOR,
+					"Invalid input buffer, buffer: %pK, length: %d",
+					read_buff, buff_length);
+				return -EINVAL;
+			}
+			read_buff += last_read_buff_size;
+		}
+
+		if (i2c_list->op_code == CAM_SENSOR_I2C_READ_RANDOM) {
+			read_length = i2c_list->i2c_settings.data_type *
+				i2c_list->i2c_settings.size;
+			if ((read_length > buff_length) ||
+				(read_length < i2c_list->i2c_settings.size)) {
+				CAM_ERR(CAM_SENSOR,
+				"Invalid size, readLen:%d, bufLen:%d, size: %d",
+				read_length, buff_length,
+				i2c_list->i2c_settings.size);
+				return -EINVAL;
+			}
+			for (cnt = 0; cnt < (i2c_list->i2c_settings.size);
+				cnt++) {
+				struct cam_sensor_i2c_reg_array *reg_setting =
+				&(i2c_list->i2c_settings.reg_setting[cnt]);
+				rc = camera_io_dev_read(io_master_info,
+					reg_setting->reg_addr,
+					&reg_setting->reg_data,
+					i2c_list->i2c_settings.addr_type,
+					i2c_list->i2c_settings.data_type,
+					false);
+				if (rc < 0) {
+					CAM_ERR(CAM_SENSOR,
+					"Failed: random read I2C settings: %d",
+					rc);
+					return rc;
+				}
+				if (i2c_list->i2c_settings.data_type <
+					CAMERA_SENSOR_I2C_TYPE_MAX) {
+					memcpy(read_buff,
+					&reg_setting->reg_data,
+					i2c_list->i2c_settings.data_type);
+					read_buff +=
+					i2c_list->i2c_settings.data_type;
+				}
+			}
+		} else if (i2c_list->op_code == CAM_SENSOR_I2C_READ_SEQ) {
+			read_length = i2c_list->i2c_settings.size;
+			if (read_length > buff_length) {
+				CAM_ERR(CAM_SENSOR,
+				"Invalid buffer size, readLen: %d, bufLen: %d",
+				read_length, buff_length);
+				return -EINVAL;
+			}
+			rc = camera_io_dev_read_seq(
+				io_master_info,
+				i2c_list->i2c_settings.reg_setting[0].reg_addr,
+				read_buff,
+				i2c_list->i2c_settings.addr_type,
+				i2c_list->i2c_settings.data_type,
+				i2c_list->i2c_settings.size);
+			if (rc < 0)
+			{
+				CAM_ERR(CAM_SENSOR,
+					"failed: seq read I2C settings: %d",
+					rc);
+				return rc;
+			}
+		} else if (i2c_list->op_code == CAM_SENSOR_I2C_WRITE_RANDOM){
+			rc = camera_io_dev_write(io_master_info,
+				&i2c_list->i2c_settings);
+			if (rc) {
+				CAM_ERR(CAM_SENSOR, "write failed rc %d",
+					rc);
+				return rc;
+			}
+		}
+		last_read_buff_size = read_length;
+	}
+
+	return rc;
+}
+
 
 int32_t msm_camera_fill_vreg_params(
 	struct cam_hw_soc_info *soc_info,
@@ -1252,6 +1350,54 @@ int32_t msm_camera_fill_vreg_params(
 			if (j == num_vreg)
 				power_setting[i].seq_val = INVALID_VREG;
 			break;
+		/* xiaomi add begin*/
+		case SENSOR_BOB:
+			for (j = 0; j < num_vreg; j++) {
+
+				if (!strcmp(soc_info->rgltr_name[j],
+					"cam_bob")) {
+					CAM_DBG(CAM_SENSOR,
+						"bob i:%d j:%d cam_bob", i, j);
+					power_setting[i].seq_val = j;
+
+					if (VALIDATE_VOLTAGE(
+						soc_info->rgltr_min_volt[j],
+						soc_info->rgltr_max_volt[j],
+						power_setting[i].config_val)) {
+						soc_info->rgltr_min_volt[j] =
+						soc_info->rgltr_max_volt[j] =
+						power_setting[i].config_val;
+					}
+					break;
+				}
+			}
+			if (j == num_vreg)
+				power_setting[i].seq_val = INVALID_VREG;
+			break;
+		case SENSOR_BOB2:
+			for (j = 0; j < num_vreg; j++) {
+
+				if (!strcmp(soc_info->rgltr_name[j],
+					"cam_bob2")) {
+					CAM_DBG(CAM_SENSOR,
+						"bob2 i:%d j:%d cam_bob2", i, j);
+					power_setting[i].seq_val = j;
+
+					if (VALIDATE_VOLTAGE(
+						soc_info->rgltr_min_volt[j],
+						soc_info->rgltr_max_volt[j],
+						power_setting[i].config_val)) {
+						soc_info->rgltr_min_volt[j] =
+						soc_info->rgltr_max_volt[j] =
+						power_setting[i].config_val;
+					}
+					break;
+				}
+			}
+			if (j == num_vreg)
+				power_setting[i].seq_val = INVALID_VREG;
+			break;
+		/* xiaomi add end*/
 		default:
 			break;
 		}
@@ -1400,8 +1546,10 @@ int32_t cam_sensor_update_power_settings(void *cmd_buf,
 	power_info->power_setting =
 		kzalloc(sizeof(struct cam_sensor_power_setting) *
 			MAX_POWER_CONFIG, GFP_KERNEL);
-	if (!power_info->power_setting)
+	if (!power_info->power_setting){
+		CAM_ERR(CAM_SENSOR, "power_setting alloc failed!"); //xiaomi add
 		return -ENOMEM;
+	}
 
 	power_info->power_down_setting_size = 0;
 	power_info->power_down_setting =
@@ -1411,12 +1559,14 @@ int32_t cam_sensor_update_power_settings(void *cmd_buf,
 		kfree(power_info->power_setting);
 		power_info->power_setting = NULL;
 		power_info->power_setting_size = 0;
+		CAM_ERR(CAM_SENSOR, "power_down_setting alloc failed!"); //xiaomi add
 		return -ENOMEM;
 	}
 
 	while (tot_size < cmd_length) {
 		if (cam_sensor_validate(ptr, (cmd_length - tot_size))) {
 			rc = -EINVAL;
+			CAM_ERR(CAM_SENSOR, "cam_sensor_validate failed!"); //xiaomi add
 			goto free_power_settings;
 		}
 		if (cmm_hdr->cmd_type ==
@@ -1603,6 +1753,7 @@ free_power_settings:
 	power_info->power_setting = NULL;
 	power_info->power_down_setting_size = 0;
 	power_info->power_setting_size = 0;
+	CAM_ERR(CAM_SENSOR, "free_power_settings!"); //xiaomi add
 	return rc;
 }
 
@@ -1952,12 +2103,23 @@ free_gpio_info:
 int msm_camera_pinctrl_init(
 	struct msm_pinctrl_info *sensor_pctrl, struct device *dev)
 {
+	int rc = 0;
 
 	sensor_pctrl->pinctrl = devm_pinctrl_get(dev);
 	if (IS_ERR_OR_NULL(sensor_pctrl->pinctrl)) {
 		CAM_DBG(CAM_SENSOR, "Getting pinctrl handle failed");
 		return -EINVAL;
 	}
+
+	if(!strcmp(product_name_get(), "nuwa") &&
+		(get_hw_version_build() != 0x9))
+	{
+		rc = get_camera_pinctrl_state(sensor_pctrl);
+		if(rc == -EINVAL)
+			return -EINVAL;
+		return 0;
+	}
+
 	sensor_pctrl->gpio_state_active =
 		pinctrl_lookup_state(sensor_pctrl->pinctrl,
 				CAM_SENSOR_PINCTRL_STATE_DEFAULT);
@@ -2225,6 +2387,10 @@ int cam_sensor_core_power_up(struct cam_sensor_power_ctrl_t *ctrl,
 		case SENSOR_VAF_PWDM:
 		case SENSOR_CUSTOM_REG1:
 		case SENSOR_CUSTOM_REG2:
+		/* xiaomi add begin*/
+		case SENSOR_BOB:
+		case SENSOR_BOB2:
+		/* xiaomi add end*/
 			if (power_setting->seq_val == INVALID_VREG)
 				break;
 
@@ -2351,6 +2517,10 @@ power_up_failed:
 		case SENSOR_VAF_PWDM:
 		case SENSOR_CUSTOM_REG1:
 		case SENSOR_CUSTOM_REG2:
+		/* xiaomi add begin*/
+		case SENSOR_BOB:
+		case SENSOR_BOB2:
+		/* xiaomi add end*/
 			if (power_setting->seq_val < num_vreg) {
 				CAM_DBG(CAM_SENSOR, "Disable Regulator");
 				vreg_idx = power_setting->seq_val;
@@ -2510,6 +2680,10 @@ int cam_sensor_util_power_down(struct cam_sensor_power_ctrl_t *ctrl,
 		case SENSOR_VAF_PWDM:
 		case SENSOR_CUSTOM_REG1:
 		case SENSOR_CUSTOM_REG2:
+		/* xiaomi add begin*/
+		case SENSOR_BOB:
+		case SENSOR_BOB2:
+		/* xiaomi add end*/
 			if (pd->seq_val == INVALID_VREG)
 				break;
 
@@ -2584,3 +2758,71 @@ int cam_sensor_util_power_down(struct cam_sensor_power_ctrl_t *ctrl,
 
 	return 0;
 }
+
+int get_camera_pinctrl_state(struct msm_pinctrl_info *sensor_pctrl)
+{
+	sensor_pctrl->gpio_state_active =
+		pinctrl_lookup_state(sensor_pctrl->pinctrl,
+			CAM_SENSOR_VERSION_PINCTRL_STATE_DEFAULT);
+	CAM_DBG(CAM_SENSOR,
+			"pinctrl state:CAM_SENSOR_VERSION_PINCTRL_STATE_DEFAULT");
+	if (IS_ERR_OR_NULL(sensor_pctrl->gpio_state_active))
+	{
+		CAM_ERR(CAM_SENSOR,
+				"Failed to get the active state pinctrl handle");
+		return -EINVAL;
+	}
+	sensor_pctrl->gpio_state_suspend =
+		pinctrl_lookup_state(sensor_pctrl->pinctrl,
+			CAM_SENSOR_VERSION_PINCTRL_STATE_SLEEP);
+	CAM_DBG(CAM_SENSOR,
+			"pinctrl state:CAM_SENSOR_VERSION_PINCTRL_STATE_SLEEP");
+	if (IS_ERR_OR_NULL(sensor_pctrl->gpio_state_suspend))
+	{
+		CAM_ERR(CAM_SENSOR,
+				"Failed to get the suspend state pinctrl handle");
+		return -EINVAL;
+	}
+	return 0;
+}
+
+// xiaomi add
+void init_power_sync_mutex(int cci, int master)
+{
+	if (cci < MAX_CCI_DEV && master < MAX_MASTER_DEV)
+	{
+		CAM_INFO(CAM_SENSOR, "init cam_power_up_sync_mutex cci[%d],master[%d]", cci, master);
+		mutex_init(&cam_power_up_sync_mutex[cci][master]);
+	}
+	else
+	{
+		CAM_ERR(CAM_SENSOR, "cci[%d]！ MAX:%d, master[%d] MAX", cci, MAX_CCI_DEV, master, MAX_MASTER_DEV);
+	}
+}
+
+void lock_power_sync_mutex(int cci, int master)
+{
+	if (cci < MAX_CCI_DEV && master < MAX_MASTER_DEV)
+	{
+		mutex_lock(&cam_power_up_sync_mutex[cci][master]);
+		CAM_DBG(CAM_SENSOR, "mutex_lock cci[%d],master[%d]", cci, master);
+	}
+	else
+	{
+		CAM_ERR(CAM_SENSOR, "cci[%d]！ MAX:%d, master[%d] MAX", cci, MAX_CCI_DEV, master, MAX_MASTER_DEV);
+	}
+}
+
+void unlock_power_sync_mutex(int cci, int master)
+{
+	if (cci < MAX_CCI_DEV && master < MAX_MASTER_DEV)
+	{
+		mutex_unlock(&cam_power_up_sync_mutex[cci][master]);
+		CAM_DBG(CAM_SENSOR, "mutex_unlock cci[%d],master[%d]", cci, master);
+	}
+	else
+	{
+		CAM_ERR(CAM_SENSOR, "cci[%d]！ MAX:%d, master[%d] MAX", cci, MAX_CCI_DEV, master, MAX_MASTER_DEV);
+	}
+}
+// xiaomi add

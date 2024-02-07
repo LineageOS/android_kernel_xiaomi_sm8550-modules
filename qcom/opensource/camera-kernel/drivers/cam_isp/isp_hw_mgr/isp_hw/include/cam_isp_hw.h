@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_ISP_HW_H_
@@ -198,7 +198,6 @@ enum cam_isp_hw_cmd_type {
 	CAM_IFE_CSID_TOP_CONFIG,
 	CAM_IFE_CSID_PROGRAM_OFFLINE_CMD,
 	CAM_IFE_CSID_SET_DUAL_SYNC_CONFIG,
-	CAM_IFE_CSID_RESET_OUT_OF_SYNC_CNT,
 	CAM_ISP_HW_CMD_CSID_DYNAMIC_SWITCH_UPDATE,
 	CAM_ISP_HW_CMD_CSID_DISCARD_INIT_FRAMES,
 	CAM_ISP_HW_CMD_BUF_UPDATE,
@@ -218,10 +217,6 @@ enum cam_isp_hw_cmd_type {
 	CAM_ISP_HW_USER_DUMP,
 	CAM_ISP_HW_CMD_RDI_LCR_CFG,
 	CAM_ISP_HW_CMD_DRV_CONFIG,
-	CAM_ISP_HW_CMD_DYNAMIC_CLOCK_UPDATE,
-	CAM_ISP_HW_CMD_SET_SYNC_HW_IDX,
-	CAM_ISP_HW_CMD_BUS_WM_DISABLE,
-	CAM_ISP_HW_CMD_BUFFER_ALIGNMENT_UPDATE,
 	CAM_ISP_HW_CMD_MAX,
 };
 
@@ -401,13 +396,11 @@ struct cam_isp_hw_get_wm_update {
  * @Brief:           Get the out resource id for given mid
  *
  * @mid:             Mid number of hw outport numb
- * @pid:             Pid number associated with mid
  * @out_res_id:      Out resource id
  *
  */
 struct cam_isp_hw_get_res_for_mid {
 	uint32_t                       mid;
-	uint32_t                       pid;
 	uint32_t                       out_res_id;
 };
 
@@ -425,7 +418,6 @@ struct cam_isp_hw_get_res_for_mid {
  * @cmd:             Command buffer information
  * @use_scratch_cfg: To indicate if it's scratch buffer config
  * @trigger_cdm_en:  Flag to indicate if cdm is trigger
- * @reg_write:        if set use AHB to config rup/aup
  *
  */
 struct cam_isp_hw_get_cmd_update {
@@ -440,7 +432,6 @@ struct cam_isp_hw_get_cmd_update {
 		struct cam_isp_hw_get_wm_update      *rm_update;
 	};
 	bool trigger_cdm_en;
-	bool reg_write;
 };
 
 /*
@@ -494,20 +485,6 @@ struct cam_isp_hw_dump_header {
 	uint8_t   tag[CAM_ISP_HW_DUMP_TAG_MAX_LEN];
 	uint64_t  size;
 	uint32_t  word_size;
-};
-
-/**
- * struct cam_isp_session_data - Session data
- *
- * @Brief:          ISP session or usecase data
- *
- * @link_hdl:       Link handle
- * @is_shdr:        Indicate is usecase is shdr
- *
- */
-struct cam_isp_session_data {
-	int32_t   link_hdl;
-	bool      is_shdr;
 };
 
 /**

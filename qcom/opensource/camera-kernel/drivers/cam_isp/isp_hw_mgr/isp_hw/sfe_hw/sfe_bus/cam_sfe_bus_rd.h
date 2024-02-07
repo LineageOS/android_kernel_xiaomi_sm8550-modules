@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_SFE_BUS_RD_H_
@@ -11,7 +11,6 @@
 
 #define CAM_SFE_BUS_RD_MAX_CLIENTS        3
 #define CAM_SFE_BUS_RD_CONS_ERR_MAX       32
-#define CAM_SFE_BUS_RD_EN_CONS_ERR_CHECK  0xC
 
 /* IRQ status bits */
 #define CAM_SFE_BUS_RD_IRQ_CONS_VIOLATION BIT(0)
@@ -121,7 +120,6 @@ struct cam_sfe_bus_rd_info {
  * @sfe_bus_rd_info:        SFE bus rd client info
  * @top_irq_shift:          Top irq shift val
  * @latency_buf_allocation: latency buf allocation
- * @sys_cache_default_val:  System cache default config
  * @irq_err_mask:           IRQ error mask
  * @fs_sync_shift:          Shift to enable FS sync
  * @constraint_error_info:  constraint violation errors info
@@ -136,7 +134,6 @@ struct cam_sfe_bus_rd_hw_info {
 		sfe_bus_rd_info[CAM_SFE_BUS_RD_MAX];
 	uint32_t top_irq_shift;
 	uint32_t latency_buf_allocation;
-	uint32_t sys_cache_default_val;
 	uint32_t irq_err_mask;
 	uint32_t fs_sync_shift;
 	struct cam_sfe_bus_rd_constraint_error_info *constraint_error_info;

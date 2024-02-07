@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -977,11 +977,6 @@ void cam_smmu_reset_iommu_table(enum cam_smmu_init_dir ops)
 	int j = 0;
 
 	for (i = 0; i < iommu_cb_set.cb_num; i++) {
-		if (ops == CAM_SMMU_TABLE_INIT)
-			mutex_init(&iommu_cb_set.cb_info[i].lock);
-
-		mutex_lock(&iommu_cb_set.cb_info[i].lock);
-
 		iommu_cb_set.cb_info[i].handle = HANDLE_INIT;
 		INIT_LIST_HEAD(&iommu_cb_set.cb_info[i].smmu_buf_list);
 		INIT_LIST_HEAD(&iommu_cb_set.cb_info[i].smmu_buf_kernel_list);
@@ -993,10 +988,9 @@ void cam_smmu_reset_iommu_table(enum cam_smmu_init_dir ops)
 			iommu_cb_set.cb_info[i].token[j] = NULL;
 			iommu_cb_set.cb_info[i].handler[j] = NULL;
 		}
-
-		mutex_unlock(&iommu_cb_set.cb_info[i].lock);
-
-		if (ops != CAM_SMMU_TABLE_INIT)
+		if (ops == CAM_SMMU_TABLE_INIT)
+			mutex_init(&iommu_cb_set.cb_info[i].lock);
+		else
 			mutex_destroy(&iommu_cb_set.cb_info[i].lock);
 	}
 }

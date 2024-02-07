@@ -22,6 +22,11 @@ struct cam_context;
 /* max device name string length*/
 #define CAM_CTX_DEV_NAME_MAX_LENGTH 20
 
+/* xiaomi add for mipi phy backup setting begin*/
+#define CAM_PHY_MAX_CTRL_NO 8
+#define CAM_PHY_DTS_NAME 50
+/* xiaomi add for mipi phy backup setting end*/
+
 /* max request number */
 #define CAM_CTX_REQ_MAX              20
 #define CAM_CTX_ICP_REQ_MAX          40
@@ -166,8 +171,6 @@ struct cam_ctx_crm_ops {
  * @recovery_ops:          Function to be invoked to try hardware recovery
  * @mini_dump_ops:         Function for mini dump
  * @err_inject_ops:        Function for error injection
- * @msg_cb_ops:            Function to be called on any message from
- *                         other subdev notifications
  *
  */
 struct cam_ctx_ops {
@@ -179,7 +182,6 @@ struct cam_ctx_ops {
 	cam_ctx_recovery_cb_func     recovery_ops;
 	cam_ctx_mini_dump_cb_func    mini_dump_ops;
 	cam_ctx_err_inject_cb_func   err_inject_ops;
-	cam_ctx_message_cb_func      msg_cb_ops;
 };
 
 
@@ -270,6 +272,12 @@ struct cam_context {
 	struct cam_hw_fence_map_entry **out_map_entries;
 	cam_ctx_mini_dump_cb_func      mini_dump_cb;
 	int                            img_iommu_hdl;
+	/*xiaomi added*/
+	uint64_t                       dbg_timestamp;
+	uint64_t                       dbg_frame;
+	int32_t                        exlink;
+	uint32_t                       batchsize;
+
 };
 
 /**
@@ -414,19 +422,6 @@ int cam_context_mini_dump_from_hw(struct cam_context *ctx,
  */
 int cam_context_dump_pf_info(void *ctx,
 	void *pf_args);
-
-/**
- * cam_context_handle_message()
- *
- * @brief:        Handle message callback command
- *
- * @ctx:          Object pointer for cam_context
- * @msg_type:     message type sent from other subdev
- * @data:         data from other subdev
- *
- */
-int cam_context_handle_message(struct cam_context *ctx,
-	uint32_t msg_type, void *data);
 
 /**
  * cam_context_handle_acquire_dev()

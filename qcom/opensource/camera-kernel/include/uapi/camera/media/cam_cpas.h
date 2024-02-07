@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __UAPI_CAM_CPAS_H__
@@ -77,13 +77,6 @@
 /* DRV Vote level */
 #define CAM_CPAS_VOTE_LEVEL_HIGH   1
 #define CAM_CPAS_VOTE_LEVEL_LOW    2
-
-/* sysfs entry of camera subparts info */
-#define CAM_SYSFS_SUBPARTS_INFO_FILENAME   "subparts_info"
-#define CAM_SYSFS_IFE_HW_IDX       0
-#define CAM_SYSFS_IFE_LITE_HW_IDX  1
-#define CAM_SYSFS_SFE_HW_IDX       2
-#define CAM_SYSFS_CUSTOM_HW_IDX    3
 
 /**
  * struct cam_cpas_fuse_value - CPAS fuse value

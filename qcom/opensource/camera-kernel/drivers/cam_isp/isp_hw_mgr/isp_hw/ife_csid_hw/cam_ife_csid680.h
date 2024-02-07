@@ -1243,7 +1243,6 @@ static struct cam_ife_csid_ver2_common_reg_info
 	.format_measure_width_shift_val          = 0x0,
 	.top_reset_irq_mask                      = 0x1,
 	.top_buf_done_irq_mask                   = 0x2000,
-	.phy_sel_base_idx                        = 1,
 	.camif_irq_support                       = true,
 };
 

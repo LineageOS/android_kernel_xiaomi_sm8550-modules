@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of_address.h>
@@ -36,24 +36,16 @@ static const struct hfi_ops hfi_icp_v2_ops = {
 	.iface_addr = cam_icp_v2_iface_addr,
 };
 
-static int cam_icp_v2_ubwc_configure(struct cam_hw_soc_info *soc_info,
-	void *args)
+static int cam_icp_v2_ubwc_configure(struct cam_hw_soc_info *soc_info)
 {
-	uint32_t disable_ubwc_comp;
 	struct cam_icp_soc_info *soc_priv;
 
 	if (!soc_info)
 		return -EINVAL;
 
 	soc_priv = soc_info->soc_private;
-	if (!args) {
-		CAM_ERR(CAM_ICP, "Invalid args");
-		return -EINVAL;
-	}
 
-	disable_ubwc_comp = *((uint32_t *)args);
-
-	return cam_icp_proc_ubwc_configure(soc_priv->uconfig.ubwc_cfg_ext, disable_ubwc_comp);
+	return cam_icp_proc_ubwc_configure(soc_priv->uconfig.ubwc_cfg_ext, 0);
 }
 
 static int cam_icp_v2_cpas_vote(struct cam_icp_v2_core_info *core_info,
@@ -80,13 +72,11 @@ static bool cam_icp_v2_cpas_cb(uint32_t handle, void *user_data,
 			"IPE/BPS UBWC decode error status=0x%08x",
 			irq_data->u.dec_err.decerr_status.value);
 		ret = true;
-		break;
 	case CAM_CAMNOC_IRQ_IPE_BPS_UBWC_ENCODE_ERROR:
 		CAM_ERR_RATE_LIMIT(CAM_ICP,
 			"IPE/BPS UBWC encode error status=0x%08x",
 			irq_data->u.enc_err.encerr_status.value);
 		ret = true;
-		break;
 	default:
 		break;
 	}
@@ -893,8 +883,7 @@ int cam_icp_v2_process_cmd(void *priv, uint32_t cmd_type,
 		rc = cam_icp_v2_cpas_stop(icp_v2_info->core_info);
 		break;
 	case CAM_ICP_CMD_UBWC_CFG:
-		rc = cam_icp_v2_ubwc_configure(&icp_v2_info->soc_info,
-			args);
+		rc = cam_icp_v2_ubwc_configure(&icp_v2_info->soc_info);
 		break;
 	case CAM_ICP_SEND_INIT:
 		hfi_send_system_cmd(HFI_CMD_SYS_INIT, 0, 0);

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __CAM_SYNC_PRIVATE_H__
@@ -211,7 +211,7 @@ struct cam_signalable_info {
 struct sync_device {
 	struct video_device *vdev;
 	struct v4l2_device v4l2_dev;
-	struct sync_table_row *sync_table;
+	struct sync_table_row sync_table[CAM_SYNC_MAX_OBJS];
 	spinlock_t row_spinlocks[CAM_SYNC_MAX_OBJS];
 	struct mutex table_lock;
 	int open_cnt;

@@ -1834,8 +1834,6 @@ struct bist_reg_settings_t bist_setting_2_2_0 = {
 
 struct data_rate_settings_t data_rate_delta_table_2_2_0 = {
 	.num_data_rate_settings = ARRAY_SIZE(data_rate_settings_2_2_0),
-	.min_supported_datarate = 0,				/* 0 MSpS */
-	.max_supported_datarate = 0,				/* 0 MSpS */
 	.data_rate_settings = data_rate_settings_2_2_0,
 };
 

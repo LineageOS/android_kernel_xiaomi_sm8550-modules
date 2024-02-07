@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __UAPI_CAM_TFE_H__
@@ -66,20 +65,12 @@
 #define CAM_ISP_TFE_PACKET_META_REG_DUMP_PER_REQUEST  6
 #define CAM_ISP_TFE_PACKET_META_REG_DUMP_ON_FLUSH     7
 #define CAM_ISP_TFE_PACKET_META_REG_DUMP_ON_ERROR     8
-#define CAM_ISP_TFE_PACKET_META_GENERIC_BLOB_LEFT     9
-#define CAM_ISP_TFE_PACKET_META_GENERIC_BLOB_RIGHT    10
 
 /* ISP TFE Generic Cmd Buffer Blob types */
-#define CAM_ISP_TFE_GENERIC_BLOB_TYPE_HFR_CONFIG              0
-#define CAM_ISP_TFE_GENERIC_BLOB_TYPE_CLOCK_CONFIG            1
-#define CAM_ISP_TFE_GENERIC_BLOB_TYPE_BW_CONFIG_V2            2
-#define CAM_ISP_TFE_GENERIC_BLOB_TYPE_CSID_CLOCK_CONFIG       3
-#define CAM_ISP_TFE_GENERIC_BLOB_TYPE_INIT_CONFIG             4
-#define CAM_ISP_TFE_GENERIC_BLOB_TYPE_DYNAMIC_MODE_SWITCH     15
-#define CAM_ISP_TFE_GENERIC_BLOB_TYPE_BW_LIMITER_CFG          16
-#define CAM_ISP_TFE_GENERIC_BLOB_TYPE_ALIGNMENT_OFFSET_INFO   17
-#define CAM_ISP_TFE_GENERIC_BLOB_TYPE_UPDATE_OUT_RES          18
-#define CAM_ISP_TFE_GENERIC_BLOB_TYPE_DISCARD_INITIAL_FRAMES  19
+#define CAM_ISP_TFE_GENERIC_BLOB_TYPE_HFR_CONFIG          0
+#define CAM_ISP_TFE_GENERIC_BLOB_TYPE_CLOCK_CONFIG        1
+#define CAM_ISP_TFE_GENERIC_BLOB_TYPE_BW_CONFIG_V2        2
+#define CAM_ISP_TFE_GENERIC_BLOB_TYPE_CSID_CLOCK_CONFIG   3
 
 /* DSP mode */
 #define CAM_ISP_TFE_DSP_MODE_NONE                   0
@@ -102,8 +93,6 @@
 /* Feature Flag indicators */
 #define CAM_ISP_TFE_FLAG_QCFA_BIN                        BIT(0)
 #define CAM_ISP_TFE_FLAG_BAYER_BIN                       BIT(1)
-#define CAM_ISP_TFE_FLAG_SHDR_MASTER_EN                  BIT(2)
-#define CAM_ISP_TFE_FLAG_SHDR_SLAVE_EN                   BIT(3)
 
 /* Query devices */
 /**
@@ -137,25 +126,6 @@ struct cam_isp_tfe_query_cap_cmd {
 	__s32                           num_dev;
 	__u32                           reserved;
 	struct cam_isp_tfe_dev_cap_info dev_caps[CAM_ISP_TFE_HW_MAX];
-};
-
-/**
- * struct cam_isp_tfe_query_cap_cmd_v2 - ISP TFE query device
- * capability payload
- *
- * @version                     returned query cap cmd api version
- * @num_dev:                    returned number of device capabilities
- * @device_iommu:               returned iommu handles for device
- * @cdm_iommu:                  returned iommu handles for cdm
- * @dev_caps:                   returned device capability array
- *
- */
-struct cam_isp_tfe_query_cap_cmd_v2 {
-	__u32                           version;
-	__s32                           num_dev;
-	struct cam_iommu_handle         device_iommu;
-	struct cam_iommu_handle         cdm_iommu;
-	struct cam_isp_tfe_dev_cap_info dev_caps[1];
 };
 
 /* Acquire Device */
@@ -502,114 +472,6 @@ struct cam_isp_tfe_acquire_hw_info {
 	__u32                input_info_offset;
 	__u64                data;
 };
-
-/**
- * struct cam_isp_tfe_wm_bw_limiter_config - ISP TFE write master
- *                                       BW limter config
- *
- *
- * @res_type          : output resource type defined in file cam_isp_tfe.h
- * @enable_limiter    : 0 for disable else enabled
- * @counter_limit     : Max counter value
- */
-struct cam_isp_tfe_wm_bw_limiter_config {
-	__u32         res_type;
-	__u32         enable_limiter;
-	__u32         counter_limit[CAM_PACKET_MAX_PLANES];
-};
-
-/**
- * struct cam_isp_tfe_out_rsrc_bw_limiter_config - ISP TFE out rsrc BW limiter config
- *
- *    Configure BW limiter for ISP TFE WMs
- *
- * @version          : Version field
- * @num_ports        : Number of ports
- * @bw_limit_config  : WM BW limiter config
- */
-struct cam_isp_tfe_out_rsrc_bw_limiter_config {
-	__u32                                       version;
-	__u32                                       num_ports;
-	struct cam_isp_tfe_wm_bw_limiter_config     bw_limiter_config[1];
-};
-
-/**
- * struct cam_isp_tfe_alignment_offset_config - ISP TFE buffer alignment config
- *
- * @resource_type:         Resourse type
- * @x_offset:              Offset of the buffer from x-axies
- * @y_offset:              Offset of the buffer from y-axies
- * @width:                 Width of out resource
- * @height:                Height of out resource
- * @stride:                Stride of out resource
- *
- */
-struct cam_isp_tfe_alignment_offset_config {
-	__u32                       resource_type;
-	__u32                       x_offset;
-	__u32                       y_offset;
-	__u32                       width;
-	__u32                       height;
-	__u32                       stride;
-} __attribute__((packed));
-
-/**
- * struct cam_isp_tfe_alignment_resource_info - ISP TFE Resource Alignment
- *
- * @version:                  Alignment api version
- * @num_ports:                Number of ports
- * @port_alignment_cfg:       Buffer alignment for each IO port
- */
-struct cam_isp_tfe_alignment_resource_info {
-	__u32                                        version;
-	__u32                                        num_ports;
-	struct cam_isp_tfe_alignment_offset_config   port_alignment_cfg[1];
-} __attribute__((packed));
-
-/**
- * struct cam_isp_tfe_wm_dimension_config - ISP TFE res Dimension config
- *
- * @res_id      : Resource id
- * @mode        : Mode of out resource
- * @height      : Out resource height
- * @width       : Out resource width
- *
- */
-struct cam_isp_tfe_wm_dimension_config {
-	__u32                    res_id;
-	__u32                    mode;
-	__u32                    height;
-	__u32                    width;
-};
-
-/**
- * struct cam_isp_tfe_out_resource_config - ISP TFE out config
- *
- * @num_ports             : Num of out res
- * @reserved              : Reserved field
- * @dimention_config      : Out resource dimension config
- */
-struct cam_isp_tfe_out_resource_config {
-	__u32                                       num_ports;
-	__u32                                       reserved;
-	struct cam_isp_tfe_wm_dimension_config      dimension_config[1];
-};
-
-/**
- * struct cam_isp_tfe_discard_initial_frames - Discard init frames
- *
- *   Some sensors require discarding the initial frames
- *   after the sensor is streamed on. The discard would be
- *   applied on all paths [IPP/PPP/RDIx] for the given
- *   pipeline.
- *
- * @version                 : Version field
- * @num_frames              : Number of frames to be discarded
- */
-struct cam_isp_tfe_discard_initial_frames {
-	__u32                    version;
-	__u32                    num_frames;
-} __attribute__((packed));
 
 #define CAM_TFE_ACQUIRE_COMMON_VER0         0x1000
 

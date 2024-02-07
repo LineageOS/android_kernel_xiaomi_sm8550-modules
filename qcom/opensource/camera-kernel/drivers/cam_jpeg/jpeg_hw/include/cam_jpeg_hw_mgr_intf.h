@@ -11,7 +11,7 @@
 #include <media/cam_jpeg.h>
 #include <media/cam_defs.h>
 
-#define CAM_JPEG_CTX_MAX        24
+#define CAM_JPEG_CTX_MAX        40
 
 enum cam_jpeg_hw_type {
 	CAM_JPEG_DEV_ENC,

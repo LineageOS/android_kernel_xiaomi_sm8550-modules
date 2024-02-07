@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CPASTOP_V780_100_H_
@@ -1198,20 +1198,6 @@ static struct cam_cpas_hw_errata_wa_list cam780_cpas100_errata_wa_list = {
 	},
 };
 
-static struct cam_cpas_subpart_info cam780_cpas100_subpart_info = {
-	.num_bits = 8,
-	.hw_bitmap_mask = {
-		{CAM_CPAS_CAM_FUSE, BIT(0)},
-		{CAM_CPAS_ISP_FUSE, BIT(1)},
-		{CAM_CPAS_ISP_FUSE, BIT(2)},
-		{CAM_CPAS_ISP_FUSE, BIT(0)},
-		{CAM_CPAS_SFE_FUSE, BIT(0)},
-		{CAM_CPAS_SFE_FUSE, BIT(1)},
-		{CAM_CPAS_SFE_FUSE, BIT(2)},
-		{CAM_CPAS_CUSTOM_FUSE, BIT(0)},
-	}
-};
-
 static struct cam_camnoc_info cam780_cpas100_camnoc_info = {
 	.specific = &cam_cpas_v780_100_camnoc_specific[0],
 	.specific_size = ARRAY_SIZE(cam_cpas_v780_100_camnoc_specific),
@@ -1223,8 +1209,7 @@ static struct cam_camnoc_info cam780_cpas100_camnoc_info = {
 	.test_irq_info = {
 		.sbm_enable_mask = 0x80,
 		.sbm_clear_mask = 0x2,
-	},
-	.cam_subpart_info = &cam780_cpas100_subpart_info,
+	}
 };
 
 static struct cam_cpas_camnoc_qchannel cam780_cpas100_qchannel_info = {

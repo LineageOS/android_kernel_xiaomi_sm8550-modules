@@ -1872,6 +1872,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe880_bus_hw_info = {
 			.mid[0]        = 34,
 			.num_wm        = 1,
 			.line_based    = 1,
+			.bufdone_shift = 2,
 			.wm_idx        = {
 				23,
 			},
@@ -1887,6 +1888,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe880_bus_hw_info = {
 			.mid[0]        = 35,
 			.num_wm        = 1,
 			.line_based    = 1,
+			.bufdone_shift = 2,
 			.wm_idx        = {
 				24,
 			},
@@ -1901,6 +1903,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe880_bus_hw_info = {
 			.source_group  = CAM_VFE_BUS_VER3_SRC_GRP_4,
 			.mid[0]        = 36,
 			.num_wm        = 1,
+			.bufdone_shift = 2,
 			.line_based    = 1,
 			.wm_idx        = {
 				25,
@@ -1996,6 +1999,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe880_bus_hw_info = {
 			.source_group  = CAM_VFE_BUS_VER3_SRC_GRP_1,
 			.mid[0]        = 8,
 			.num_wm        = 1,
+			.bufdone_shift = 2,
 			.wm_idx        = {
 				20,
 			},
@@ -2142,6 +2146,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe880_bus_hw_info = {
 			.source_group  = CAM_VFE_BUS_VER3_SRC_GRP_1,
 			.mid[0]        = 9,
 			.num_wm        = 1,
+			.bufdone_shift = 2,
 			.wm_idx        = {
 				21,
 			},
@@ -2170,6 +2175,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe880_bus_hw_info = {
 			.source_group  = CAM_VFE_BUS_VER3_SRC_GRP_1,
 			.mid[0]        = 10,
 			.num_wm        = 1,
+			.bufdone_shift = 2,
 			.wm_idx        = {
 				22,
 			},
@@ -2230,7 +2236,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe880_bus_hw_info = {
 			.mid[0]        = 30,
 			.num_wm        = 1,
 			.wm_idx        = {
-				27,
+				28,
 			},
 			.name          = {
 				"STATS_ALSC",
@@ -2359,12 +2365,7 @@ static struct cam_vfe_bus_ver3_hw_info vfe880_bus_hw_info = {
 	},
 	.num_comp_grp          = 16,
 	.support_consumed_addr = true,
-	.comp_done_mask = {
-		BIT(0), BIT(1), BIT(2), BIT(3), BIT(4),
-		BIT(5), BIT(6), BIT(7), BIT(8),
-		BIT(9), BIT(10), BIT(13),
-		BIT(14), BIT(15), BIT(16), BIT(11),
-	},
+	.comp_done_shift       = 0,
 	.top_irq_shift         = 0,
 	.max_out_res           = CAM_ISP_IFE_OUT_RES_BASE + 37,
 	.pack_align_shift      = 5,

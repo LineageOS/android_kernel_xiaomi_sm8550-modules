@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_REQ_MGR_INTERFACE_H
@@ -61,6 +61,10 @@ typedef int (*cam_req_mgr_flush_req)(struct cam_req_mgr_flush_request *);
 typedef int (*cam_req_mgr_process_evt)(struct cam_req_mgr_link_evt_data *);
 typedef int (*cam_req_mgr_dump_req)(struct cam_req_mgr_dump_info *);
 
+// xiaomi add
+typedef bool (*cam_req_mgr_do_frame_skip)(int64_t req_id,
+	int32_t dev_hdl);
+
 /**
  * @brief          : cam_req_mgr_crm_cb - func table
  *
@@ -97,6 +101,7 @@ struct cam_req_mgr_kmd_ops {
 	cam_req_mgr_flush_req         flush_req;
 	cam_req_mgr_process_evt       process_evt;
 	cam_req_mgr_dump_req          dump_req;
+	cam_req_mgr_do_frame_skip     do_frame_skip; // xiaomi add
 };
 
 /**
@@ -116,23 +121,6 @@ enum cam_pipeline_delay {
 };
 
 /**
- * enum cam_modeswitch_delay
- * @brief     : enumerator for different modeswitch delays in camera
- *
- * @DELAY_0   : device processed mode switch settings after 0 frame
- * @DELAY_1   : device processed mode switch settings after 1 frame
- * @DELAY_2   : device processed mode switch settings after 2 frames
- * @DELAY_MAX : maximum supported mode switch delay
- */
-enum cam_modeswitch_delay {
-	CAM_MODESWITCH_DELAY_0,
-	CAM_MODESWITCH_DELAY_1,
-	CAM_MODESWITCH_DELAY_2,
-	CAM_MODESWITCH_DELAY_MAX,
-};
-
-
-/**
  * @CAM_TRIGGER_POINT_SOF   : Trigger point for Start Of Frame
  * @CAM_TRIGGER_POINT_EOF   : Trigger point for End Of Frame
  * @CAM_TRIGGER_MAX_POINTS  : Maximum number of trigger point
@@ -140,14 +128,6 @@ enum cam_modeswitch_delay {
 #define CAM_TRIGGER_POINT_SOF     (1 << 0)
 #define CAM_TRIGGER_POINT_EOF     (1 << 1)
 #define CAM_TRIGGER_MAX_POINTS    2
-
-
-enum cam_req_mgr_dual_trigger {
-	CAM_REQ_DUAL_TRIGGER_NONE,
-	CAM_REQ_DUAL_TRIGGER_ONE_EXPOSURE,
-	CAM_REQ_DUAL_TRIGGER_TWO_EXPOSURE,
-	CAM_REQ_DUAL_TRIGGER_MAX,
-};
 
 /**
  * enum cam_req_status
@@ -215,6 +195,7 @@ enum cam_req_mgr_device_id {
 	CAM_REQ_MGR_DEVICE_EXTERNAL_2,
 	CAM_REQ_MGR_DEVICE_EXTERNAL_3,
 	CAM_REQ_MGR_DEVICE_TPG,
+	CAM_REQ_MGR_DEVICE_OIS,
 	CAM_REQ_MGR_DEVICE_ID_MAX,
 };
 
@@ -267,6 +248,9 @@ struct cam_req_mgr_trigger_notify {
 	uint64_t sof_timestamp_val;
 	uint64_t req_id;
 	int32_t  trigger_id;
+	bool     process_rdi_mismatch;
+	int64_t request_mismatched;
+	int32_t ctx_mismatched;
 };
 
 /**
@@ -312,7 +296,6 @@ struct cam_req_mgr_error_notify {
  *                         by not sending request to devices. ex: IFE and Flash
  * @trigger_eof          : to identify that one of the device at this slot needs
  *                         to be apply at EOF
- * @num_exp              : num of exposure associated with the request
  */
 struct cam_req_mgr_add_request {
 	int32_t  link_hdl;
@@ -320,7 +303,6 @@ struct cam_req_mgr_add_request {
 	uint64_t req_id;
 	uint32_t skip_at_sof;
 	uint32_t skip_at_eof;
-	uint32_t num_exp;
 	bool     trigger_eof;
 };
 
@@ -341,24 +323,16 @@ struct cam_req_mgr_notify_stop {
  * @name    : link link or unlink
  * @dev_id  : device id info
  * @p_delay : delay between time settings applied and take effect
- * @m_delay : delay between time modeswitch settings applied and take effect
  * @trigger : Trigger point for the client
- * @mode_switch_req : Request id on which sensor mode switch observed on the device
  * @trigger_on : This device provides trigger
- * @is_shdr : Flag to indicate auto shdr usecase without SFE
- * @is_shdr_master : Flag to indicate master dev in auto shdr usecase without SFE
  */
 struct cam_req_mgr_device_info {
 	int32_t                     dev_hdl;
 	char                        name[256];
 	enum cam_req_mgr_device_id  dev_id;
 	enum cam_pipeline_delay     p_delay;
-	enum cam_modeswitch_delay   m_delay;
 	uint32_t                    trigger;
-	uint64_t                    mode_switch_req;
 	bool                        trigger_on;
-	bool                        is_shdr;
-	bool                        is_shdr_master;
 };
 
 /**
@@ -367,7 +341,6 @@ struct cam_req_mgr_device_info {
  * @link_hdl        : link identifier
  * @dev_hdl         : device handle for reference
  * @max_delay       : max pipeline delay on this link
- * @mode_switch_max_delay : max modeswitch delay on this link
  * @crm_cb          : callback funcs to communicate with req mgr
  * @trigger_id      : Unique ID provided to the triggering device
  */
@@ -376,7 +349,6 @@ struct cam_req_mgr_core_dev_link_setup {
 	int32_t                    link_hdl;
 	int32_t                    dev_hdl;
 	enum cam_pipeline_delay    max_delay;
-	enum cam_modeswitch_delay  mode_switch_max_delay;
 	struct cam_req_mgr_crm_cb *crm_cb;
 	int32_t                    trigger_id;
 };
@@ -386,23 +358,18 @@ struct cam_req_mgr_core_dev_link_setup {
  * @link_hdl         : link identifier
  * @dev_hdl          : device handle for cross check
  * @request_id       : request id settings to apply
- * @last_applied_max_pd_req : Last applied req on highest pd dev -1 is considered invalid
  * @report_if_bubble : report to crm if failure in applying
  * @trigger_point    : the trigger point of this apply
  * @re_apply         : to skip re_apply for buf_done request
- * @recovery         : Indicate if it is recovery req
- * @dual_trigger_status : Enum to indicate status of dual trigger
+ *
  */
 struct cam_req_mgr_apply_request {
-	int32_t                       link_hdl;
-	int32_t                       dev_hdl;
-	uint64_t                      request_id;
-	int64_t                       last_applied_max_pd_req;
-	int32_t                       report_if_bubble;
-	uint32_t                      trigger_point;
-	bool                          re_apply;
-	bool                          recovery;
-	enum cam_req_mgr_dual_trigger dual_trigger_status;
+	int32_t    link_hdl;
+	int32_t    dev_hdl;
+	uint64_t   request_id;
+	int32_t    report_if_bubble;
+	uint32_t   trigger_point;
+	bool       re_apply;
 };
 
 /**

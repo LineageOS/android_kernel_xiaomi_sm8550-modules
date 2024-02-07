@@ -177,7 +177,7 @@ struct cam_sfe_bus_sfe_out_hw_info {
  * @bus_client_reg:            Bus client register info
  * @sfe_out_hw_info:           SFE output capability
  * @constraint_error_info:     Constraint Error information
- * @comp_done_mask:           List of buf done mask shift values for
+ * @comp_done_shift:           List of buf done mask shift values for
  *                             each comp grp
  * @num_comp_grp:              Number of composite groups
  * @line_done_cfg:             Line done cfg for wr/rd sync
@@ -185,7 +185,6 @@ struct cam_sfe_bus_sfe_out_hw_info {
  * @max_out_res:               maximum number of sfe out res in uapi
  * @pack_align_shift:          Packer format alignment bit shift
  * @max_bw_counter_limit:      Max BW counter limit
- * @sys_cache_default_val:     System cache default config
  * @irq_err_mask:              IRQ error mask
  */
 struct cam_sfe_bus_wr_hw_info {
@@ -198,14 +197,13 @@ struct cam_sfe_bus_wr_hw_info {
 		sfe_out_hw_info[CAM_SFE_BUS_SFE_OUT_MAX];
 	struct cam_sfe_bus_wr_constraint_error_info
 		*constraint_error_info;
-	uint32_t comp_done_mask[CAM_SFE_BUS_WR_COMP_GRP_MAX];
+	uint32_t comp_done_shift[CAM_SFE_BUS_WR_COMP_GRP_MAX];
 	uint32_t num_comp_grp;
 	uint32_t line_done_cfg;
 	uint32_t top_irq_shift;
 	uint32_t max_out_res;
 	uint32_t pack_align_shift;
 	uint32_t max_bw_counter_limit;
-	uint32_t sys_cache_default_val;
 	uint32_t irq_err_mask;
 };
 

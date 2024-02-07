@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/iopoll.h>
@@ -1617,9 +1617,6 @@ bool cam_ife_csid_ver1_is_width_valid(
 		width = reserve->in_port->right_stop -
 			reserve->in_port->right_start + 1;
 
-	if (reserve->in_port->horizontal_bin || reserve->in_port->qcfa_bin)
-		width /= 2;
-
 	if (!cam_ife_csid_ver1_is_width_valid_by_fuse(csid_hw, width)) {
 		CAM_ERR(CAM_ISP, "CSID[%u] width limited by fuse",
 			csid_hw->hw_intf->hw_idx);
@@ -2227,12 +2224,10 @@ static int cam_ife_csid_ver1_init_config_rdi_path(
 		cam_io_w_mb(val, mem_base + path_reg->multi_vcdt_cfg0_addr);
 	}
 
+	val = 0;
 	/*configure cfg1 addr
 	 * Timestamp strobe selection
 	 */
-
-	val = cam_io_r_mb(mem_base + path_reg->cfg1_addr);
-
 	val |= cmn_reg->timestamp_strobe_val <<
 			cmn_reg->timestamp_stb_sel_shift_val;
 
@@ -2552,9 +2547,7 @@ static int cam_ife_csid_ver1_init_config_pxl_path(
 	 * timestamp strobe selection
 	 */
 
-	val = cam_io_r_mb(mem_base + path_reg->cfg1_addr);
-
-	val |= cmn_reg->timestamp_strobe_val <<
+	val = cmn_reg->timestamp_strobe_val <<
 		cmn_reg->timestamp_stb_sel_shift_val;
 
 	cam_io_w_mb(val, mem_base + path_reg->cfg1_addr);
@@ -2626,13 +2619,10 @@ static int cam_ife_csid_ver1_enable_hw(struct cam_ife_csid_ver1_hw *csid_hw)
 			csid_hw->core_info->csid_reg;
 	soc_info = &csid_hw->hw_info->soc_info;
 
-	mutex_lock(&csid_hw->hw_info->hw_mutex);
-
 	/* overflow check before increment */
 	if (csid_hw->hw_info->open_count == UINT_MAX) {
 		CAM_ERR(CAM_ISP, "CSID:%d Open count reached max",
 			csid_hw->hw_intf->hw_idx);
-			mutex_unlock(&csid_hw->hw_info->hw_mutex);
 		return -EINVAL;
 	}
 
@@ -2641,10 +2631,8 @@ static int cam_ife_csid_ver1_enable_hw(struct cam_ife_csid_ver1_hw *csid_hw)
 
 	if (csid_hw->hw_info->open_count > 1) {
 		CAM_DBG(CAM_ISP, "CSID hw has already been enabled");
-		mutex_unlock(&csid_hw->hw_info->hw_mutex);
 		return rc;
 	}
-	mutex_unlock(&csid_hw->hw_info->hw_mutex);
 
 	rc = cam_soc_util_get_clk_level(soc_info, csid_hw->clk_rate,
 		soc_info->src_clk_idx, &clk_lvl);
@@ -2721,9 +2709,7 @@ disable_soc:
 	cam_ife_csid_disable_soc_resources(soc_info);
 	csid_hw->hw_info->hw_state = CAM_HW_STATE_POWER_DOWN;
 err:
-	mutex_lock(&csid_hw->hw_info->hw_mutex);
 	csid_hw->hw_info->open_count--;
-	mutex_unlock(&csid_hw->hw_info->hw_mutex);
 	return rc;
 }
 
@@ -2800,14 +2786,7 @@ int cam_ife_csid_ver1_init_hw(void *hw_priv,
 	default:
 		CAM_ERR(CAM_ISP, "CSID:%d Invalid Res id %d",
 			csid_hw->hw_intf->hw_idx, res->res_id);
-		rc = -EINVAL;
 		break;
-	}
-
-	if (rc < 0) {
-		CAM_ERR(CAM_ISP, "CSID:%d res_id:%d path init configuration failed with rc: %d",
-			csid_hw->hw_intf->hw_idx, res->res_id, rc);
-		goto end;
 	}
 
 	rc = cam_ife_csid_ver1_hw_reset(csid_hw);
@@ -2865,22 +2844,17 @@ static int cam_ife_csid_ver1_disable_hw(
 	int rc = 0;
 	unsigned long                             flags;
 
-	mutex_lock(&csid_hw->hw_info->hw_mutex);
 	/* Check for refcount */
 	if (!csid_hw->hw_info->open_count) {
 		CAM_WARN(CAM_ISP, "Unbalanced disable_hw");
-		mutex_unlock(&csid_hw->hw_info->hw_mutex);
 		return rc;
 	}
 
 	/* Decrement ref Count */
 	csid_hw->hw_info->open_count--;
 
-	if (csid_hw->hw_info->open_count) {
-		mutex_unlock(&csid_hw->hw_info->hw_mutex);
+	if (csid_hw->hw_info->open_count)
 		return rc;
-	}
-	mutex_unlock(&csid_hw->hw_info->hw_mutex);
 
 	soc_info = &csid_hw->hw_info->soc_info;
 	csid_reg = (struct cam_ife_csid_ver1_reg_info *)
@@ -3224,9 +3198,6 @@ int cam_ife_csid_ver1_stop(void *hw_priv,
 		csid_hw->hw_intf->hw_idx,
 		csid_stop->num_res);
 	cam_ife_csid_ver1_tpg_stop(csid_hw);
-
-	csid_hw->flags.device_enabled = false;
-
 	/* Stop the resource first */
 	for (i = 0; i < csid_stop->num_res; i++) {
 
@@ -3789,10 +3760,6 @@ static int cam_ife_csid_ver1_process_cmd(void *hw_priv,
 		/* Not supported for V1 */
 		rc = 0;
 		break;
-	case CAM_IFE_CSID_RESET_OUT_OF_SYNC_CNT:
-		/* Not supported for V1 */
-		rc = 0;
-		break;
 	default:
 		CAM_ERR(CAM_ISP, "CSID:%d unsupported cmd:%d",
 			csid_hw->hw_intf->hw_idx, cmd_type);
@@ -4199,14 +4166,6 @@ static int cam_ife_csid_ver1_bottom_half_handler(
 
 	csid_hw = (struct cam_ife_csid_ver1_hw *)handler_priv;
 	evt_payload = (struct cam_ife_csid_ver1_evt_payload *)evt_payload_priv;
-
-	if (!csid_hw->flags.device_enabled) {
-		CAM_DBG(CAM_ISP, "CSID[%d] bottom-half after csid stop",
-			csid_hw->hw_intf->hw_idx);
-		cam_ife_csid_ver1_put_evt_payload(csid_hw, &evt_payload,
-			&csid_hw->free_payload_list);
-		return 0;
-	}
 
 	if (evt_payload->irq_status[CAM_IFE_CSID_IRQ_REG_RX])
 		cam_ife_csid_ver1_rx_bottom_half_handler(

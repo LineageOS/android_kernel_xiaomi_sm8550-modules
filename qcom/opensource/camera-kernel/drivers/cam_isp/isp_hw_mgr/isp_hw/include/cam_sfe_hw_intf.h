@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_SFE_HW_INTF_H_
@@ -349,15 +349,6 @@ struct cam_sfe_acquire_args {
 		struct cam_sfe_hw_sfe_bus_rd_acquire_args  sfe_rd;
 	};
 };
-
-/*
- * cam_sfe_get_num_sfes()
- *
- * @brief : Populates number of SFEs.
- *
- * @num_sfes : Fills number of SFEs in the address passed.
- */
-void cam_sfe_get_num_sfes(uint32_t *num_sfes);
 
 /*
  * cam_sfe_hw_init()
