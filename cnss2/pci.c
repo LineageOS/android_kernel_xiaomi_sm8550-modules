@@ -6135,7 +6135,7 @@ int cnss_pci_force_fw_assert_hdlr(struct cnss_pci_data *pci_priv)
 		cnss_pr_dbg("Sending Host Reset Req\n");
 		if (!cnss_mhi_force_reset(pci_priv)) {
 			ret = 0;
-			goto runtime_pm_put;
+			goto mhi_reg_dump;
 		}
 
 		cnss_pci_dump_debug_reg(pci_priv);
@@ -6145,6 +6145,7 @@ int cnss_pci_force_fw_assert_hdlr(struct cnss_pci_data *pci_priv)
 		goto runtime_pm_put;
 	}
 
+mhi_reg_dump:
 	if (pci_priv->is_smmu_fault) {
 		cnss_pci_mhi_reg_dump(pci_priv);
 		pci_priv->is_smmu_fault = false;
