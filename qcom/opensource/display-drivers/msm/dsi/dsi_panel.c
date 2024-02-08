@@ -685,6 +685,8 @@ skip_setbl:
 	mi_disp_feature_event_notify_by_type(mi_get_disp_id(panel->type),
 		MI_DISP_EVENT_51_BRIGHTNESS, sizeof(bl_lvl), bl_lvl);
 
+	mi_dsi_panel_sync_lhbm_alpha(panel, bl_lvl);
+
 	return rc;
 }
 

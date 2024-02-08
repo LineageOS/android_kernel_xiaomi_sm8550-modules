@@ -783,10 +783,24 @@ bool is_dc_on_skip_backlight(struct dsi_panel *panel, u32 bl_lvl)
 		return false;
 }
 
+void mi_dsi_panel_sync_lhbm_alpha(struct dsi_panel *panel, u32 bl_lvl) {
+	struct mi_dsi_panel_cfg *mi_cfg = &panel->mi_cfg;
+	struct disp_feature_ctl ctl;
+
+	if (!is_hbm_fod_on(panel))
+		return;
+
+	memset(&ctl, 0, sizeof(struct disp_feature_ctl));
+	ctl.feature_id = DISP_FEATURE_LOCAL_HBM;
+	ctl.feature_val = mi_cfg->feature_val[DISP_FEATURE_LOCAL_HBM];
+
+	mi_dsi_panel_update_last_bl_level(panel, bl_lvl);
+	mi_dsi_panel_set_lhbm_fod_locked(panel, &ctl);
+}
+
 bool is_backlight_set_skip(struct dsi_panel *panel, u32 bl_lvl)
 {
 	struct mi_dsi_panel_cfg *mi_cfg = &panel->mi_cfg;
-	int feature_val = -1;
 
 	if (mi_cfg->in_fod_calibration || is_hbm_fod_on(panel)) {
 		if (bl_lvl != 0) {
@@ -794,23 +808,8 @@ bool is_backlight_set_skip(struct dsi_panel *panel, u32 bl_lvl)
 				(mi_get_panel_id(panel->mi_cfg.mi_panel_id) == N11_PANEL_PA)) {
 				DISP_INFO("[%s] skip set backlight %d due to LHBM is on,"
 					"but update alpha\n", panel->type, bl_lvl);
-				feature_val = mi_cfg->feature_val[DISP_FEATURE_LOCAL_HBM];
-				if (feature_val== LOCAL_HBM_NORMAL_WHITE_1000NIT ||
-					feature_val == LOCAL_HBM_HLPM_WHITE_1000NIT) {
-					mi_dsi_update_lhbm_cmd_87reg(panel,
-						DSI_CMD_SET_MI_LOCAL_HBM_NORMAL_WHITE_1000NIT, bl_lvl);
-					dsi_panel_tx_cmd_set(panel,
-						DSI_CMD_SET_MI_LOCAL_HBM_NORMAL_WHITE_1000NIT);
-				} else if (feature_val == LOCAL_HBM_NORMAL_WHITE_110NIT ||
-					feature_val == LOCAL_HBM_HLPM_WHITE_110NIT) {
-					mi_dsi_update_lhbm_cmd_87reg(panel,
-						DSI_CMD_SET_MI_LOCAL_HBM_NORMAL_WHITE_110NIT, bl_lvl);
-					dsi_panel_tx_cmd_set(panel,
-						DSI_CMD_SET_MI_LOCAL_HBM_NORMAL_WHITE_110NIT);
-				} else {
-					DISP_INFO("[%s] skip set backlight %d due to fod hbm "
-							"or fod calibration\n", panel->type, bl_lvl);
-				}
+
+				mi_dsi_panel_sync_lhbm_alpha(panel, bl_lvl);
 				return true;
 			} else if (mi_get_panel_id(panel->mi_cfg.mi_panel_id) == M2_PANEL_PA && is_hbm_fod_on(panel)) {
 				if ( bl_lvl > mi_cfg->panel_1920pwm_dbv_threshold)
@@ -3460,7 +3459,7 @@ int mi_dsi_panel_set_dc_mode_locked(struct dsi_panel *panel, bool enable)
 	return rc;
 }
 
-static int mi_dsi_panel_set_lhbm_fod_locked(struct dsi_panel *panel,
+int mi_dsi_panel_set_lhbm_fod_locked(struct dsi_panel *panel,
 		struct disp_feature_ctl *ctl)
 {
 	int rc = 0;

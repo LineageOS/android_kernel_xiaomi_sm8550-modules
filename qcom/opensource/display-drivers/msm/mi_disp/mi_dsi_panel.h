@@ -295,6 +295,8 @@ int mi_dsi_release_wakelock(struct dsi_panel *panel);
 
 bool is_aod_and_panel_initialized(struct dsi_panel *panel);
 
+void mi_dsi_panel_sync_lhbm_alpha(struct dsi_panel *panel, u32 bl_lvl);
+
 bool is_backlight_set_skip(struct dsi_panel *panel, u32 bl_lvl);
 
 void mi_dsi_panel_update_last_bl_level(struct dsi_panel *panel,
@@ -372,6 +374,9 @@ int mi_dsi_panel_get_max_brightness_clone(struct dsi_panel *panel,
 int mi_dsi_panel_set_dc_mode(struct dsi_panel *panel, bool enable);
 
 int mi_dsi_panel_set_dc_mode_locked(struct dsi_panel *panel, bool enable);
+
+int mi_dsi_panel_set_lhbm_fod_locked(struct dsi_panel *panel,
+		struct disp_feature_ctl *ctl);
 
 int mi_dsi_panel_read_and_update_flat_param_locked(struct dsi_panel *panel);
 
