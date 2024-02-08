@@ -4301,9 +4301,6 @@ static int cnss_pci_runtime_resume(struct device *dev)
 	else
 		ret = cnss_auto_resume(dev);
 
-	if (!ret)
-		pci_priv->drv_connected_last = 0;
-
 	cnss_pr_vdbg("Runtime resume status: %d\n", ret);
 
 	return ret;
@@ -4572,6 +4569,7 @@ int cnss_auto_resume(struct device *dev)
 	mutex_unlock(&pci_priv->bus_lock);
 
 	cnss_request_bus_bandwidth(dev, plat_priv->icc.current_bw_vote);
+	pci_priv->drv_connected_last = 0;
 
 	return 0;
 }
