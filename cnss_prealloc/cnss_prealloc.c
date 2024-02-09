@@ -271,7 +271,7 @@ static int wcnss_find_pool_table_slot(int pool, void *mem)
 
 	cnss_pools[pool].pool_ptrs = krealloc(cnss_pools[pool].pool_ptrs,
 					      new_capacity * sizeof(void *),
-					      GFP_KERNEL);
+					      GFP_ATOMIC);
 
 	if (!cnss_pools[pool].pool_ptrs) {
 		pr_debug("%s pool is full, failed to increase table size to %d\n",
