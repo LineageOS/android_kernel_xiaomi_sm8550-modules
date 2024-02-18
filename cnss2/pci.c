@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/completion.h>
@@ -53,7 +53,6 @@
 #define PHY_UCODE_V2_FILE_NAME		"phy_ucode20.elf"
 #define DEFAULT_FW_FILE_NAME		"amss.bin"
 #define FW_V2_FILE_NAME			"amss20.bin"
-#define FW_V2_FTM_FILE_NAME		"amss20_ftm.bin"
 #define DEVICE_MAJOR_VERSION_MASK	0xF
 
 #define WAKE_MSI_NAME			"WAKE"
@@ -1838,6 +1837,20 @@ int cnss_pci_is_device_down(struct device *dev)
 }
 EXPORT_SYMBOL(cnss_pci_is_device_down);
 
+int cnss_pci_shutdown_cleanup(struct cnss_pci_data *pci_priv)
+{
+	int ret;
+
+	if (!pci_priv) {
+		cnss_pr_err("pci_priv is NULL\n");
+		return -ENODEV;
+	}
+
+	ret = del_timer(&pci_priv->dev_rddm_timer);
+	cnss_pr_dbg("%s RDDM timer deleted", ret ? "Active" : "Inactive");
+	return ret;
+}
+
 void cnss_pci_lock_reg_window(struct device *dev, unsigned long *flags)
 {
 	spin_lock_bh(&pci_reg_window_lock);
@@ -2310,9 +2323,6 @@ retry_mhi_suspend:
 		ret = mhi_force_rddm_mode(pci_priv->mhi_ctrl);
 		if (ret) {
 			cnss_pr_err("Failed to trigger RDDM, err = %d\n", ret);
-
-			cnss_pr_dbg("Sending host reset req\n");
-			ret = cnss_mhi_force_reset(pci_priv);
 			cnss_rddm_trigger_check(pci_priv);
 		}
 		break;
@@ -3325,21 +3335,6 @@ static int cnss_qca6174_ramdump(struct cnss_pci_data *pci_priv)
 	return cnss_do_ramdump(plat_priv);
 }
 
-static void cnss_get_driver_mode_update_fw_name(struct cnss_plat_data *plat_priv)
-{
-	struct cnss_pci_data *pci_priv;
-	struct cnss_wlan_driver *driver_ops;
-
-	pci_priv = plat_priv->bus_priv;
-	driver_ops = pci_priv->driver_ops;
-
-	if (driver_ops && driver_ops->get_driver_mode) {
-		plat_priv->driver_mode = driver_ops->get_driver_mode();
-		cnss_pci_update_fw_name(pci_priv);
-		cnss_pr_dbg("New driver mode is %d", plat_priv->driver_mode);
-	}
-}
-
 static int cnss_qca6290_powerup(struct cnss_pci_data *pci_priv)
 {
 	int ret = 0;
@@ -3360,8 +3355,6 @@ static int cnss_qca6290_powerup(struct cnss_pci_data *pci_priv)
 	pci_priv->qmi_send_usage_count = 0;
 
 	plat_priv->power_up_error = 0;
-
-	cnss_get_driver_mode_update_fw_name(plat_priv);
 retry:
 	ret = cnss_power_on_device(plat_priv, false);
 	if (ret) {
@@ -3823,8 +3816,6 @@ int cnss_wlan_register_driver(struct cnss_wlan_driver *driver_ops)
 			    plat_priv->device_version.major_version);
 		return -ENODEV;
 	}
-
-	cnss_get_driver_mode_update_fw_name(plat_priv);
 	set_bit(CNSS_DRIVER_REGISTER, &plat_priv->driver_state);
 
 	if (!plat_priv->cbc_enabled ||
@@ -5975,8 +5966,24 @@ static void cnss_pci_dump_debug_reg(struct cnss_pci_data *pci_priv)
 
 static int cnss_pci_assert_host_sol(struct cnss_pci_data *pci_priv)
 {
-	if (cnss_get_host_sol_value(pci_priv->plat_priv))
-		return -EINVAL;
+	int ret;
+
+	ret = cnss_get_host_sol_value(pci_priv->plat_priv);
+	if (ret) {
+		if (ret < 0) {
+			cnss_pr_dbg("Host SOL functionality is not enabled\n");
+			return ret;
+		} else {
+			cnss_pr_dbg("Host SOL is already high\n");
+			/*
+			 * Return success if HOST SOL is already high.
+			 * This will indicate caller that a HOST SOL is
+			 * already asserted from some other thread and
+			 * no further action required from the caller.
+			 */
+			return 0;
+		}
+	}
 
 	cnss_pr_dbg("Assert host SOL GPIO to retry RDDM, expecting link down\n");
 	cnss_set_host_sol_value(pci_priv->plat_priv, 1);
@@ -6100,6 +6107,11 @@ int cnss_pci_force_fw_assert_hdlr(struct cnss_pci_data *pci_priv)
 		return 0;
 	}
 
+	/*
+	 * Fist try MHI SYS_ERR, if fails try HOST SOL and return.
+	 * If SOL is not enabled try HOST Reset Rquest after MHI
+	 * SYS_ERRR fails.
+	 */
 	ret = cnss_pci_set_mhi_state(pci_priv, CNSS_MHI_TRIGGER_RDDM);
 	if (ret) {
 		if (pci_priv->is_smmu_fault) {
@@ -6119,6 +6131,13 @@ int cnss_pci_force_fw_assert_hdlr(struct cnss_pci_data *pci_priv)
 			cnss_pci_pm_runtime_put_autosuspend(pci_priv, RTPM_ID_CNSS);
 			return 0;
 		}
+
+		cnss_pr_dbg("Sending Host Reset Req\n");
+		if (!cnss_mhi_force_reset(pci_priv)) {
+			ret = 0;
+			goto mhi_reg_dump;
+		}
+
 		cnss_pci_dump_debug_reg(pci_priv);
 		cnss_schedule_recovery(&pci_priv->pci_dev->dev,
 				       CNSS_REASON_DEFAULT);
@@ -6126,6 +6145,7 @@ int cnss_pci_force_fw_assert_hdlr(struct cnss_pci_data *pci_priv)
 		goto runtime_pm_put;
 	}
 
+mhi_reg_dump:
 	if (pci_priv->is_smmu_fault) {
 		cnss_pci_mhi_reg_dump(pci_priv);
 		pci_priv->is_smmu_fault = false;
@@ -6616,65 +6636,17 @@ static int cnss_pci_update_fw_name(struct cnss_pci_data *pci_priv)
 			 FW_V2_FILE_NAME);
 		break;
 	case QCA6490_DEVICE_ID:
-		switch (plat_priv->device_version.major_version) {
-		case FW_V2_NUMBER:
-				cnss_pci_add_fw_prefix_name(pci_priv,
-							    plat_priv->firmware_name,
-							    FW_V2_FILE_NAME);
-				snprintf(plat_priv->fw_fallback_name,
-					 MAX_FIRMWARE_NAME_LEN,
-					 FW_V2_FILE_NAME);
-			break;
-		default:
-			cnss_pci_add_fw_prefix_name(pci_priv,
-						    plat_priv->firmware_name,
-						    DEFAULT_FW_FILE_NAME);
-			snprintf(plat_priv->fw_fallback_name,
-				 MAX_FIRMWARE_NAME_LEN,
-				 DEFAULT_FW_FILE_NAME);
-			break;
-		}
-		break;
 	case KIWI_DEVICE_ID:
 	case MANGO_DEVICE_ID:
 	case PEACH_DEVICE_ID:
 		switch (plat_priv->device_version.major_version) {
 		case FW_V2_NUMBER:
-			/*
-			 * kiwiv2 using seprate fw binary for MM and FTM mode,
-			 * platform driver loads corresponding binary according
-			 * to current mode indicated by wlan driver. Otherwise
-			 * use default binary.
-			 * Mission mode using same binary name as before,
-			 * if seprate binary is not there, fall back to default.
-			 */
-			if (plat_priv->driver_mode == CNSS_MISSION) {
-				cnss_pci_add_fw_prefix_name(pci_priv,
-							    plat_priv->firmware_name,
-							    FW_V2_FILE_NAME);
-				cnss_pci_add_fw_prefix_name(pci_priv,
-							    plat_priv->fw_fallback_name,
-							    FW_V2_FILE_NAME);
-			} else if (plat_priv->driver_mode == CNSS_FTM) {
-				cnss_pci_add_fw_prefix_name(pci_priv,
-							    plat_priv->firmware_name,
-							    FW_V2_FTM_FILE_NAME);
-				cnss_pci_add_fw_prefix_name(pci_priv,
-							    plat_priv->fw_fallback_name,
-							    FW_V2_FILE_NAME);
-			} else {
-				/*
-				 * Since during cold boot calibration phase,
-				 * wlan driver has not registered, so default
-				 * fw binary will be used.
-				 */
 				cnss_pci_add_fw_prefix_name(pci_priv,
 							    plat_priv->firmware_name,
 							    FW_V2_FILE_NAME);
 				snprintf(plat_priv->fw_fallback_name,
 					 MAX_FIRMWARE_NAME_LEN,
 					 FW_V2_FILE_NAME);
-			}
 			break;
 		default:
 			cnss_pci_add_fw_prefix_name(pci_priv,
@@ -6734,9 +6706,6 @@ static void cnss_dev_rddm_timeout_hdlr(struct timer_list *t)
 
 	cnss_fatal_err("Timeout waiting for RDDM notification\n");
 
-	if (!cnss_pci_assert_host_sol(pci_priv))
-		return;
-
 	mhi_ee = mhi_get_exec_env(pci_priv->mhi_ctrl);
 	if (mhi_ee == MHI_EE_PBL)
 		cnss_pr_err("Device MHI EE is PBL, unable to collect dump\n");
@@ -6746,6 +6715,8 @@ static void cnss_dev_rddm_timeout_hdlr(struct timer_list *t)
 		cnss_schedule_recovery(&pci_priv->pci_dev->dev,
 				       CNSS_REASON_RDDM);
 	} else {
+		if (!cnss_pci_assert_host_sol(pci_priv))
+			return;
 		cnss_mhi_debug_reg_dump(pci_priv);
 		cnss_pci_bhi_debug_reg_dump(pci_priv);
 		cnss_pci_soc_scratch_reg_dump(pci_priv);
@@ -6848,12 +6819,8 @@ static void cnss_mhi_notify_status(struct mhi_controller *mhi_ctrl,
 #if IS_ENABLED(CONFIG_MHI_BUS_MISC) && \
 (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
 	case MHI_CB_FALLBACK_IMG:
-		/* for kiwi_v2 binary fallback is used, skip path fallback here */
-		if (!(pci_priv->device_id == KIWI_DEVICE_ID &&
-		      plat_priv->device_version.major_version == FW_V2_NUMBER)) {
-			plat_priv->use_fw_path_with_prefix = false;
-			cnss_pci_update_fw_name(pci_priv);
-		}
+		plat_priv->use_fw_path_with_prefix = false;
+		cnss_pci_update_fw_name(pci_priv);
 		return;
 #endif
 

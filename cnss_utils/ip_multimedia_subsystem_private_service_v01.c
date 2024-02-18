@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2019-2020, The Linux Foundation. All rights reserved. */
+/* Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ */
 
 #include "ip_multimedia_subsystem_private_service_v01.h"
 
@@ -30,7 +32,7 @@ static struct qmi_elem_info ims_private_service_header_value_v01_ei[] = {
 };
 
 struct qmi_elem_info
-ims_private_service_subscribe_for_indications_req_msg_v01_ei[] = {
+ims_private_service_subscribe_ind_req_msg_v01_ei[] = {
 	{
 		.data_type      = QMI_OPT_FLAG,
 		.elem_len       = 1,
@@ -77,9 +79,10 @@ ims_private_service_subscribe_for_indications_req_msg_v01_ei[] = {
 		.tlv_type       = QMI_COMMON_TLV_TYPE,
 	},
 };
+EXPORT_SYMBOL(ims_private_service_subscribe_ind_req_msg_v01_ei);
 
 struct qmi_elem_info
-ims_private_service_subscribe_for_indications_rsp_msg_v01_ei[] = {
+ims_private_service_subscribe_ind_rsp_msg_v01_ei[] = {
 	{
 		.data_type      = QMI_STRUCT,
 		.elem_len       = 1,
@@ -97,6 +100,7 @@ ims_private_service_subscribe_for_indications_rsp_msg_v01_ei[] = {
 		.tlv_type       = QMI_COMMON_TLV_TYPE,
 	},
 };
+EXPORT_SYMBOL(ims_private_service_subscribe_ind_rsp_msg_v01_ei);
 
 struct qmi_elem_info ims_private_service_mt_invite_ind_msg_v01_ei[] = {
 	{
@@ -167,6 +171,7 @@ struct qmi_elem_info ims_private_service_mt_invite_ind_msg_v01_ei[] = {
 		.tlv_type       = QMI_COMMON_TLV_TYPE,
 	},
 };
+EXPORT_SYMBOL(ims_private_service_mt_invite_ind_msg_v01_ei);
 
 struct qmi_elem_info ims_private_service_wfc_call_status_ind_msg_v01_ei[] = {
 	{
@@ -285,6 +290,7 @@ struct qmi_elem_info ims_private_service_wfc_call_status_ind_msg_v01_ei[] = {
 		.tlv_type       = QMI_COMMON_TLV_TYPE,
 	},
 };
+EXPORT_SYMBOL(ims_private_service_wfc_call_status_ind_msg_v01_ei);
 
 struct qmi_elem_info
 ims_private_service_wfc_call_twt_config_req_msg_v01_ei[] = {
@@ -426,6 +432,7 @@ ims_private_service_wfc_call_twt_config_req_msg_v01_ei[] = {
 		.tlv_type       = QMI_COMMON_TLV_TYPE,
 	},
 };
+EXPORT_SYMBOL(ims_private_service_wfc_call_twt_config_req_msg_v01_ei);
 
 struct qmi_elem_info
 ims_private_service_wfc_call_twt_config_rsp_msg_v01_ei[] = {
@@ -447,4 +454,4 @@ ims_private_service_wfc_call_twt_config_rsp_msg_v01_ei[] = {
 		.tlv_type       = QMI_COMMON_TLV_TYPE,
 	},
 };
-
+EXPORT_SYMBOL(ims_private_service_wfc_call_twt_config_rsp_msg_v01_ei);

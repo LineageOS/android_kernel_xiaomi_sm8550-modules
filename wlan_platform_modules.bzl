@@ -98,7 +98,6 @@ def _define_modules_for_target_variant(target, variant):
                     True: [
                         "cnss2/qmi.c",
                         "cnss2/coexistence_service_v01.c",
-                        "cnss2/ip_multimedia_subsystem_private_service_v01.c",
                     ]
                 },
                 "CONFIG_PCI_MSM": {
@@ -219,6 +218,7 @@ def _define_modules_for_target_variant(target, variant):
         srcs = native.glob([
             "cnss_utils/wlan_firmware_service_v01.c",
             "cnss_utils/device_management_service_v01.c",
+            "cnss_utils/ip_multimedia_subsystem_private_service_v01.c",
             "cnss_utils/*.h"
         ]),
         kconfig = "cnss_utils/Kconfig",

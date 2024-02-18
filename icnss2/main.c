@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2020, 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "icnss2: " fmt
@@ -234,6 +234,10 @@ char *icnss_driver_event_to_str(enum icnss_driver_event_type type)
 		return "QDSS_TRACE_FREE";
 	case ICNSS_DRIVER_EVENT_M3_DUMP_UPLOAD_REQ:
 		return "M3_DUMP_UPLOAD";
+	case ICNSS_DRIVER_EVENT_IMS_WFC_CALL_IND:
+		return "IMS_WFC_CALL_IND";
+	case ICNSS_DRIVER_EVENT_WLFW_TWT_CFG_IND:
+		return "WLFW_TWC_CFG_IND";
 	case ICNSS_DRIVER_EVENT_QDSS_TRACE_REQ_DATA:
 		return "QDSS_TRACE_REQ_DATA";
 	case ICNSS_DRIVER_EVENT_SUBSYS_RESTART_LEVEL:
@@ -921,6 +925,12 @@ static int icnss_driver_event_server_arrive(struct icnss_priv *priv,
 
 	set_bit(ICNSS_WLFW_CONNECTED, &priv->state);
 
+	if (priv->device_id == ADRASTEA_DEVICE_ID) {
+		ret = icnss_hw_power_on(priv);
+		if (ret)
+			goto fail;
+	}
+
 	ret = wlfw_ind_register_send_sync_msg(priv);
 	if (ret < 0) {
 		if (ret == -EALREADY) {
@@ -986,12 +996,20 @@ static int icnss_driver_event_server_arrive(struct icnss_priv *priv,
 		goto fail;
 	}
 
-	ret = icnss_hw_power_on(priv);
-	if (ret)
-		goto fail;
+	if (priv->device_id == ADRASTEA_DEVICE_ID && priv->is_chain1_supported) {
+		ret = icnss_power_on_chain1_reg(priv);
+		if (ret) {
+			ignore_assert = true;
+			goto fail;
+		}
+	}
 
 	if (priv->device_id == WCN6750_DEVICE_ID ||
 	    priv->device_id == WCN6450_DEVICE_ID) {
+		ret = icnss_hw_power_on(priv);
+		if (ret)
+			goto fail;
+
 		ret = wlfw_device_info_send_msg(priv);
 		if (ret < 0) {
 			ignore_assert = true;
@@ -1964,6 +1982,14 @@ static void icnss_driver_event_work(struct work_struct *work)
 			break;
 		case ICNSS_DRIVER_EVENT_SUBSYS_RESTART_LEVEL:
 			ret = icnss_subsys_restart_level(priv, event->data);
+			break;
+		case ICNSS_DRIVER_EVENT_IMS_WFC_CALL_IND:
+			ret = icnss_process_wfc_call_ind_event(priv,
+							      event->data);
+			break;
+		case ICNSS_DRIVER_EVENT_WLFW_TWT_CFG_IND:
+			ret = icnss_process_twt_cfg_ind_event(priv,
+							     event->data);
 			break;
 		default:
 			icnss_pr_err("Invalid Event type: %d", event->type);
@@ -4878,6 +4904,7 @@ static int icnss_probe(struct platform_device *pdev)
 			    icnss_wpss_ssr_timeout_hdlr, 0);
 	}
 
+	icnss_register_ims_service(priv);
 	INIT_LIST_HEAD(&priv->icnss_tcdev_list);
 
 	icnss_pr_info("Platform driver probed successfully\n");
@@ -4935,6 +4962,8 @@ static int icnss_remove(struct platform_device *pdev)
 		del_timer(&priv->wpss_ssr_timer);
 
 	device_init_wakeup(&priv->pdev->dev, false);
+
+	icnss_unregister_ims_service(priv);
 
 	icnss_debugfs_destroy(priv);
 

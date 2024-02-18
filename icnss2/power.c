@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/clk.h>
 #include <linux/delay.h>
@@ -27,7 +27,7 @@ static struct icnss_vreg_cfg icnss_adrestea_vreg_list[] = {
 	{"vdd-cx-mx", 752000, 752000, 0, 0, 0, false, true},
 	{"vdd-1.8-xo", 1800000, 1800000, 0, 0, 0, false, true},
 	{"vdd-1.3-rfa", 1304000, 1304000, 0, 0, 0, false, true},
-	{"vdd-3.3-ch1", 3312000, 3312000, 0, 0, 0, false, true},
+	{"vdd-3.3-ch1", 3312000, 3312000, 0, 0, 0, false, false},
 	{"vdd-3.3-ch0", 3312000, 3312000, 0, 0, 0, false, true},
 };
 
@@ -385,14 +385,6 @@ static int icnss_vreg_on(struct icnss_priv *priv)
 	list_for_each_entry(vreg, vreg_list, list) {
 		if (IS_ERR_OR_NULL(vreg->reg) || !vreg->cfg.is_supported)
 			continue;
-		if (!priv->chain_reg_info_updated &&
-		    !strcmp(ICNSS_CHAIN1_REGULATOR, vreg->cfg.name)) {
-			priv->chain_reg_info_updated = true;
-			if (!priv->is_chain1_supported) {
-				vreg->cfg.is_supported = false;
-				continue;
-			}
-		}
 
 		ret = icnss_vreg_on_single(vreg);
 		if (ret)
@@ -729,6 +721,26 @@ int icnss_power_off(struct device *dev)
 	return icnss_hw_power_off(priv);
 }
 EXPORT_SYMBOL(icnss_power_off);
+
+int icnss_power_on_chain1_reg(struct icnss_priv *priv)
+{
+	struct list_head *vreg_list = &priv->vreg_list;
+	struct icnss_vreg_info *vreg = NULL;
+	int ret = 0;
+
+	list_for_each_entry(vreg, vreg_list, list) {
+		if (!strcmp(ICNSS_CHAIN1_REGULATOR, vreg->cfg.name) && priv->is_chain1_supported) {
+			vreg->cfg.is_supported = true;
+			ret = icnss_vreg_on_single(vreg);
+			break;
+		}
+	}
+
+	/* Setting chain1 supported to false as chain1 regulator cfg already updated */
+	priv->is_chain1_supported = false;
+
+	return ret;
+}
 
 void icnss_put_resources(struct icnss_priv *priv)
 {

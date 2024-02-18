@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -1209,6 +1209,7 @@ int cnss_power_on_device(struct cnss_plat_data *plat_priv, bool reset)
 	}
 
 	plat_priv->powered_on = true;
+	clear_bit(CNSS_POWER_OFF, &plat_priv->driver_state);
 	cnss_enable_dev_sol_irq(plat_priv);
 	cnss_set_host_sol_value(plat_priv, 0);
 
@@ -1229,6 +1230,8 @@ void cnss_power_off_device(struct cnss_plat_data *plat_priv)
 		return;
 	}
 
+	set_bit(CNSS_POWER_OFF, &plat_priv->driver_state);
+	cnss_bus_shutdown_cleanup(plat_priv);
 	cnss_disable_dev_sol_irq(plat_priv);
 	cnss_select_pinctrl_state(plat_priv, false);
 	cnss_clk_off(plat_priv, &plat_priv->clk_list);
