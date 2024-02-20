@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -25,6 +25,12 @@
 #define DP_STATE_LINK_MAINTENANCE_FAILED    BIT(11)
 #define DP_STATE_AUX_TIMEOUT                BIT(12)
 #define DP_STATE_PLL_LOCKED                 BIT(13)
+
+enum dp_aux_switch_type {
+	DP_AUX_SWITCH_BYPASS,
+	DP_AUX_SWITCH_FSA4480,
+	DP_AUX_SWITCH_WCD939x,
+};
 
 enum dp_aux_error {
 	DP_AUX_ERR_NONE	= 0,
@@ -52,14 +58,15 @@ struct dp_aux {
 	void (*deinit)(struct dp_aux *aux);
 	void (*reconfig)(struct dp_aux *aux);
 	void (*abort)(struct dp_aux *aux, bool abort);
-	void (*set_sim_mode)(struct dp_aux *aux,
-		struct dp_aux_bridge *sim_bridge);
-	int (*aux_switch)(struct dp_aux *aux, bool enable, int orientation);
+	void (*set_sim_mode)(struct dp_aux *aux, struct dp_aux_bridge *sim_bridge);
+	int (*switch_configure)(struct dp_aux *aux, bool enable, int orientation);
+	int (*switch_register_notifier)(struct notifier_block *nb, struct device_node *node);
+	int (*switch_unregister_notifier)(struct notifier_block *nb, struct device_node *node);
 };
 
 struct dp_aux *dp_aux_get(struct device *dev, struct dp_catalog_aux *catalog,
 		struct dp_parser *parser, struct device_node *aux_switch,
-		struct dp_aux_bridge *aux_bridge);
+		struct dp_aux_bridge *aux_bridge, enum dp_aux_switch_type switch_type);
 void dp_aux_put(struct dp_aux *aux);
 
 #endif /*__DP_AUX_H_*/
