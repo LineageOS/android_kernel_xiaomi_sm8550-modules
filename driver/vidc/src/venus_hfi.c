@@ -1152,7 +1152,8 @@ static void __flush_debug_queue(struct msm_vidc_core *core,
 		 * line.
 		 */
 		log = (u8 *)packet + sizeof(struct hfi_debug_header) + 1;
-		dprintk_firmware(log_level, "%s", log);
+		log_level = (msm_vidc_debug & ~FW_LOGMASK) | (pkt->debug_level << FW_LOGSHIFT);
+		dprintk_firmware(log_level, pkt->size, "%s", log);
 	}
 
 	if (local_packet)
