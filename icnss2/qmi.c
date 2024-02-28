@@ -3509,6 +3509,7 @@ int icnss_wlfw_get_info_send_sync(struct icnss_priv *plat_priv, int type,
 	struct wlfw_get_info_resp_msg_v01 *resp;
 	struct qmi_txn txn;
 	int ret = 0;
+	int flags = GFP_KERNEL & ~__GFP_DIRECT_RECLAIM;
 
 	if (cmd_len > QMI_WLFW_MAX_DATA_SIZE_V01)
 		return -EINVAL;
@@ -3516,11 +3517,11 @@ int icnss_wlfw_get_info_send_sync(struct icnss_priv *plat_priv, int type,
 	if (test_bit(ICNSS_FW_DOWN, &plat_priv->state))
 		return -EINVAL;
 
-	req = kzalloc(sizeof(*req), GFP_KERNEL);
+	req = kzalloc(sizeof(*req), flags);
 	if (!req)
 		return -ENOMEM;
 
-	resp = kzalloc(sizeof(*resp), GFP_KERNEL);
+	resp = kzalloc(sizeof(*resp), flags);
 	if (!resp) {
 		kfree(req);
 		return -ENOMEM;
