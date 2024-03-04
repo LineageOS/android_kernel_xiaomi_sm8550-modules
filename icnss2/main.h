@@ -433,6 +433,7 @@ struct icnss_priv {
 	uint32_t nr_mem_region;
 	struct icnss_mem_region_info
 		mem_region[WLFW_MAX_NUM_MEMORY_REGIONS];
+	struct icnss_dev_mem_info dev_mem_info[ICNSS_MAX_DEV_MEM_NUM];
 	struct dentry *root_dentry;
 	spinlock_t on_off_lock;
 	struct icnss_stats stats;

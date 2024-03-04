@@ -3400,6 +3400,8 @@ int icnss_get_soc_info(struct device *dev, struct icnss_soc_info *info)
 	info->rd_card_chain_cap = priv->rd_card_chain_cap;
 	info->phy_he_channel_width_cap = priv->phy_he_channel_width_cap;
 	info->phy_qam_cap = priv->phy_qam_cap;
+	memcpy(&info->dev_mem_info, &priv->dev_mem_info,
+	       sizeof(info->dev_mem_info));
 
 	return 0;
 }
