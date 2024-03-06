@@ -326,6 +326,10 @@ static int cnss_dev_boot_debug_show(struct seq_file *s, void *data)
 	seq_puts(s, "\npdc_update usage:");
 	seq_puts(s, "1. echo pdc_update {class: wlan_pdc ss: <pdc_ss>, res: <vreg>.<mode>, <seq>: <val>} > <debugfs_path>/cnss/dev_boot\n");
 	seq_puts(s, "2. echo pdc_update {class: wlan_pdc ss: <pdc_ss>, res: pdc, enable: <val>} > <debugfs_path>/cnss/dev_boot\n");
+	seq_puts(s, "assert_host_sol: Assert host sol\n");
+	seq_puts(s, "deassert_host_sol: Deassert host sol\n");
+	seq_puts(s, "dev_check: Check whether HW is disabled or not\n");
+	seq_puts(s, "dev_enable: Enable HW\n");
 
 	return 0;
 }
