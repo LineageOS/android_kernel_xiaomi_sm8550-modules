@@ -648,6 +648,7 @@ struct cnss_plat_data {
 	u32 *on_chip_pmic_board_ids;
 	bool no_bwscale;
 	bool sleep_clk;
+	struct wlchip_serial_id_v01 serial_id;
 };
 
 #if IS_ENABLED(CONFIG_ARCH_QCOM)

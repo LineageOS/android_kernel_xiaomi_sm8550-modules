@@ -544,6 +544,11 @@ struct wlfw_host_pcie_link_info_s_v01 {
 	u32 pci_link_width;
 };
 
+struct wlchip_serial_id_v01 {
+	u32 serial_id_msb;
+	u32 serial_id_lsb;
+};
+
 struct wlfw_ind_register_req_msg_v01 {
 	u8 fw_ready_enable_valid;
 	u8 fw_ready_enable;
@@ -732,8 +737,10 @@ struct wlfw_cap_resp_msg_v01 {
 	enum wlfw_he_channel_width_cap_v01 he_channel_width_cap;
 	u8 phy_qam_cap_valid;
 	enum wlfw_phy_qam_cap_v01 phy_qam_cap;
+	u8 serial_id_valid;
+	struct wlchip_serial_id_v01 serial_id;
 };
-#define WLFW_CAP_RESP_MSG_V01_MAX_MSG_LEN 1160
+#define WLFW_CAP_RESP_MSG_V01_MAX_MSG_LEN 1171
 extern struct qmi_elem_info wlfw_cap_resp_msg_v01_ei[];
 
 struct wlfw_bdf_download_req_msg_v01 {

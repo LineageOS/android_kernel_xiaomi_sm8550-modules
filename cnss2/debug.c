@@ -73,6 +73,15 @@ static const struct file_operations cnss_pin_connect_fops = {
 	.llseek		= seq_lseek,
 };
 
+static u64 cnss_get_serial_id(struct cnss_plat_data *plat_priv)
+{
+	u32 msb = plat_priv->serial_id.serial_id_msb;
+	u32 lsb = plat_priv->serial_id.serial_id_lsb;
+
+	msb &= 0xFFFF;
+	return (((u64)msb << 32) | lsb);
+}
+
 static int cnss_stats_show_state(struct seq_file *s,
 				 struct cnss_plat_data *plat_priv)
 {
@@ -80,6 +89,7 @@ static int cnss_stats_show_state(struct seq_file *s,
 	int skip = 0;
 	unsigned long state;
 
+	seq_printf(s, "\nSerial Number: 0x%lx", cnss_get_serial_id(plat_priv));
 	seq_printf(s, "\nState: 0x%lx(", plat_priv->driver_state);
 	for (i = 0, state = plat_priv->driver_state; state != 0;
 	     state >>= 1, i++) {
