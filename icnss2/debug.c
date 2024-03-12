@@ -341,12 +341,22 @@ static int icnss_stats_show_events(struct seq_file *s, struct icnss_priv *priv)
 	return 0;
 }
 
+static u64 icnss_get_serial_id(struct icnss_priv *priv)
+{
+	u32 msb = priv->serial_id.serial_id_msb;
+	u32 lsb = priv->serial_id.serial_id_lsb;
+
+	msb &= 0xFFFF;
+	return (((u64)msb << 32) | lsb);
+}
+
 static int icnss_stats_show_state(struct seq_file *s, struct icnss_priv *priv)
 {
 	enum icnss_driver_state i;
 	int skip = 0;
 	unsigned long state;
 
+	seq_printf(s, "\nSerial Number: 0x%llx", icnss_get_serial_id(priv));
 	seq_printf(s, "\nState: 0x%lx(", priv->state);
 	for (i = 0, state = priv->state; state != 0; state >>= 1, i++) {
 
