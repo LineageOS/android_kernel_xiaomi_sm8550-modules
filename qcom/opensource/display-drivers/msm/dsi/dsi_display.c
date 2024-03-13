@@ -11,6 +11,7 @@
 #include <linux/version.h>
 #include <video/mipi_display.h>
 
+#include <drm/xiaomi/mi_disp_notifier.h>
 
 #include "msm_drv.h"
 #include "sde_connector.h"
@@ -1409,6 +1410,9 @@ int dsi_display_set_power(struct drm_connector *connector,
 		int power_mode, void *disp)
 {
 	struct dsi_display *display = disp;
+	struct mi_disp_notifier *notify_data;
+	unsigned long notify_event = 0;
+	int mi_power_mode;
 	int rc = 0;
 
 	if (!display || !display->panel) {
@@ -1424,10 +1428,14 @@ int dsi_display_set_power(struct drm_connector *connector,
 	switch (power_mode) {
 	case SDE_MODE_DPMS_LP1:
 		display->panel->power_mode = power_mode;
+		notify_event = MI_DISP_DPMS_EARLY_EVENT;
+		mi_power_mode = MI_DISP_DPMS_LP1;
 		rc = dsi_panel_set_lp1(display->panel);
 		break;
 	case SDE_MODE_DPMS_LP2:
 		display->panel->power_mode = power_mode;
+		notify_event = MI_DISP_DPMS_EARLY_EVENT;
+		mi_power_mode = MI_DISP_DPMS_LP2;
 		rc = dsi_panel_set_lp2(display->panel);
 		break;
 	case SDE_MODE_DPMS_ON:
@@ -1438,15 +1446,19 @@ int dsi_display_set_power(struct drm_connector *connector,
 			if(mi_get_panel_id_by_dsi_panel(display->panel) == M1_PANEL_PA)
 				rc = dsi_panel_switch(display->panel);
 		}
+		notify_event = MI_DISP_DPMS_EVENT;
+		mi_power_mode = MI_DISP_DPMS_ON;
 		break;
 	case SDE_MODE_DPMS_OFF:
 		if (mi_disp_lhbm_fod_enabled(display->panel))
 			mi_disp_lhbm_fod_allow_tx_lhbm(display, false);
 		mi_disp_feature_event_notify_by_type(mi_get_disp_id(display->display_type),
 			MI_DISP_EVENT_POWER, sizeof(power_mode), power_mode);
+		notify_event = MI_DISP_DPMS_EARLY_EVENT;
+		mi_power_mode = MI_DISP_DPMS_POWERDOWN;
+		goto notify;
 	default:
-		mutex_unlock(&display->panel->mi_cfg.doze_lock);
-		return rc;
+		goto free;
 	}
 
 	SDE_EVT32(display->panel->power_mode, power_mode, rc);
@@ -1464,6 +1476,19 @@ int dsi_display_set_power(struct drm_connector *connector,
 			MI_DISP_EVENT_POWER, sizeof(power_mode), power_mode);
 	}
 
+notify:
+	notify_data = kzalloc(sizeof(struct mi_disp_notifier), GFP_KERNEL);
+	if (notify_data != NULL && notify_event != 0) {
+		DSI_INFO("notifying power mode %d", mi_power_mode);
+		notify_data->disp_id = mi_get_disp_id(display->display_type);
+		notify_data->data = &mi_power_mode;
+		mi_disp_notifier_call_chain(notify_event, notify_data);
+	} else {
+		DSI_ERR("could not allocate notify data memory");
+	}
+
+free:
+	kfree(notify_data);
 	mutex_unlock(&display->panel->mi_cfg.doze_lock);
 	return rc;
 }
