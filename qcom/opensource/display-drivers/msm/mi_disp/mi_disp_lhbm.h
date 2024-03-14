@@ -30,14 +30,6 @@ enum mi_panel_op_code {
 	MI_FOD_NORMAL_TO_AOD,
 };
 
-enum fod_ui_ready_state {
-	LOCAL_HBM_UI_NONE = 0,
-	GLOBAL_FOD_HBM_OVERLAY = BIT(0),
-	GLOBAL_FOD_ICON = BIT(1),
-	FOD_LOW_BRIGHTNESS_CAPTURE = BIT(2),
-	LOCAL_HBM_UI_READY  = BIT(3)
-};
-
 struct disp_lhbm_fod {
 	struct dsi_display *display;
 
