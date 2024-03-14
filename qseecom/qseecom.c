@@ -10057,18 +10057,7 @@ static int qseecom_suspend(struct device *dev)
 	if (qseecom.no_clock_support)
 		return 0;
 
-	mutex_lock(&qsee_bw_mutex);
 	mutex_lock(&clk_access_lock);
-
-	if (qseecom.current_mode != INACTIVE) {
-		ret = qseecom_bus_scale_update_request(
-			qseecom.qsee_perf_client, INACTIVE);
-		if (ret)
-			pr_err("Fail to scale down bus\n");
-		else
-			qseecom.current_mode = INACTIVE;
-	}
-
 	if (qclk->clk_access_cnt) {
 		if (qclk->ce_clk != NULL)
 			clk_disable_unprepare(qclk->ce_clk);
@@ -10077,14 +10066,26 @@ static int qseecom_suspend(struct device *dev)
 		if (qclk->ce_bus_clk != NULL)
 			clk_disable_unprepare(qclk->ce_bus_clk);
 	}
-
-	del_timer_sync(&(qseecom.bw_scale_down_timer));
-	qseecom.timer_running = false;
-
 	mutex_unlock(&clk_access_lock);
-	mutex_unlock(&qsee_bw_mutex);
-	cancel_work_sync(&qseecom.bw_inactive_req_ws);
 
+	if (qseecom.support_bus_scaling) {
+		mutex_lock(&qsee_bw_mutex);
+
+		if (qseecom.current_mode != INACTIVE) {
+			ret = qseecom_bus_scale_update_request(
+					qseecom.qsee_perf_client, INACTIVE);
+			if (ret)
+				pr_err("Fail to scale down bus\n");
+			else
+				qseecom.current_mode = INACTIVE;
+		}
+
+		del_timer_sync(&(qseecom.bw_scale_down_timer));
+		qseecom.timer_running = false;
+
+		mutex_unlock(&qsee_bw_mutex);
+		cancel_work_sync(&qseecom.bw_inactive_req_ws);
+	}
 	return 0;
 }
 
@@ -10098,21 +10099,7 @@ static int qseecom_resume(struct device *dev)
 	if (qseecom.no_clock_support)
 		goto exit;
 
-	mutex_lock(&qsee_bw_mutex);
 	mutex_lock(&clk_access_lock);
-	if (qseecom.cumulative_mode >= HIGH)
-		mode = HIGH;
-	else
-		mode = qseecom.cumulative_mode;
-
-	if (qseecom.cumulative_mode != INACTIVE) {
-		ret = qseecom_bus_scale_update_request(
-			qseecom.qsee_perf_client, mode);
-		if (ret)
-			pr_err("Fail to scale up bus to %d\n", mode);
-		else
-			qseecom.current_mode = mode;
-	}
 
 	if (qclk->clk_access_cnt) {
 		if (qclk->ce_core_clk != NULL) {
@@ -10141,16 +10128,33 @@ static int qseecom_resume(struct device *dev)
 		}
 	}
 
-	if (qclk->clk_access_cnt || qseecom.cumulative_mode) {
-		qseecom.bw_scale_down_timer.expires = jiffies +
-			msecs_to_jiffies(QSEECOM_SEND_CMD_CRYPTO_TIMEOUT);
-		mod_timer(&(qseecom.bw_scale_down_timer),
-				qseecom.bw_scale_down_timer.expires);
-		qseecom.timer_running = true;
-	}
+	if (qseecom.support_bus_scaling) {
+		mutex_lock(&qsee_bw_mutex);
+		if (qseecom.cumulative_mode >= HIGH)
+			mode = HIGH;
+		else
+			mode = qseecom.cumulative_mode;
 
+		if (qseecom.cumulative_mode != INACTIVE) {
+			ret = qseecom_bus_scale_update_request(
+					qseecom.qsee_perf_client, mode);
+			if (ret)
+				pr_err("Fail to scale up bus to %d\n", mode);
+			else
+				qseecom.current_mode = mode;
+		}
+
+		if (qclk->clk_access_cnt || qseecom.cumulative_mode) {
+			qseecom.bw_scale_down_timer.expires = jiffies +
+				msecs_to_jiffies(QSEECOM_SEND_CMD_CRYPTO_TIMEOUT);
+			mod_timer(&(qseecom.bw_scale_down_timer),
+					qseecom.bw_scale_down_timer.expires);
+			qseecom.timer_running = true;
+		}
+		mutex_unlock(&qsee_bw_mutex);
+	}
 	mutex_unlock(&clk_access_lock);
-	mutex_unlock(&qsee_bw_mutex);
+
 	goto exit;
 
 ce_bus_clk_err:
@@ -10161,7 +10165,6 @@ ce_clk_err:
 		clk_disable_unprepare(qclk->ce_core_clk);
 err:
 	mutex_unlock(&clk_access_lock);
-	mutex_unlock(&qsee_bw_mutex);
 	ret = -EIO;
 exit:
 	atomic_set(&qseecom.qseecom_state, QSEECOM_STATE_READY);
