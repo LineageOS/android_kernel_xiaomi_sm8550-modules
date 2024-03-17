@@ -615,14 +615,12 @@ int msm_cvp_unmap_buf_wncc(struct msm_cvp_inst *inst,
 		mutex_unlock(&inst->cvpwnccbufs.lock);
 		return -EINVAL;
 	}
-	mutex_unlock(&inst->cvpwnccbufs.lock);
 
 	if (cbuf->smem->device_addr) {
 		msm_cvp_unmap_smem(inst, cbuf->smem, "unmap wncc");
 		msm_cvp_smem_put_dma_buf(cbuf->smem->dma_buf);
 	}
 
-	mutex_lock(&inst->cvpwnccbufs.lock);
 	list_del(&cbuf->list);
 	inst->cvpwnccbufs_table[buf_idx].fd = 0;
 	inst->cvpwnccbufs_table[buf_idx].iova = 0;
