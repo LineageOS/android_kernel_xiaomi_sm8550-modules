@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_TFE_CSID_HW_H_
@@ -246,6 +246,7 @@ struct cam_tfe_csid_csi2_rx_reg_offset {
 	uint32_t csi2_irq_mask_all;
 	uint32_t csi2_misr_enable_shift_val;
 	uint32_t csi2_vc_mode_shift_val;
+	uint32_t csi2_rx_epd_mode_shift_en;
 	uint32_t csi2_capture_long_pkt_en_shift;
 	uint32_t csi2_capture_short_pkt_en_shift;
 	uint32_t csi2_capture_cphy_pkt_en_shift;
@@ -348,10 +349,11 @@ struct cam_tfe_csid_hw_info {
 
 /**
  * struct cam_tfe_csid_csi2_rx_cfg- csid csi2 rx configuration data
- * @phy_sel:     input resource type for sensor only
- * @lane_type:   lane type: c-phy or d-phy
- * @lane_num :   active lane number
- * @lane_cfg:    lane configurations: 4 bits per lane
+ * @phy_sel:          input resource type for sensor only
+ * @lane_type:        lane type: c-phy or d-phy
+ * @lane_num :        active lane number
+ * @lane_cfg:         lane configurations: 4 bits per lane
+ * @epd_supported:    Flag to check if epd supported
  *
  */
 struct cam_tfe_csid_csi2_rx_cfg  {
@@ -359,6 +361,7 @@ struct cam_tfe_csid_csi2_rx_cfg  {
 	uint32_t                        lane_type;
 	uint32_t                        lane_num;
 	uint32_t                        lane_cfg;
+	uint32_t                        epd_supported;
 };
 
 /**
