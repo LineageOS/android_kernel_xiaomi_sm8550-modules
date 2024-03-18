@@ -1392,11 +1392,20 @@ static int tzdbg_procfs_release(struct inode *inode, struct file *file)
 	return single_release(inode, file);
 }
 
+static loff_t tzdbg_procfs_lseek(struct file *file, loff_t offset, int whence)
+{
+	loff_t retval = -EINVAL;
+	pr_err("%s: Operation not supported\n",__func__);
+	return retval;
+}
+
 struct proc_ops tzdbg_fops = {
 	.proc_flags   = PROC_ENTRY_PERMANENT,
 	.proc_read    = tzdbg_fs_read,
 	.proc_open    = tzdbg_procfs_open,
 	.proc_release = tzdbg_procfs_release,
+/* mandatory unless nonseekable_open() or equivalent is used */
+	.proc_lseek   = tzdbg_procfs_lseek,
 };
 
 static int tzdbg_init_tme_log(struct platform_device *pdev, void __iomem *virt_iobase)
