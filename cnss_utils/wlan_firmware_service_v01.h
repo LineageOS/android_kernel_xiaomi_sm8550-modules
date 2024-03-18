@@ -331,7 +331,8 @@ enum wlfw_gpio_info_type_v01 {
 	BT_EN_GPIO_V01 = 1,
 	HOST_SOL_GPIO_V01 = 2,
 	TARGET_SOL_GPIO_V01 = 3,
-	GPIO_TYPE_MAX_V01 = 4,
+	WLAN_SW_CTRL_GPIO_V01 = 4,
+	GPIO_TYPE_MAX_V01 = 5,
 	WLFW_GPIO_INFO_TYPE_MAX_VAL_V01 = INT_MAX,
 };
 
@@ -408,6 +409,8 @@ enum wlfw_lpass_ssr_reason_v01 {
 #define QMI_WLFW_DIRECT_LINK_SUPPORT_V01 ((u64)0x02ULL)
 #define QMI_WLFW_AUX_UC_SUPPORT_V01 ((u64)0x04ULL)
 #define QMI_WLFW_CALDB_SEG_DDR_SUPPORT_V01 ((u64)0x08ULL)
+
+#define QMI_WLFW_DIRECT_LINK_SKU_SUPPORT_V01 ((u64)0x01ULL)
 
 struct wlfw_ce_tgt_pipe_cfg_s_v01 {
 	u32 pipe_num;
@@ -1069,8 +1072,10 @@ struct wlfw_fw_init_done_ind_msg_v01 {
 	u32 hang_data_addr_offset;
 	u8 hang_data_length_valid;
 	u16 hang_data_length;
+	u8 soft_sku_features_valid;
+	u64 soft_sku_features;
 };
-#define WLFW_FW_INIT_DONE_IND_MSG_V01_MAX_MSG_LEN 12
+#define WLFW_FW_INIT_DONE_IND_MSG_V01_MAX_MSG_LEN 23
 extern struct qmi_elem_info wlfw_fw_init_done_ind_msg_v01_ei[];
 
 struct wlfw_rejuvenate_ind_msg_v01 {
