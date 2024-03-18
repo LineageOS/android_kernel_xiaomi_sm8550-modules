@@ -1023,7 +1023,8 @@ int cnss_wlfw_tme_opt_file_dnld_send_sync(struct cnss_plat_data *plat_priv,
 		file_name = TME_DPR_FILE_NAME;
 	}
 
-	if (!tme_opt_file_mem->pa || !tme_opt_file_mem->size) {
+	if (!tme_opt_file_mem || !tme_opt_file_mem->pa ||
+	    !tme_opt_file_mem->size) {
 		cnss_pr_err("Memory for TME opt file is not available\n");
 		ret = -ENOMEM;
 		goto out;

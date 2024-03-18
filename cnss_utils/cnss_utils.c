@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2017, 2019, 2021 The Linux Foundation. All rights reserved. */
+/*
+ * Copyright (c) 2017, 2019, 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ */
 
 #define pr_fmt(fmt) "cnss_utils: " fmt
 
@@ -13,6 +16,10 @@
 #include "cnss_utils.h"
 #else
 #include <net/cnss_utils.h>
+#endif
+
+#ifdef CONFIG_FEATURE_SMEM_MAILBOX
+#include <smem-mailbox.h>
 #endif
 
 #define CNSS_MAX_CH_NUM 157
@@ -53,6 +60,10 @@ static struct cnss_utils_priv {
 	/* generic mutex for device_id */
 	struct mutex cnss_device_id_lock;
 	enum cnss_utils_device_type cnss_device_type;
+#ifdef CONFIG_FEATURE_SMEM_MAILBOX
+	bool smem_mailbox_initialized;
+	int smem_mailbox_id;
+#endif
 } *cnss_utils_priv;
 
 int cnss_utils_set_wlan_unsafe_channel(struct device *dev,
@@ -342,6 +353,27 @@ enum cnss_utils_cc_src cnss_utils_get_cc_source(struct device *dev)
 }
 EXPORT_SYMBOL(cnss_utils_get_cc_source);
 
+#ifdef CONFIG_FEATURE_SMEM_MAILBOX
+int cnss_utils_smem_mailbox_write(struct device *dev, int flags,
+				  const __u8 *data, uint32_t len)
+{
+	struct cnss_utils_priv *priv = cnss_utils_priv;
+
+	if (!priv)
+		return -EINVAL;
+	if (!priv->smem_mailbox_initialized) {
+		if (smem_mailbox_start(priv->smem_mailbox_id, NULL) != 1) {
+			pr_err("Didn't init smem mailbox properly\n");
+			return -EINVAL;
+		} else
+			priv->smem_mailbox_initialized = true;
+	}
+	return smem_mailbox_write(priv->smem_mailbox_id, flags, (__u8 *)data,
+				  len);
+}
+EXPORT_SYMBOL(cnss_utils_smem_mailbox_write);
+#endif
+
 static ssize_t cnss_utils_mac_write(struct file *fp,
 				    const char __user *user_buf,
 				    size_t count, loff_t *off)
@@ -496,6 +528,31 @@ static bool cnss_utils_is_valid_dt_node_found(void)
 	return false;
 }
 
+#ifdef CONFIG_FEATURE_SMEM_MAILBOX
+static void cnss_utils_smem_mailbox_init(void)
+{
+	struct cnss_utils_priv *priv = cnss_utils_priv;
+
+	priv->smem_mailbox_id = 0;
+	priv->smem_mailbox_initialized = false;
+}
+
+static void cnss_utils_smem_mailbox_deinit(void)
+{
+	struct cnss_utils_priv *priv = cnss_utils_priv;
+
+	smem_mailbox_stop(priv->smem_mailbox_id);
+}
+#else
+static void cnss_utils_smem_mailbox_init(void)
+{
+}
+
+static void cnss_utils_smem_mailbox_deinit(void)
+{
+}
+#endif
+
 static int __init cnss_utils_init(void)
 {
 	struct cnss_utils_priv *priv = NULL;
@@ -515,12 +572,13 @@ static int __init cnss_utils_init(void)
 	spin_lock_init(&priv->dfs_nol_info_lock);
 	cnss_utils_debugfs_create(priv);
 	cnss_utils_priv = priv;
-
+	cnss_utils_smem_mailbox_init();
 	return 0;
 }
 
 static void __exit cnss_utils_exit(void)
 {
+	cnss_utils_smem_mailbox_deinit();
 	kfree(cnss_utils_priv);
 	cnss_utils_priv = NULL;
 }
