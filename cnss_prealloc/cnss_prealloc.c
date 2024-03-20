@@ -383,32 +383,28 @@ EXPORT_SYMBOL(wcnss_prealloc_get);
 int wcnss_prealloc_put(void *mem)
 {
 	int i;
-	size_t size;
 	int ret;
 	unsigned long irq_flags;
 
 	if (!mem || !cnss_pools)
 		return 0;
 
-	size = ksize(mem);
+	for (i = 0; i < cnss_prealloc_pool_size; i++) {
+		if (cnss_pools[i].mp) {
+			if (!cnss_pools[i].pool_ptrs) {
+				pr_err("%s mempool table is null\n",
+				       cnss_pools[i].name);
+				break;
+			}
+			spin_lock_irqsave(&pool_table_lock, irq_flags);
+			ret = wcnss_free_pool_table_slot(cnss_pools[i],
+							 mem);
+			spin_unlock_irqrestore(&pool_table_lock,
+					       irq_flags);
 
-	if (size > cnss_pool_alloc_threshold()) {
-		for (i = 0; i < cnss_prealloc_pool_size; i++) {
-			if (cnss_pools[i].size >= size && cnss_pools[i].mp) {
-				if (!cnss_pools[i].pool_ptrs) {
-					pr_err("%s mempool table is null\n",
-					       cnss_pools[i].name);
-					break;
-				}
-				spin_lock_irqsave(&pool_table_lock, irq_flags);
-				ret = wcnss_free_pool_table_slot(cnss_pools[i],
-								 mem);
-				spin_unlock_irqrestore(&pool_table_lock,
-						       irq_flags);
-				if (ret >= 0) {
-					mempool_free(mem, cnss_pools[i].mp);
-					return 1;
-				}
+			if (ret >= 0) {
+				mempool_free(mem, cnss_pools[i].mp);
+				return 1;
 			}
 		}
 	}
