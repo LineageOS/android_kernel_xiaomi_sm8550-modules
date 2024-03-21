@@ -2201,14 +2201,20 @@ static int icnss_wpss_notifier_nb(struct notifier_block *nb,
 	icnss_pr_vdbg("WPSS-Notify: event %s(%lu)\n",
 		      icnss_qcom_ssr_notify_state_to_str(code), code);
 
-	if (code == QCOM_SSR_AFTER_SHUTDOWN) {
-		icnss_pr_info("Collecting msa0 segment dump\n");
-		icnss_msa0_ramdump(priv);
+	switch (code) {
+	case QCOM_SSR_BEFORE_SHUTDOWN:
+		break;
+	case QCOM_SSR_AFTER_SHUTDOWN:
+		/* Collect ramdump only when there was a crash. */
+		if (notif->crashed) {
+			icnss_pr_info("Collecting msa0 segment dump\n");
+			icnss_msa0_ramdump(priv);
+		}
+		goto out;
+	default:
 		goto out;
 	}
 
-	if (code != QCOM_SSR_BEFORE_SHUTDOWN)
-		goto out;
 
 	if (priv->wpss_self_recovery_enabled)
 		del_timer(&priv->wpss_ssr_timer);
