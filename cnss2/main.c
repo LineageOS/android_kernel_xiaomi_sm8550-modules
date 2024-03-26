@@ -4742,7 +4742,8 @@ int cnss_wlan_hw_disable_check(struct cnss_plat_data *plat_priv)
 
 	peripheralStateInfo = qcom_smem_get(QCOM_SMEM_HOST_ANY, PERISEC_SMEM_ID, &size);
 	if (IS_ERR_OR_NULL(peripheralStateInfo)) {
-		if (PTR_ERR(peripheralStateInfo) != -ENOENT)
+		if (PTR_ERR(peripheralStateInfo) != -ENOENT &&
+		    PTR_ERR(peripheralStateInfo) != -ENODEV)
 			CNSS_ASSERT(0);
 
 		cnss_pr_dbg("Secure HW feature not enabled. ret = %d\n",
