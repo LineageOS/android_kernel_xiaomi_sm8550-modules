@@ -89,7 +89,8 @@ static int cnss_stats_show_state(struct seq_file *s,
 	int skip = 0;
 	unsigned long state;
 
-	seq_printf(s, "\nSerial Number: 0x%lx", cnss_get_serial_id(plat_priv));
+	seq_printf(s, "\nSerial Number: 0x%llx",
+		   cnss_get_serial_id(plat_priv));
 	seq_printf(s, "\nState: 0x%lx(", plat_priv->driver_state);
 	for (i = 0, state = plat_priv->driver_state; state != 0;
 	     state >>= 1, i++) {
