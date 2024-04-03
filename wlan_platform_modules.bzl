@@ -6,10 +6,10 @@ _default_module_enablement_list = [
     "cnss_nl",
     "cnss_prealloc",
     "cnss_utils",
-    "wlan_firmware_service"
+    "wlan_firmware_service",
 ]
 
-_cnss2_enabled_target = ["niobe", "pineapple", "sun"]
+_cnss2_enabled_target = ["anorak", "niobe", "pineapple", "sun"]
 _icnss2_enabled_target = ["blair", "pineapple", "monaco", "pitti", "volcano"]
 
 def _get_module_list(target, variant):
@@ -77,6 +77,17 @@ def _define_modules_for_target_variant(target, variant):
         module = "cnss2"
         _define_platform_config_rule(module, target, variant)
         defconfig = ":{}/{}_defconfig_generate_{}".format(module, tv, variant)
+        deps = [
+            ":{}_cnss_utils".format(tv),
+            ":{}_cnss_prealloc".format(tv),
+            ":{}_wlan_firmware_service".format(tv),
+            ":{}_cnss_plat_ipc_qmi_svc".format(tv),
+            "//msm-kernel:all_headers",
+            ":wlan-platform-headers",
+        ]
+        if target != "anorak":
+            deps.append("//vendor/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv))
+
         ddk_module(
             name = "{}_cnss2".format(tv),
             srcs = native.glob([
@@ -93,12 +104,12 @@ def _define_modules_for_target_variant(target, variant):
             includes = ["cnss", "cnss_utils"],
             kconfig = "cnss2/Kconfig",
             defconfig = defconfig,
-            conditional_srcs =  {
+            conditional_srcs = {
                 "CONFIG_CNSS2_QMI": {
                     True: [
                         "cnss2/qmi.c",
                         "cnss2/coexistence_service_v01.c",
-                    ]
+                    ],
                 },
                 "CONFIG_PCI_MSM": {
                     True: [
@@ -108,15 +119,7 @@ def _define_modules_for_target_variant(target, variant):
             },
             out = "cnss2.ko",
             kernel_build = "//msm-kernel:{}".format(tv),
-            deps = [
-                "//vendor/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv),
-                ":{}_cnss_utils".format(tv),
-                ":{}_cnss_prealloc".format(tv),
-                ":{}_wlan_firmware_service".format(tv),
-                ":{}_cnss_plat_ipc_qmi_svc".format(tv),
-                "//msm-kernel:all_headers",
-                ":wlan-platform-headers",
-            ],
+            deps = deps,
         )
 
     if icnss2_enabled:
@@ -199,7 +202,7 @@ def _define_modules_for_target_variant(target, variant):
         name = "{}_cnss_utils".format(tv),
         srcs = native.glob([
             "cnss_utils/cnss_utils.c",
-            "cnss_utils/*.h"
+            "cnss_utils/*.h",
         ]),
         kconfig = "cnss_utils/Kconfig",
         defconfig = defconfig,
@@ -219,7 +222,7 @@ def _define_modules_for_target_variant(target, variant):
             "cnss_utils/wlan_firmware_service_v01.c",
             "cnss_utils/device_management_service_v01.c",
             "cnss_utils/ip_multimedia_subsystem_private_service_v01.c",
-            "cnss_utils/*.h"
+            "cnss_utils/*.h",
         ]),
         kconfig = "cnss_utils/Kconfig",
         defconfig = defconfig,
@@ -236,7 +239,7 @@ def _define_modules_for_target_variant(target, variant):
             srcs = native.glob([
                 "cnss_utils/cnss_plat_ipc_qmi.c",
                 "cnss_utils/cnss_plat_ipc_service_v01.c",
-                "cnss_utils/*.h"
+                "cnss_utils/*.h",
             ]),
             kconfig = "cnss_utils/Kconfig",
             defconfig = defconfig,
@@ -253,7 +256,7 @@ def _define_modules_for_target_variant(target, variant):
         wipe_dist_dir = False,
         allow_duplicate_filenames = False,
         mode_overrides = {"**/*": "644"},
-        log = "info"
+        log = "info",
     )
 
 def define_modules():
