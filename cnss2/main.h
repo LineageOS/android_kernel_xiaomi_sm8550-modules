@@ -603,6 +603,8 @@ struct cnss_plat_data {
 	u64 dynamic_feature;
 	void *get_info_cb_ctx;
 	int (*get_info_cb)(void *ctx, void *event, int event_len);
+	void *get_driver_async_data_ctx;
+	int (*get_driver_async_data_cb)(void *ctx, uint16_t type, void *event, int event_len);
 	bool cbc_enabled;
 	u8 use_pm_domain;
 	u8 use_nv_mac;

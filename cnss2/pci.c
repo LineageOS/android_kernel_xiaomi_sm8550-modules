@@ -3094,6 +3094,8 @@ int cnss_pci_call_driver_remove(struct cnss_pci_data *pci_priv)
 
 	plat_priv->get_info_cb_ctx = NULL;
 	plat_priv->get_info_cb = NULL;
+	plat_priv->get_driver_async_data_ctx = NULL;
+	plat_priv->get_driver_async_data_cb = NULL;
 
 	return 0;
 }
