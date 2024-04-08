@@ -56,6 +56,7 @@
 #define QMI_WLFW_PIN_CONNECT_RESULT_IND_V01 0x002C
 #define QMI_WLFW_M3_DUMP_UPLOAD_DONE_RESP_V01 0x004E
 #define QMI_WLFW_QDSS_TRACE_SAVE_IND_V01 0x0041
+#define QMI_WLFW_DRIVER_ASYNC_DATA_IND_V01 0x0061
 #define QMI_WLFW_BDF_DOWNLOAD_RESP_V01 0x0025
 #define QMI_WLFW_REJUVENATE_ACK_RESP_V01 0x003A
 #define QMI_WLFW_MSA_INFO_RESP_V01 0x002D
@@ -595,8 +596,10 @@ struct wlfw_ind_register_req_msg_v01 {
 	u8 m3_dump_upload_segments_req_enable;
 	u8 fw_ssr_enable_valid;
 	u8 fw_ssr_enable;
+	u8 async_data_enable_valid;
+	u8 async_data_enable;
 };
-#define WLFW_IND_REGISTER_REQ_MSG_V01_MAX_MSG_LEN 90
+#define WLFW_IND_REGISTER_REQ_MSG_V01_MAX_MSG_LEN 94
 extern struct qmi_elem_info wlfw_ind_register_req_msg_v01_ei[];
 
 struct wlfw_ind_register_resp_msg_v01 {
@@ -1497,8 +1500,10 @@ struct wlfw_phy_cap_resp_msg_v01 {
 	u32 board_id;
 	u8 mlo_cap_v2_support_valid;
 	u32 mlo_cap_v2_support;
+	u8 single_chip_mlo_support_valid;
+	u8 single_chip_mlo_support;
 };
-#define WLFW_PHY_CAP_RESP_MSG_V01_MAX_MSG_LEN 25
+#define WLFW_PHY_CAP_RESP_MSG_V01_MAX_MSG_LEN 29
 extern struct qmi_elem_info wlfw_phy_cap_resp_msg_v01_ei[];
 
 struct wlfw_wlan_hw_init_cfg_req_msg_v01 {
@@ -1620,5 +1625,13 @@ struct wlfw_mlo_reconfig_info_resp_msg_v01 {
 };
 #define WLFW_MLO_RECONFIG_INFO_RESP_MSG_V01_MAX_MSG_LEN 7
 extern struct qmi_elem_info wlfw_mlo_reconfig_info_resp_msg_v01_ei[];
+
+struct wlfw_driver_async_data_ind_msg_v01 {
+	u32 data_len;
+	u8 data[QMI_WLFW_MAX_DATA_SIZE_V01];
+	u16 type;
+};
+#define WLFW_DRIVER_ASYNC_DATA_IND_MSG_V01_MAX_MSG_LEN 6154
+extern struct qmi_elem_info wlfw_driver_async_data_ind_msg_v01_ei[];
 
 #endif
