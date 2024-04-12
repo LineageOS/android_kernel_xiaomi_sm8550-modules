@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/file.h>
 #include <linux/fs.h>
@@ -409,6 +409,16 @@ static int __qseecom_start_app(struct qseecom_handle **handle,
 		pr_err("failed to get apploader when loading app %s, ret %d\n",
 			app_name, ret);
 		ret = -EINVAL;
+		goto exit_release_clientenv;
+	}
+
+	/*
+	 * IClientEnv_open can be success(ret = 0) but cxt->app_loader can still be null.
+	 * Add null sanity check.
+	 */
+	if (Object_isNull(cxt->app_loader) && (ret == OBJECT_OK)) {
+		pr_err("[%s][%d] cxt->app_loader is null, ret:%d\n", __func__, __LINE__, ret);
+		ret = OBJECT_ERROR_INVALID;
 		goto exit_release_clientenv;
 	}
 
