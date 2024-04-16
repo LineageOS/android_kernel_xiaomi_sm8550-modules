@@ -115,7 +115,7 @@ uint64_t dynamic_feature_mask = ICNSS_DEFAULT_FEATURE_MASK;
 #define WLAN_EN_TEMP_THRESHOLD		5000
 #define WLAN_EN_DELAY			500
 
-#define ICNSS_RPROC_LEN			10
+#define ICNSS_RPROC_LEN			100
 static DEFINE_IDA(rd_minor_id);
 
 enum icnss_pdr_cause_index {
