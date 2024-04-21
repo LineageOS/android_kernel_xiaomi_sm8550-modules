@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2016-2021, The Linux Foundation. All rights reserved. */
-/* Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved. */
+/* Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved. */
 
 
 #include <linux/err.h>
@@ -174,6 +174,9 @@ static int cnss_stats_show_state(struct seq_file *s,
 		case CNSS_DRIVER_REGISTERED:
 			seq_puts(s, "DRIVER REGISTERED");
 			continue;
+		case CNSS_POWER_OFF:
+			seq_puts(s, "POWER OFF");
+			continue;
 		}
 
 		seq_printf(s, "UNKNOWN-%d", i);
@@ -262,6 +265,8 @@ static ssize_t cnss_dev_boot_debug_write(struct file *fp,
 					     0, NULL);
 		clear_bit(CNSS_DRIVER_DEBUG, &plat_priv->driver_state);
 	} else if (sysfs_streq(cmd, "assert_host_sol")) {
+		pci_priv = plat_priv->bus_priv;
+		cnss_auto_resume(&pci_priv->pci_dev->dev);
 		ret = cnss_set_host_sol_value(plat_priv, 1);
 	} else if (sysfs_streq(cmd, "deassert_host_sol")) {
 		ret = cnss_set_host_sol_value(plat_priv, 0);

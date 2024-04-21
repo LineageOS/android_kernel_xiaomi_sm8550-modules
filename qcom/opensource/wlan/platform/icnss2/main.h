@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2020, 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __MAIN_H__
@@ -68,6 +68,8 @@ enum icnss_driver_event_type {
 	ICNSS_DRIVER_EVENT_QDSS_TRACE_SAVE,
 	ICNSS_DRIVER_EVENT_QDSS_TRACE_FREE,
 	ICNSS_DRIVER_EVENT_M3_DUMP_UPLOAD_REQ,
+	ICNSS_DRIVER_EVENT_IMS_WFC_CALL_IND,
+	ICNSS_DRIVER_EVENT_WLFW_TWT_CFG_IND,
 	ICNSS_DRIVER_EVENT_QDSS_TRACE_REQ_DATA,
 	ICNSS_DRIVER_EVENT_SUBSYS_RESTART_LEVEL,
 	ICNSS_DRIVER_EVENT_MAX,
@@ -127,6 +129,7 @@ enum icnss_driver_state {
 	ICNSS_MODE_ON,
 	ICNSS_BLOCK_SHUTDOWN,
 	ICNSS_PDR,
+	ICNSS_IMS_CONNECTED,
 	ICNSS_DEL_SERVER,
 	ICNSS_COLD_BOOT_CAL,
 	ICNSS_QMI_DMS_CONNECTED,
@@ -402,6 +405,8 @@ struct icnss_priv {
 	size_t smmu_iova_ipa_len;
 	struct qmi_handle qmi;
 	struct qmi_handle qmi_dms;
+	struct qmi_handle ims_qmi;
+	struct qmi_txn ims_async_txn;
 	struct list_head event_list;
 	struct list_head soc_wake_msg_list;
 	spinlock_t event_lock;
@@ -479,7 +484,6 @@ struct icnss_priv {
 	struct list_head icnss_tcdev_list;
 	struct mutex tcdev_lock;
 	bool is_chain1_supported;
-	bool chain_reg_info_updated;
 	u32 hw_trc_override;
 	struct icnss_dms_data dms;
 	u8 use_nv_mac;
@@ -492,6 +496,8 @@ struct icnss_priv {
 	struct qmp *qmp;
 #endif
 	bool use_direct_qmp;
+	const char **pdc_init_table;
+	int pdc_init_table_len;
 	u32 wlan_en_delay_ms;
 	u32 wlan_en_delay_ms_user;
 	struct class *icnss_ramdump_class;
@@ -552,6 +558,8 @@ void icnss_add_fw_prefix_name(struct icnss_priv *priv, char *prefix_name,
 			      char *name);
 int icnss_aop_interface_init(struct icnss_priv *priv);
 void icnss_aop_interface_deinit(struct icnss_priv *priv);
+int icnss_aop_pdc_reconfig(struct icnss_priv *priv);
+void icnss_power_misc_params_init(struct icnss_priv *priv);
 void icnss_recovery_timeout_hdlr(struct timer_list *t);
 void icnss_wpss_ssr_timeout_hdlr(struct timer_list *t);
 #endif

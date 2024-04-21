@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -880,8 +880,41 @@ int cnss_get_pinctrl(struct cnss_plat_data *plat_priv)
 							       0);
 		cnss_pr_dbg("Switch control GPIO: %d\n",
 			    pinctrl_info->sw_ctrl_gpio);
+
+		pinctrl_info->sw_ctrl =
+			pinctrl_lookup_state(pinctrl_info->pinctrl,
+					     "sw_ctrl");
+		if (IS_ERR_OR_NULL(pinctrl_info->sw_ctrl)) {
+			ret = PTR_ERR(pinctrl_info->sw_ctrl);
+			cnss_pr_dbg("Failed to get sw_ctrl state, err = %d\n",
+				    ret);
+		} else {
+			ret = pinctrl_select_state(pinctrl_info->pinctrl,
+						   pinctrl_info->sw_ctrl);
+			if (ret)
+				cnss_pr_err("Failed to select sw_ctrl state, err = %d\n",
+					    ret);
+		}
 	} else {
 		pinctrl_info->sw_ctrl_gpio = -EINVAL;
+	}
+
+	if (of_find_property(dev->of_node, WLAN_SW_CTRL_GPIO, NULL)) {
+		pinctrl_info->sw_ctrl_wl_cx =
+			pinctrl_lookup_state(pinctrl_info->pinctrl,
+					     "sw_ctrl_wl_cx");
+		if (IS_ERR_OR_NULL(pinctrl_info->sw_ctrl_wl_cx)) {
+			ret = PTR_ERR(pinctrl_info->sw_ctrl_wl_cx);
+			cnss_pr_dbg("Failed to get sw_ctrl_wl_cx state, err = %d\n",
+				    ret);
+		} else {
+
+			ret = pinctrl_select_state(pinctrl_info->pinctrl,
+						   pinctrl_info->sw_ctrl_wl_cx);
+			if (ret)
+				cnss_pr_err("Failed to select sw_ctrl_wl_cx state, err = %d\n",
+					    ret);
+		}
 	}
 
 	/* Find out and configure all those GPIOs which need to be setup
@@ -1176,6 +1209,7 @@ int cnss_power_on_device(struct cnss_plat_data *plat_priv, bool reset)
 	}
 
 	plat_priv->powered_on = true;
+	clear_bit(CNSS_POWER_OFF, &plat_priv->driver_state);
 	cnss_enable_dev_sol_irq(plat_priv);
 	cnss_set_host_sol_value(plat_priv, 0);
 
@@ -1196,6 +1230,8 @@ void cnss_power_off_device(struct cnss_plat_data *plat_priv)
 		return;
 	}
 
+	set_bit(CNSS_POWER_OFF, &plat_priv->driver_state);
+	cnss_bus_shutdown_cleanup(plat_priv);
 	cnss_disable_dev_sol_irq(plat_priv);
 	cnss_select_pinctrl_state(plat_priv, false);
 	cnss_clk_off(plat_priv, &plat_priv->clk_list);
@@ -1784,7 +1820,7 @@ int cnss_update_cpr_info(struct cnss_plat_data *plat_priv)
 		return -EINVAL;
 
 	if (!plat_priv->vreg_ol_cpr ||
-	    (!plat_priv->mbox_chan && !plat_priv->qmp)) {
+	    (!plat_priv->mbox_chan && !plat_priv->use_direct_qmp)) {
 		cnss_pr_dbg("Mbox channel / QMP / OL CPR Vreg not configured\n");
 	} else {
 		return cnss_aop_set_vreg_param(plat_priv,
@@ -1865,7 +1901,7 @@ int cnss_enable_int_pow_amp_vreg(struct cnss_plat_data *plat_priv)
 	}
 
 	if (!plat_priv->vreg_ipa ||
-	    (!plat_priv->mbox_chan && !plat_priv->qmp)) {
+	    (!plat_priv->mbox_chan && !plat_priv->use_direct_qmp)) {
 		cnss_pr_dbg("Mbox channel / QMP / IPA Vreg not configured\n");
 	} else {
 		ret = cnss_aop_set_vreg_param(plat_priv,

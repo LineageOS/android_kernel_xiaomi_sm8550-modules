@@ -23,3 +23,8 @@ config CNSS_OUT_OF_TREE
 	bool "Build module out-of-tree"
 	help
 	  This enables building the module out of the main kernel tree
+
+config FEATURE_SMEM_MAILBOX
+	bool "Enable Feature SMEM Mailbox"
+	default n
+

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/clk.h>
 #include <linux/delay.h>
@@ -27,7 +27,7 @@ static struct icnss_vreg_cfg icnss_adrestea_vreg_list[] = {
 	{"vdd-cx-mx", 752000, 752000, 0, 0, 0, false, true},
 	{"vdd-1.8-xo", 1800000, 1800000, 0, 0, 0, false, true},
 	{"vdd-1.3-rfa", 1304000, 1304000, 0, 0, 0, false, true},
-	{"vdd-3.3-ch1", 3312000, 3312000, 0, 0, 0, false, true},
+	{"vdd-3.3-ch1", 3312000, 3312000, 0, 0, 0, false, false},
 	{"vdd-3.3-ch0", 3312000, 3312000, 0, 0, 0, false, true},
 };
 
@@ -385,14 +385,6 @@ static int icnss_vreg_on(struct icnss_priv *priv)
 	list_for_each_entry(vreg, vreg_list, list) {
 		if (IS_ERR_OR_NULL(vreg->reg) || !vreg->cfg.is_supported)
 			continue;
-		if (!priv->chain_reg_info_updated &&
-		    !strcmp(ICNSS_CHAIN1_REGULATOR, vreg->cfg.name)) {
-			priv->chain_reg_info_updated = true;
-			if (!priv->is_chain1_supported) {
-				vreg->cfg.is_supported = false;
-				continue;
-			}
-		}
 
 		ret = icnss_vreg_on_single(vreg);
 		if (ret)
@@ -730,6 +722,26 @@ int icnss_power_off(struct device *dev)
 }
 EXPORT_SYMBOL(icnss_power_off);
 
+int icnss_power_on_chain1_reg(struct icnss_priv *priv)
+{
+	struct list_head *vreg_list = &priv->vreg_list;
+	struct icnss_vreg_info *vreg = NULL;
+	int ret = 0;
+
+	list_for_each_entry(vreg, vreg_list, list) {
+		if (!strcmp(ICNSS_CHAIN1_REGULATOR, vreg->cfg.name) && priv->is_chain1_supported) {
+			vreg->cfg.is_supported = true;
+			ret = icnss_vreg_on_single(vreg);
+			break;
+		}
+	}
+
+	/* Setting chain1 supported to false as chain1 regulator cfg already updated */
+	priv->is_chain1_supported = false;
+
+	return ret;
+}
+
 void icnss_put_resources(struct icnss_priv *priv)
 {
 	icnss_put_clk(priv);
@@ -751,13 +763,14 @@ int icnss_aop_interface_init(struct icnss_priv *priv)
 {
 	struct mbox_client *mbox = &priv->mbox_client_data;
 	struct mbox_chan *chan;
-	int ret = 0;
+	int ret = 0, ol_cpr = 0;
 
-	ret = of_property_read_string(priv->pdev->dev.of_node,
-				      "qcom,vreg_ol_cpr",
-				      &priv->cpr_info.vreg_ol_cpr);
-	if (ret) {
-		icnss_pr_dbg("Vreg for OL CPR not configured\n");
+	ol_cpr = of_property_read_string(priv->pdev->dev.of_node,
+					 "qcom,vreg_ol_cpr",
+					 &priv->cpr_info.vreg_ol_cpr);
+
+	if (ol_cpr && !priv->pdc_init_table) {
+		icnss_pr_dbg("Vreg for OL CPR and pdc_init table not configured\n");
 		return -EINVAL;
 	}
 
@@ -789,11 +802,15 @@ int icnss_aop_interface_init(struct icnss_priv *priv)
 		priv->mbox_chan = chan;
 		icnss_pr_dbg("Mbox channel initialized\n");
 	}
+	ret = icnss_aop_pdc_reconfig(priv);
+	if (ret)
+		icnss_pr_err("Failed to reconfig WLAN PDC, err = %d\n", ret);
+
 	return ret;
 }
 
 /**
- * cnss_aop_interface_deinit: Cleanup AOP interface
+ * icnss_aop_interface_deinit: Cleanup AOP interface
  * @priv: Pointer to icnss platform data
  *
  * Cleanup mbox channel or QMP whichever was configured during initialization.
@@ -850,6 +867,53 @@ static int icnss_aop_set_vreg_param(struct icnss_priv *priv,
 
 	return ret;
 }
+
+/* icnss_aop_pdc_reconfig: Send AOP msg to configure PDC table for WLAN device
+ * @priv: Pointer to icnss platform data
+ *
+ * Send AOP QMP or Mbox msg to configure PDC table for WLAN device
+ *
+ * Return: 0 for success, otherwise error code
+ */
+int icnss_aop_pdc_reconfig(struct icnss_priv *priv)
+{
+	u32 i;
+	int ret;
+	char *mbox_msg;
+	struct qmp_pkt pkt;
+
+	if (priv->pdc_init_table_len <= 0 || !priv->pdc_init_table)
+		return 0;
+
+	icnss_pr_dbg("Setting PDC defaults for device ID: (0x%x)\n",
+		     priv->device_id);
+	for (i = 0; i < priv->pdc_init_table_len; i++) {
+		mbox_msg = (char *)priv->pdc_init_table[i];
+		if (priv->use_direct_qmp) {
+			icnss_pr_dbg("Sending AOP QMP msg: %s\n", mbox_msg);
+			ret = qmp_send(priv->qmp, mbox_msg,
+				       ICNSS_MBOX_MSG_MAX_LEN);
+			if (ret < 0)
+				icnss_pr_err("Failed to send AOP QMP msg: %s\n",
+					     mbox_msg);
+			else
+				ret = 0;
+		} else {
+			icnss_pr_dbg("Sending AOP Mbox msg: %s\n", mbox_msg);
+			pkt.size = ICNSS_MBOX_MSG_MAX_LEN;
+			pkt.data = mbox_msg;
+
+			ret = mbox_send_message(priv->mbox_chan, &pkt);
+			if (ret < 0)
+				icnss_pr_err("Failed to send AOP mbox msg: %s,ret: %d\n",
+					     mbox_msg, ret);
+			else
+				ret = 0;
+		}
+	}
+	return ret;
+}
+
 #else
 int icnss_aop_interface_init(struct icnss_priv *priv)
 {
@@ -867,13 +931,47 @@ static int icnss_aop_set_vreg_param(struct icnss_priv *priv,
 {
 	return 0;
 }
+
+int icnss_aop_pdc_reconfig(struct icnss_priv *priv)
+{
+	return 0;
+}
+
 #endif
+
+void icnss_power_misc_params_init(struct icnss_priv *priv)
+{
+	struct device *dev = &priv->pdev->dev;
+	int ret;
+
+	/* common DT Entries */
+	priv->pdc_init_table_len =
+				of_property_count_strings(dev->of_node,
+							  "qcom,pdc_init_table");
+	if (priv->pdc_init_table_len > 0) {
+		priv->pdc_init_table =
+			kcalloc(priv->pdc_init_table_len,
+				sizeof(char *), GFP_KERNEL);
+		if (priv->pdc_init_table) {
+			ret = of_property_read_string_array(dev->of_node,
+						"qcom,pdc_init_table",
+						priv->pdc_init_table,
+						priv->pdc_init_table_len);
+			if (ret < 0)
+				icnss_pr_err("Failed to get PDC Init Table\n");
+		} else {
+			icnss_pr_err("Failed to alloc PDC Init Table mem\n");
+		}
+	} else {
+		icnss_pr_dbg("PDC Init Table not configured\n");
+	}
+}
 
 int icnss_update_cpr_info(struct icnss_priv *priv)
 {
 	struct icnss_cpr_info *cpr_info = &priv->cpr_info;
 
-	if (!cpr_info->vreg_ol_cpr || (!priv->mbox_chan && !priv->qmp)) {
+	if (!cpr_info->vreg_ol_cpr || (!priv->mbox_chan && !priv->use_direct_qmp)) {
 		icnss_pr_dbg("Mbox channel / QMP / OL CPR Vreg not configured\n");
 		return 0;
 	}

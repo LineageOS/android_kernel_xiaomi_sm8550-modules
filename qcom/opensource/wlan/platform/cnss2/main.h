@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CNSS_MAIN_H
@@ -59,6 +59,7 @@
 #define CNSS_RAMDUMP_MAGIC		0x574C414E
 #define CNSS_RAMDUMP_VERSION		0
 #define MAX_FIRMWARE_NAME_LEN		40
+#define FW_V1_NUMBER                    1
 #define FW_V2_NUMBER                    2
 #ifdef CONFIG_CNSS_SUPPORT_DUAL_DEV
 #define POWER_ON_RETRY_MAX_TIMES	2
@@ -80,6 +81,10 @@
 #define CNSS_EVENT_SYNC_UNINTERRUPTIBLE (CNSS_EVENT_SYNC | \
 				CNSS_EVENT_UNINTERRUPTIBLE)
 #define CNSS_EVENT_SYNC_UNKILLABLE (CNSS_EVENT_SYNC | CNSS_EVENT_UNKILLABLE)
+#define QMI_WLFW_MAX_TME_OPT_FILE_NUM 3
+#define TME_OEM_FUSE_FILE_NAME		"peach_sec.dat"
+#define TME_RPR_FILE_NAME		"peach_rpr.bin"
+#define TME_DPR_FILE_NAME		"peach_dpr.bin"
 
 enum cnss_dt_type {
 	CNSS_DTT_LEGACY = 0,
@@ -132,6 +137,8 @@ struct cnss_pinctrl_info {
 	struct pinctrl_state *sol_default;
 	struct pinctrl_state *wlan_en_active;
 	struct pinctrl_state *wlan_en_sleep;
+	struct pinctrl_state *sw_ctrl;
+	struct pinctrl_state *sw_ctrl_wl_cx;
 	int bt_en_gpio;
 	int wlan_en_gpio;
 	int xo_clk_gpio; /*qca6490 only */
@@ -275,6 +282,7 @@ enum cnss_fw_dump_type {
 	CNSS_FW_IMAGE,
 	CNSS_FW_RDDM,
 	CNSS_FW_REMOTE_HEAP,
+	CNSS_FW_CAL,
 	CNSS_FW_DUMP_TYPE_MAX,
 };
 
@@ -354,6 +362,7 @@ enum cnss_driver_state {
 	CNSS_FS_READY = 25,
 	CNSS_DRIVER_REGISTERED,
 	CNSS_DMS_DEL_SERVER,
+	CNSS_POWER_OFF,
 };
 
 struct cnss_recovery_data {
@@ -548,6 +557,7 @@ struct cnss_plat_data {
 	struct cnss_fw_mem fw_mem[QMI_WLFW_MAX_NUM_MEM_SEG_V01];
 	struct cnss_fw_mem m3_mem;
 	struct cnss_fw_mem tme_lite_mem;
+	struct cnss_fw_mem tme_opt_file_mem[QMI_WLFW_MAX_TME_OPT_FILE_NUM];
 	struct cnss_fw_mem *cal_mem;
 	struct cnss_fw_mem aux_mem;
 	u64 cal_time;
@@ -603,6 +613,7 @@ struct cnss_plat_data {
 	u64 fw_caps;
 	u8 pcie_gen_speed;
 	struct iommu_domain *audio_iommu_domain;
+	bool is_audio_shared_iommu_group;
 	struct cnss_dms_data dms;
 	int power_up_error;
 	u32 hw_trc_override;
@@ -624,7 +635,6 @@ struct cnss_plat_data {
 	u32 hang_data_addr_offset;
 	/* bitmap to detect FEM combination */
 	u8 hwid_bitmap;
-	enum cnss_driver_mode driver_mode;
 	uint32_t num_shadow_regs_v3;
 	bool sec_peri_feature_disable;
 	struct device_node *dev_node;
