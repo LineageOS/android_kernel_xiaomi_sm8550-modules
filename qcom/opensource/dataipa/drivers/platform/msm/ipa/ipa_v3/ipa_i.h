@@ -1220,6 +1220,7 @@ struct ipa3_sys_context {
 	struct list_head pending_pkts[GSI_VEID_MAX];
 	atomic_t xmit_eot_cnt;
 	struct tasklet_struct tasklet;
+	struct work_struct tasklet_work;
 	bool skip_eot;
 	u32 eob_drop_cnt;
 	struct napi_struct napi_tx;
@@ -1253,6 +1254,7 @@ struct ipa3_sys_context {
 	struct workqueue_struct *freepage_wq;
 	struct delayed_work freepage_work;
 	struct tasklet_struct tasklet_find_freepage;
+	struct workqueue_struct *tasklet_wq;
 	/* ordering is important - other immutable fields go below */
 };
 
@@ -2271,7 +2273,7 @@ enum ipa_per_usb_enum_type_e {
  * @ipa_wdi2: using wdi-2.0
  * @ipa_config_is_auto: is this AUTO use case
  * @ipa_config_is_apq_dma: this is for APQ DMA use case
- * @ipa_config_is_apq_uc_load: this is for APQ uC load use case
+ * @ipa_config_is_apq_no_uc_load: flag which configures to load uC or not in APQ
  * @ipa_fltrt_not_hashable: filter/route rules not hashable
  * @use_xbl_boot: use xbl loading for IPA FW
  * @use_64_bit_dma_mask: using 64bits dma mask
@@ -2409,7 +2411,7 @@ struct ipa3_context {
 	bool ipa_wdi2;
 	bool ipa_config_is_auto;
 	bool ipa_config_is_apq_dma;
-	bool ipa_config_is_apq_uc_load;
+	bool ipa_config_is_apq_no_uc_load;
 	bool ipa_wdi2_over_gsi;
 	bool ipa_wdi3_over_gsi;
 	bool ipa_endp_delay_wa;
@@ -2627,7 +2629,7 @@ struct ipa3_plat_drv_res {
 	bool ipa_wdi2;
 	bool ipa_config_is_auto;
 	bool ipa_config_is_apq_dma;
-	bool ipa_config_is_apq_uc_load;
+	bool ipa_config_is_apq_no_uc_load;
 	bool ipa_wdi2_over_gsi;
 	bool ipa_wdi3_over_gsi;
 	bool ipa_fltrt_not_hashable;

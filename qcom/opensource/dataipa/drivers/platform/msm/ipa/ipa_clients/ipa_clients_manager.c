@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -15,7 +15,11 @@ static int __init ipa_clients_manager_init(void)
 {
 	pr_info("IPA clients manager init\n");
 
-	ipa3_usb_init();
+	/*RNDIS over USB tethering is not supported for APQ targets.
+	Initialize USB & RMNET drivers only for non-APQ-DMA targets.*/
+	if (!ipa3_ctx->ipa_config_is_apq_dma) {
+		ipa3_usb_init();
+	}
 
 	ipa_wdi3_register();
 
@@ -45,7 +49,9 @@ static void __exit ipa_clients_manager_exit(void)
 {
 	pr_debug("IPA clients manger exit\n");
 
-	ipa3_usb_exit();
+	if (!ipa3_ctx->ipa_config_is_apq_dma) {
+		ipa3_usb_exit();
+	}
 }
 module_exit(ipa_clients_manager_exit);
 
