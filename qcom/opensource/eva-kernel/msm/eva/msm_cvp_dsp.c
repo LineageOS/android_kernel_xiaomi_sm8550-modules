@@ -1898,6 +1898,8 @@ static void __dsp_cvp_mem_free(struct cvp_dsp_cmd_msg *cmd)
 	buf_list = &inst->cvpdspbufs;
 	mutex_lock(&buf_list->lock);
 	list_for_each_safe(ptr, next, &buf_list->list) {
+		if (!ptr)
+			break;
 		buf = list_entry(ptr, struct cvp_internal_buf, list);
 
 		if (!buf->smem) {
