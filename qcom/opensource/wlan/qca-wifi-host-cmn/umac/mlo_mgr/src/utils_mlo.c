@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1982,6 +1982,11 @@ QDF_STATUS util_gen_link_reqrsp_cmn(uint8_t *frame, qdf_size_t frame_len,
 		frame_iesection_offset = WLAN_REASSOC_REQ_IES_OFFSET;
 	} else if (subtype == WLAN_FC0_STYPE_PROBE_RESP) {
 		frame_iesection_offset = WLAN_PROBE_RESP_IES_OFFSET;
+		if (frame_len < WLAN_TIMESTAMP_LEN) {
+			mlo_err("Frame length %zu is smaller than required timestamp length",
+				frame_len);
+			return QDF_STATUS_E_INVAL;
+		}
 		qdf_mem_copy(&tsf, frame, WLAN_TIMESTAMP_LEN);
 		tsf = qdf_le64_to_cpu(tsf);
 	} else {
@@ -3152,7 +3157,8 @@ util_get_bvmlie_bssparamchangecnt(uint8_t *mlieseq, qdf_size_t mlieseqlen,
 	uint16_t mlcontrol;
 	uint16_t presencebitmap;
 	uint8_t *commoninfo;
-	qdf_size_t commoninfolen;
+	uint8_t commoninfolen;
+	qdf_size_t mldcap_offset;
 
 	if (!mlieseq || !mlieseqlen || !bssparamchangecntfound ||
 	    !bssparamchangecnt)
@@ -3182,21 +3188,31 @@ util_get_bvmlie_bssparamchangecnt(uint8_t *mlieseq, qdf_size_t mlieseqlen,
 				      WLAN_ML_CTRL_PBM_BITS);
 
 	commoninfo = mlieseq + sizeof(struct wlan_ie_multilink);
-	commoninfolen = WLAN_ML_BV_CINFO_LENGTH_SIZE;
+	commoninfolen = *(mlieseq + sizeof(struct wlan_ie_multilink));
 
-	commoninfolen += QDF_MAC_ADDR_SIZE;
+	mldcap_offset = WLAN_ML_BV_CINFO_LENGTH_SIZE;
+
+	mldcap_offset += QDF_MAC_ADDR_SIZE;
 
 	if (presencebitmap & WLAN_ML_BV_CTRL_PBM_LINKIDINFO_P) {
-		commoninfolen += WLAN_ML_BV_CINFO_LINKIDINFO_SIZE;
+		mldcap_offset += WLAN_ML_BV_CINFO_LINKIDINFO_SIZE;
 
-		if ((sizeof(struct wlan_ie_multilink) + commoninfolen) >
+		if ((sizeof(struct wlan_ie_multilink) + mldcap_offset) >
 				mlieseqlen)
 			return QDF_STATUS_E_PROTO;
 	}
 
 	if (presencebitmap & WLAN_ML_BV_CTRL_PBM_BSSPARAMCHANGECNT_P) {
+		if (commoninfolen < (mldcap_offset +
+				     WLAN_ML_BSSPARAMCHNGCNT_SIZE))
+			return QDF_STATUS_E_PROTO;
+
+		if ((sizeof(struct wlan_ie_multilink) + mldcap_offset +
+				WLAN_ML_BSSPARAMCHNGCNT_SIZE) >
+				mlieseqlen)
+			return QDF_STATUS_E_PROTO;
 		*bssparamchangecntfound = true;
-		*bssparamchangecnt = *(commoninfo + commoninfolen);
+		*bssparamchangecnt = *(commoninfo + mldcap_offset);
 	}
 
 	return QDF_STATUS_SUCCESS;
