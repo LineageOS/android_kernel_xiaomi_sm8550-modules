@@ -6931,14 +6931,61 @@ static void cnss_mhi_write_reg(struct mhi_controller *mhi_ctrl,
 	writel_relaxed(val, addr);
 }
 
+#if IS_ENABLED(CONFIG_MHI_BUS_MISC)
+/**
+ * __cnss_get_mhi_soc_info - Get SoC info before registering mhi controller
+ * @mhi_ctrl: MHI controller
+ *
+ * Return: 0 for success, error code on failure
+ */
+static inline int __cnss_get_mhi_soc_info(struct mhi_controller *mhi_ctrl)
+{
+	return mhi_get_soc_info(mhi_ctrl);
+}
+#else
+#define SOC_HW_VERSION_OFFS (0x224)
+#define SOC_HW_VERSION_FAM_NUM_BMSK (0xF0000000)
+#define SOC_HW_VERSION_FAM_NUM_SHFT (28)
+#define SOC_HW_VERSION_DEV_NUM_BMSK (0x0FFF0000)
+#define SOC_HW_VERSION_DEV_NUM_SHFT (16)
+#define SOC_HW_VERSION_MAJOR_VER_BMSK (0x0000FF00)
+#define SOC_HW_VERSION_MAJOR_VER_SHFT (8)
+#define SOC_HW_VERSION_MINOR_VER_BMSK (0x000000FF)
+#define SOC_HW_VERSION_MINOR_VER_SHFT (0)
+
+static int __cnss_get_mhi_soc_info(struct mhi_controller *mhi_ctrl)
+{
+	u32 soc_info;
+	int ret;
+
+	ret = mhi_ctrl->read_reg(mhi_ctrl,
+				 mhi_ctrl->regs + SOC_HW_VERSION_OFFS,
+				 &soc_info);
+	if (ret)
+		return ret;
+
+	mhi_ctrl->family_number = (soc_info & SOC_HW_VERSION_FAM_NUM_BMSK) >>
+		SOC_HW_VERSION_FAM_NUM_SHFT;
+	mhi_ctrl->device_number = (soc_info & SOC_HW_VERSION_DEV_NUM_BMSK) >>
+		SOC_HW_VERSION_DEV_NUM_SHFT;
+	mhi_ctrl->major_version = (soc_info & SOC_HW_VERSION_MAJOR_VER_BMSK) >>
+		SOC_HW_VERSION_MAJOR_VER_SHFT;
+	mhi_ctrl->minor_version = (soc_info & SOC_HW_VERSION_MINOR_VER_BMSK) >>
+		SOC_HW_VERSION_MINOR_VER_SHFT;
+	return 0;
+}
+#endif
+
 static int cnss_get_mhi_soc_info(struct cnss_plat_data *plat_priv,
 				 struct mhi_controller *mhi_ctrl)
 {
 	int ret = 0;
 
-	ret = mhi_get_soc_info(mhi_ctrl);
-	if (ret)
+	ret = __cnss_get_mhi_soc_info(mhi_ctrl);
+	if (ret) {
+		cnss_pr_err("failed to get mhi soc info, ret %d\n", ret);
 		goto exit;
+	}
 
 	plat_priv->device_version.family_number = mhi_ctrl->family_number;
 	plat_priv->device_version.device_number = mhi_ctrl->device_number;
@@ -7388,24 +7435,6 @@ static bool cnss_should_suspend_pwroff(struct pci_dev *pci_dev)
 }
 #endif
 
-static int cnss_pci_set_gen2_speed(struct cnss_plat_data *plat_priv, u32 rc_num)
-{
-	int ret;
-
-	/* Always set initial target PCIe link speed to Gen2 for QCA6490 device
-	 * since there may be link issues if it boots up with Gen3 link speed.
-	 * Device is able to change it later at any time. It will be rejected
-	 * if requested speed is higher than the one specified in PCIe DT.
-	 */
-	ret = cnss_pci_set_max_link_speed(plat_priv->bus_priv, rc_num,
-					  PCI_EXP_LNKSTA_CLS_5_0GB);
-	if (ret && ret != -EPROBE_DEFER)
-		cnss_pr_err("Failed to set max PCIe RC%x link speed to Gen2, err = %d\n",
-				rc_num, ret);
-
-	return ret;
-}
-
 #ifdef CONFIG_CNSS2_ENUM_WITH_LOW_SPEED
 static void
 cnss_pci_downgrade_rc_speed(struct cnss_plat_data *plat_priv, u32 rc_num)
@@ -7426,9 +7455,7 @@ cnss_pci_restore_rc_speed(struct cnss_pci_data *pci_priv)
 	struct cnss_plat_data *plat_priv = pci_priv->plat_priv;
 
 	/* if not Genoa, do not restore rc speed */
-	if (pci_priv->device_id == QCA6490_DEVICE_ID) {
-		cnss_pci_set_gen2_speed(plat_priv, plat_priv->rc_num);
-	} else if (pci_priv->device_id != QCN7605_DEVICE_ID) {
+	if (pci_priv->device_id != QCN7605_DEVICE_ID) {
 		/* The request 0 will reset maximum GEN speed to default */
 		ret = cnss_pci_set_max_link_speed(pci_priv, plat_priv->rc_num, 0);
 		if (ret)
@@ -7727,8 +7754,17 @@ static int cnss_pci_enumerate(struct cnss_plat_data *plat_priv, u32 rc_num)
 {
 	int ret, retry = 0;
 
+	/* Always set initial target PCIe link speed to Gen2 for QCA6490 device
+	 * since there may be link issues if it boots up with Gen3 link speed.
+	 * Device is able to change it later at any time. It will be rejected
+	 * if requested speed is higher than the one specified in PCIe DT.
+	 */
 	if (plat_priv->device_id == QCA6490_DEVICE_ID) {
-		cnss_pci_set_gen2_speed(plat_priv, rc_num);
+		ret = cnss_pci_set_max_link_speed(plat_priv->bus_priv, rc_num,
+						  PCI_EXP_LNKSTA_CLS_5_0GB);
+		if (ret && ret != -EPROBE_DEFER)
+			cnss_pr_err("Failed to set max PCIe RC%x link speed to Gen2, err = %d\n",
+				    rc_num, ret);
 	} else {
 		cnss_pci_downgrade_rc_speed(plat_priv, rc_num);
 	}

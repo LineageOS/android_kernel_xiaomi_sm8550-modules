@@ -832,6 +832,34 @@ static struct qmi_elem_info wlfw_host_pcie_link_info_s_v01_ei[] = {
 	},
 };
 
+static struct qmi_elem_info wlchip_serial_id_v01_ei[] = {
+	{
+		.data_type      = QMI_UNSIGNED_4_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u32),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0,
+		.offset         = offsetof(struct
+					   wlchip_serial_id_v01,
+					   serial_id_msb),
+	},
+	{
+		.data_type      = QMI_UNSIGNED_4_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u32),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0,
+		.offset         = offsetof(struct
+					   wlchip_serial_id_v01,
+					   serial_id_lsb),
+	},
+	{
+		.data_type      = QMI_EOTI,
+		.array_type       = NO_ARRAY,
+		.tlv_type       = QMI_COMMON_TLV_TYPE,
+	},
+};
+
 struct qmi_elem_info wlfw_ind_register_req_msg_v01_ei[] = {
 	{
 		.data_type      = QMI_OPT_FLAG,
@@ -2289,6 +2317,27 @@ struct qmi_elem_info wlfw_cap_resp_msg_v01_ei[] = {
 		.offset         = offsetof(struct
 					   wlfw_cap_resp_msg_v01,
 					   phy_qam_cap),
+	},
+	{
+		.data_type      = QMI_OPT_FLAG,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x28,
+		.offset         = offsetof(struct
+					   wlfw_cap_resp_msg_v01,
+					   serial_id_valid),
+	},
+	{
+		.data_type      = QMI_STRUCT,
+		.elem_len       = 1,
+		.elem_size      = sizeof(struct wlchip_serial_id_v01),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x28,
+		.offset         = offsetof(struct
+					   wlfw_cap_resp_msg_v01,
+					   serial_id),
+		.ei_array      = wlchip_serial_id_v01_ei,
 	},
 	{
 		.data_type      = QMI_EOTI,
@@ -4319,6 +4368,26 @@ struct qmi_elem_info wlfw_fw_init_done_ind_msg_v01_ei[] = {
 		.offset         = offsetof(struct
 					   wlfw_fw_init_done_ind_msg_v01,
 					   hang_data_length),
+	},
+	{
+		.data_type      = QMI_OPT_FLAG,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x12,
+		.offset         = offsetof(struct
+					   wlfw_fw_init_done_ind_msg_v01,
+					   soft_sku_features_valid),
+	},
+	{
+		.data_type      = QMI_UNSIGNED_8_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u64),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x12,
+		.offset         = offsetof(struct
+					   wlfw_fw_init_done_ind_msg_v01,
+					   soft_sku_features),
 	},
 	{
 		.data_type      = QMI_EOTI,

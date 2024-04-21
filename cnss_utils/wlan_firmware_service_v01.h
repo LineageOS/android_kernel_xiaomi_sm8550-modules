@@ -200,6 +200,7 @@ enum wlfw_mem_type_enum_v01 {
 	QMI_WLFW_PAGEABLE_MEM_V01 = 9,
 	QMI_WLFW_AFC_MEM_V01 = 10,
 	QMI_WLFW_MEM_LPASS_SHARED_V01 = 11,
+	QMI_WLFW_MEM_CALDB_SEG_V01 = 12,
 	WLFW_MEM_TYPE_ENUM_MAX_VAL_V01 = INT_MAX,
 };
 
@@ -330,7 +331,8 @@ enum wlfw_gpio_info_type_v01 {
 	BT_EN_GPIO_V01 = 1,
 	HOST_SOL_GPIO_V01 = 2,
 	TARGET_SOL_GPIO_V01 = 3,
-	GPIO_TYPE_MAX_V01 = 4,
+	WLAN_SW_CTRL_GPIO_V01 = 4,
+	GPIO_TYPE_MAX_V01 = 5,
 	WLFW_GPIO_INFO_TYPE_MAX_VAL_V01 = INT_MAX,
 };
 
@@ -407,6 +409,8 @@ enum wlfw_lpass_ssr_reason_v01 {
 #define QMI_WLFW_DIRECT_LINK_SUPPORT_V01 ((u64)0x02ULL)
 #define QMI_WLFW_AUX_UC_SUPPORT_V01 ((u64)0x04ULL)
 #define QMI_WLFW_CALDB_SEG_DDR_SUPPORT_V01 ((u64)0x08ULL)
+
+#define QMI_WLFW_DIRECT_LINK_SKU_SUPPORT_V01 ((u64)0x01ULL)
 
 struct wlfw_ce_tgt_pipe_cfg_s_v01 {
 	u32 pipe_num;
@@ -541,6 +545,11 @@ struct wlfw_share_mem_info_s_v01 {
 struct wlfw_host_pcie_link_info_s_v01 {
 	u32 pci_link_speed;
 	u32 pci_link_width;
+};
+
+struct wlchip_serial_id_v01 {
+	u32 serial_id_msb;
+	u32 serial_id_lsb;
 };
 
 struct wlfw_ind_register_req_msg_v01 {
@@ -731,8 +740,10 @@ struct wlfw_cap_resp_msg_v01 {
 	enum wlfw_he_channel_width_cap_v01 he_channel_width_cap;
 	u8 phy_qam_cap_valid;
 	enum wlfw_phy_qam_cap_v01 phy_qam_cap;
+	u8 serial_id_valid;
+	struct wlchip_serial_id_v01 serial_id;
 };
-#define WLFW_CAP_RESP_MSG_V01_MAX_MSG_LEN 1160
+#define WLFW_CAP_RESP_MSG_V01_MAX_MSG_LEN 1171
 extern struct qmi_elem_info wlfw_cap_resp_msg_v01_ei[];
 
 struct wlfw_bdf_download_req_msg_v01 {
@@ -1061,8 +1072,10 @@ struct wlfw_fw_init_done_ind_msg_v01 {
 	u32 hang_data_addr_offset;
 	u8 hang_data_length_valid;
 	u16 hang_data_length;
+	u8 soft_sku_features_valid;
+	u64 soft_sku_features;
 };
-#define WLFW_FW_INIT_DONE_IND_MSG_V01_MAX_MSG_LEN 12
+#define WLFW_FW_INIT_DONE_IND_MSG_V01_MAX_MSG_LEN 23
 extern struct qmi_elem_info wlfw_fw_init_done_ind_msg_v01_ei[];
 
 struct wlfw_rejuvenate_ind_msg_v01 {

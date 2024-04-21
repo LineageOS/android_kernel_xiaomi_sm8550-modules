@@ -46,7 +46,7 @@
 #include <linux/remoteproc.h>
 #include <linux/version.h>
 #include <trace/hooks/remoteproc.h>
-#ifdef SLATE_MODULE_ENABLED
+#ifdef CONFIG_SLATE_MODULE_ENABLED
 #include <linux/soc/qcom/slatecom_interface.h>
 #include <linux/soc/qcom/slate_events_bridge_intf.h>
 #include <uapi/linux/slatecom_interface.h>
@@ -847,7 +847,7 @@ static enum wlfw_wlan_rf_subtype_v01 icnss_rf_subtype_value_to_type(u32 val)
 	}
 }
 
-#ifdef SLATE_MODULE_ENABLED
+#ifdef CONFIG_SLATE_MODULE_ENABLED
 static void icnss_send_wlan_boot_init(void)
 {
 	send_wlan_state(GMI_MGR_WLAN_BOOT_INIT);
@@ -2201,14 +2201,20 @@ static int icnss_wpss_notifier_nb(struct notifier_block *nb,
 	icnss_pr_vdbg("WPSS-Notify: event %s(%lu)\n",
 		      icnss_qcom_ssr_notify_state_to_str(code), code);
 
-	if (code == QCOM_SSR_AFTER_SHUTDOWN) {
-		icnss_pr_info("Collecting msa0 segment dump\n");
-		icnss_msa0_ramdump(priv);
+	switch (code) {
+	case QCOM_SSR_BEFORE_SHUTDOWN:
+		break;
+	case QCOM_SSR_AFTER_SHUTDOWN:
+		/* Collect ramdump only when there was a crash. */
+		if (notif->crashed) {
+			icnss_pr_info("Collecting msa0 segment dump\n");
+			icnss_msa0_ramdump(priv);
+		}
+		goto out;
+	default:
 		goto out;
 	}
 
-	if (code != QCOM_SSR_BEFORE_SHUTDOWN)
-		goto out;
 
 	if (priv->wpss_self_recovery_enabled)
 		del_timer(&priv->wpss_ssr_timer);
@@ -2395,7 +2401,7 @@ static int icnss_wpss_ssr_register_notifier(struct icnss_priv *priv)
 	return ret;
 }
 
-#ifdef SLATE_MODULE_ENABLED
+#ifdef CONFIG_SLATE_MODULE_ENABLED
 static int icnss_slate_event_notifier_nb(struct notifier_block *nb,
 					 unsigned long event, void *data)
 {
@@ -3400,6 +3406,8 @@ int icnss_get_soc_info(struct device *dev, struct icnss_soc_info *info)
 	info->rd_card_chain_cap = priv->rd_card_chain_cap;
 	info->phy_he_channel_width_cap = priv->phy_he_channel_width_cap;
 	info->phy_qam_cap = priv->phy_qam_cap;
+	memcpy(&info->dev_mem_info, &priv->dev_mem_info,
+	       sizeof(info->dev_mem_info));
 
 	return 0;
 }

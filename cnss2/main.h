@@ -620,10 +620,7 @@ struct cnss_plat_data {
 	u8 charger_mode;
 	struct mbox_client mbox_client_data;
 	struct mbox_chan *mbox_chan;
-#if IS_ENABLED(CONFIG_MSM_QMP)
 	struct qmp *qmp;
-#endif
-	bool use_direct_qmp;
 	const char *vreg_ol_cpr, *vreg_ipa;
 	const char **pdc_init_table, **vreg_pdc_map, **pmu_vreg_map;
 	int pdc_init_table_len, vreg_pdc_map_len, pmu_vreg_map_len;
@@ -648,6 +645,7 @@ struct cnss_plat_data {
 	u32 *on_chip_pmic_board_ids;
 	bool no_bwscale;
 	bool sleep_clk;
+	struct wlchip_serial_id_v01 serial_id;
 };
 
 #if IS_ENABLED(CONFIG_ARCH_QCOM)

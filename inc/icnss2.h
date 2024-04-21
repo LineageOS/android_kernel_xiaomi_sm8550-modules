@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef _ICNSS_WLAN_H_
 #define _ICNSS_WLAN_H_
@@ -13,6 +13,7 @@
 #define IWCN_MAX_IRQ_REGISTRATIONS    32
 #define ICNSS_MAX_TIMESTAMP_LEN        32
 #define ICNSS_WLFW_MAX_BUILD_ID_LEN    128
+#define ICNSS_MAX_DEV_MEM_NUM            4
 
 #define DEVICE_NAME_MAX		10
 enum icnss_uevent {
@@ -38,6 +39,11 @@ struct icnss_uevent_fw_down_data {
 struct icnss_uevent_data {
 	enum icnss_uevent uevent;
 	void *data;
+};
+
+struct icnss_dev_mem_info {
+	u64 start;
+	u64 size;
 };
 
 /* Device information like supported device ids, etc*/
@@ -165,6 +171,7 @@ struct icnss_soc_info {
 	enum icnss_rd_card_chain_cap rd_card_chain_cap;
 	enum icnss_phy_he_channel_width_cap phy_he_channel_width_cap;
 	enum icnss_phy_qam_cap phy_qam_cap;
+	struct icnss_dev_mem_info dev_mem_info[ICNSS_MAX_DEV_MEM_NUM];
 };
 
 #define icnss_register_driver(ops)		\
