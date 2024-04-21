@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * RMNET WLAN Generic Netlink
  *
@@ -15,6 +15,7 @@
 #include "rmnet_wlan_genl.h"
 #include "rmnet_wlan.h"
 #include "rmnet_wlan_connection.h"
+#include "rmnet_wlan_fragment.h"
 #define DATARMNET5fe2c6571f (0xf07+1104-0x131d)
 static struct nla_policy DATARMNET19c5fce390[DATARMNETf6bbad94a5+
 (0xd26+209-0xdf6)]={[DATARMNET8c062d7709]=NLA_POLICY_EXACT_LEN(sizeof(struct 
@@ -289,12 +290,16 @@ DATARMNET61c2303133){pr_err(
 ,__func__,DATARMNET61c2303133);goto DATARMNET27d4697979;}DATARMNET61c2303133=
 DATARMNET9f106ed933();if(DATARMNET61c2303133){pr_err(
 "\x25\x73\x28\x29\x3a\x20\x63\x6f\x6e\x6e\x65\x63\x74\x69\x6f\x6e\x20\x6d\x61\x6e\x61\x67\x65\x6d\x65\x6e\x74\x20\x69\x6e\x69\x74\x20\x66\x61\x69\x6c\x65\x64\x3a\x20\x25\x69" "\n"
-,__func__,DATARMNET61c2303133);goto DATARMNETb042feb7e2;}DATARMNET333c107558();
+,__func__,DATARMNET61c2303133);goto DATARMNETb042feb7e2;}DATARMNET61c2303133=
+DATARMNET49c2c17e77();if(DATARMNET61c2303133){pr_err(
+"\x25\x73\x28\x29\x3a\x20\x66\x72\x61\x67\x6d\x65\x6e\x74\x20\x6d\x61\x6e\x61\x67\x65\x6d\x65\x6e\x74\x20\x69\x6e\x69\x74\x20\x66\x61\x69\x6c\x65\x64\x3a\x20\x25\x69" "\n"
+,__func__,DATARMNET61c2303133);goto DATARMNET321a78afb9;}DATARMNET333c107558();
 pr_info(
 "\x25\x73\x28\x29\x3a\x20\x72\x6d\x6e\x65\x74\x5f\x77\x6c\x61\x6e\x5f\x73\x65\x74\x5f\x68\x6f\x6f\x6b\x73\x20\x73\x65\x74" "\n"
-,__func__);return(0xd2d+202-0xdf7);DATARMNETb042feb7e2:genl_unregister_family(&
-DATARMNET61e8f41aae);DATARMNET27d4697979:return DATARMNET61c2303133;}static void
- __exit DATARMNET7a381832d5(void){int DATARMNET61c2303133;pr_info(
+,__func__);return(0xd2d+202-0xdf7);DATARMNET321a78afb9:DATARMNETf56cbaa2b1();
+DATARMNETb042feb7e2:genl_unregister_family(&DATARMNET61e8f41aae);
+DATARMNET27d4697979:return DATARMNET61c2303133;}static void __exit 
+DATARMNET7a381832d5(void){int DATARMNET61c2303133;pr_info(
 "\x25\x73\x28\x29\x3a\x20\x72\x6d\x6e\x65\x74\x5f\x77\x6c\x61\x6e\x20\x65\x78\x69\x74\x69\x6e\x67" "\n"
 ,__func__);DATARMNET61c2303133=DATARMNETf56cbaa2b1();if(DATARMNET61c2303133)
 pr_err(
