@@ -44,6 +44,11 @@ static int debug_level_set(const char *val,
 	if (ret)
 		return ret;
 
+	#if !defined(CONFIG_MSM_VIDC_ANORAK)
+	if (dvalue & (FW_TRACE | FW_FTRACE))
+		dvalue &= ~(FW_TRACE | FW_FTRACE);
+	#endif
+
 	msm_vidc_debug = dvalue;
 
 	/* check if driver or FW logmask is more than default level */
