@@ -600,8 +600,31 @@ char *firmware_request_from_smcinvoke(const char *appname, size_t *fw_size, stru
 		goto release_fw_entry00;
 	}
 
-	/*Total size of image will be the offset of last image + the size of last split image*/
-	*fw_size = fw_entrylast->size + offset[num_images-1];
+	/*Find the total image size*/
+	*fw_size = fw_entry00->size;
+	for (phi = 1; phi < num_images-1; phi++) {
+		snprintf(fw_name, ARRAY_SIZE(fw_name), "%s.b%02d", appname, phi);
+		rc = firmware_request_nowarn(&fw_entry, fw_name, class_dev);
+		if (rc) {
+			pr_err("Failed to locate blob %s\n", fw_name);
+			goto release_fw_entrylast;
+		}
+
+		if (*fw_size > U32_MAX - fw_entry->size) {
+			release_firmware(fw_entry);
+			goto release_fw_entrylast;
+		}
+
+		if((*fw_size) < (offset[phi] + fw_entry->size))
+			*fw_size = offset[phi] + fw_entry->size;
+		release_firmware(fw_entry);
+		fw_entry = NULL;
+	}
+
+	if((*fw_size) < (offset[phi] + fw_entrylast->size))
+		*fw_size = offset[phi] + fw_entrylast->size;
+
+
 
 	/*Allocate memory for the buffer that will hold the split image*/
 	rc = qtee_shmbridge_allocate_shm((*fw_size), shm);
