@@ -888,6 +888,8 @@ struct msm_vidc_map {
 	struct sg_table            *table;
 	struct dma_buf_attachment  *attach;
 	u32                         skip_delayed_unmap:1;
+	u32                         size;
+	phys_addr_t                 phys_addr;
 };
 
 struct msm_vidc_mappings {
