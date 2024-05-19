@@ -218,7 +218,8 @@ static int msm_cvp_session_process_hfi(
 	}
 	if (!is_buf_param_valid(buf_num, offset)) {
 		dprintk(CVP_ERR, "Incorrect buffer num and offset in cmd\n");
-		return -EINVAL;
+		rc = -EINVAL;
+		goto exit;
 	}
 
 	rc = msm_cvp_proc_oob(inst, in_pkt);
@@ -742,6 +743,13 @@ static int msm_cvp_session_process_hfi_fence(struct msm_cvp_inst *inst,
 		f->output_index = kfc->output_index;
 	}
 
+	if (f->num_fences >= (MAX_HFI_FENCE_SIZE / 2)) {
+		dprintk(CVP_ERR, "%s: Max number of fences exceeded! Max number supported: %d",
+				__func__, (MAX_HFI_FENCE_SIZE / 2));
+		cvp_free_fence_data(f);
+		msm_cvp_unmap_frame(inst, pkt->client_data.kdata);
+		goto exit;
+	}
 
 	dprintk(CVP_SYNX, "%s: frameID %llu ktid %llu\n",
 			__func__, f->frame_id, pkt->client_data.kdata);
