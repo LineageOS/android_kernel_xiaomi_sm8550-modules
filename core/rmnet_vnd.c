@@ -1,5 +1,9 @@
 /* Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
+<<<<<<< HEAD   (e467bf datarmnet: Enabled datarmnet for trinket IOT)
  * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+=======
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+>>>>>>> CHANGE (f58365 core: Increase the gso max size for rmnet)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -747,7 +751,7 @@ int rmnet_vnd_newlink(u8 id, struct net_device *rmnet_dev,
 
 	priv->real_dev = real_dev;
 
-	rmnet_dev->gso_max_size = 64000;
+	rmnet_dev->gso_max_size = 65535;
 
 	rc = register_netdevice(rmnet_dev);
 	if (!rc) {
