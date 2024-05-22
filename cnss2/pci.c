@@ -2406,7 +2406,7 @@ static int cnss_pci_config_msi_data(struct cnss_pci_data *pci_priv)
 static struct cnss_plat_data *
 cnss_get_plat_priv_by_driver_ops(struct cnss_wlan_driver *driver_ops)
 {
-	int plat_env_count = cnss_get_plat_env_count();
+	int plat_env_count = cnss_get_max_plat_env_count();
 	struct cnss_plat_data *plat_env;
 	struct cnss_pci_data *pci_priv;
 	int i = 0;
@@ -3094,6 +3094,8 @@ int cnss_pci_call_driver_remove(struct cnss_pci_data *pci_priv)
 
 	plat_priv->get_info_cb_ctx = NULL;
 	plat_priv->get_info_cb = NULL;
+	plat_priv->get_driver_async_data_ctx = NULL;
+	plat_priv->get_driver_async_data_cb = NULL;
 
 	return 0;
 }
