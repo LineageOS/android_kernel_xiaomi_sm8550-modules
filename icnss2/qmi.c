@@ -2806,7 +2806,8 @@ static int icnss_wlfw_wfc_call_status_send_sync
 	struct qmi_txn txn;
 	int ret = 0;
 
-	if (!test_bit(ICNSS_FW_READY, &priv->state)) {
+	if (!test_bit(ICNSS_FW_READY, &priv->state) ||
+	    !test_bit(ICNSS_MODE_ON, &priv->state)) {
 		icnss_pr_err("Drop IMS WFC indication as FW not initialized\n");
 		return -EINVAL;
 	}
