@@ -38,7 +38,7 @@ endif
 endif
 endif
 
-ifeq ($(filter $(CONFIG_ARCH_KHAJE) $(CONFIG_ARCH_MONACO) $(CONFIG_ARCH_TRINKET), y), y)
+ifeq ($(filter $(CONFIG_ARCH_KHAJE) $(CONFIG_ARCH_MONACO) $(CONFIG_ARCH_TRINKET) $(CONFIG_ARCH_SCUBA), y), y)
 DATAIPADRVTOP = $(srctree)/../../vendor/qcom/opensource/dataipa/drivers/platform/msm
 LINUXINCLUDE    += -include $(srctree)/../../vendor/qcom/opensource/dataipa/config/dataipa_vendor_ipav4.h
 include $(srctree)/../../vendor/qcom/opensource/dataipa/config/dataipa_GKI_ipav4.conf
@@ -74,15 +74,6 @@ endif
 ifeq ($(CONFIG_ARCH_SDXNIGHTJAR), y)
 LINUXINCLUDE    += -include $(srctree)/techpack/dataipa/config/sdx12dataipa.h
 include $(srctree)/techpack/dataipa/config/sdx12dataipa_QGKI.conf
-ifneq ($(CONFIG_LOCALVERSION), "-perf")
-include $(srctree)/techpack/dataipa/config/dataipa_debug.conf
-LINUXINCLUDE    += -include $(srctree)/techpack/dataipa/config/dataipa_debug.h
-endif
-endif
-
-ifeq ($(CONFIG_ARCH_SCUBA), y)
-LINUXINCLUDE    += -include $(srctree)/techpack/dataipa/config/sa410mdataipa.h
-include $(srctree)/techpack/dataipa/config/sa410mdataipa_QGKI.conf
 ifneq ($(CONFIG_LOCALVERSION), "-perf")
 include $(srctree)/techpack/dataipa/config/dataipa_debug.conf
 LINUXINCLUDE    += -include $(srctree)/techpack/dataipa/config/dataipa_debug.h
