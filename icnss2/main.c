@@ -282,7 +282,7 @@ int icnss_driver_event_post(struct icnss_priv *priv,
 		return -EINVAL;
 	}
 
-	if (in_interrupt() || irqs_disabled())
+	if (in_interrupt() || !preemptible() || rcu_preempt_depth())
 		gfp = GFP_ATOMIC;
 
 	event = kzalloc(sizeof(*event), gfp);
