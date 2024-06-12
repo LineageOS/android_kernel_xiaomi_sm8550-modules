@@ -118,6 +118,11 @@ enum cnss_vreg_type {
 	CNSS_VREG_PRIM,
 };
 
+enum cnss_pci_switch_type {
+	PCIE_DIRECT_ATTACH = 0,
+	PCIE_SWITCH_NTN3,
+};
+
 struct cnss_clk_cfg {
 	const char *name;
 	u32 freq;
@@ -650,6 +655,7 @@ struct cnss_plat_data {
 	bool sleep_clk;
 	struct wlchip_serial_id_v01 serial_id;
 	bool ipa_shared_cb_enable;
+	u32 pcie_switch_type;
 };
 
 #if IS_ENABLED(CONFIG_ARCH_QCOM)
@@ -741,6 +747,7 @@ void cnss_aop_interface_deinit(struct cnss_plat_data *plat_priv);
 int cnss_aop_pdc_reconfig(struct cnss_plat_data *plat_priv);
 int cnss_aop_send_msg(struct cnss_plat_data *plat_priv, char *msg);
 void cnss_power_misc_params_init(struct cnss_plat_data *plat_priv);
+void cnss_pci_of_switch_type_init(struct cnss_plat_data *plat_priv);
 int cnss_aop_ol_cpr_cfg_setup(struct cnss_plat_data *plat_priv,
 			      struct wlfw_pmu_cfg_v01 *fw_pmu_cfg);
 int cnss_request_firmware_direct(struct cnss_plat_data *plat_priv,
