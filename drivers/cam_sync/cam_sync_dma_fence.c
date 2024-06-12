@@ -247,6 +247,7 @@ struct dma_fence *cam_dma_fence_get_fence_from_fd(
 	int32_t fd, int32_t *dma_fence_row_idx)
 {
 	struct dma_fence *dma_fence = NULL;
+	struct cam_dma_fence_row *row;
 
 	dma_fence = __cam_dma_fence_find_fence_in_table(fd, dma_fence_row_idx);
 	if (IS_ERR_OR_NULL(dma_fence)) {
@@ -256,7 +257,19 @@ struct dma_fence *cam_dma_fence_get_fence_from_fd(
 		return cam_dma_fence_get_fence_from_sync_file(fd, dma_fence_row_idx);
 	}
 
+	spin_lock_bh(&g_cam_dma_fence_dev->row_spinlocks[*dma_fence_row_idx]);
+	row = &g_cam_dma_fence_dev->rows[*dma_fence_row_idx];
+
+	if (row->state == CAM_DMA_FENCE_STATE_INVALID) {
+		CAM_ERR(CAM_DMA_FENCE,
+			"dma fence at idx: %d is in invalid state: %d",
+			dma_fence_row_idx, row->state);
+		spin_unlock_bh(&g_cam_dma_fence_dev->row_spinlocks[*dma_fence_row_idx]);
+		return ERR_PTR(-EINVAL);
+	}
+
 	dma_fence_get(dma_fence);
+	spin_unlock_bh(&g_cam_dma_fence_dev->row_spinlocks[*dma_fence_row_idx]);
 
 	CAM_DBG(CAM_DMA_FENCE, "dma fence found for fd: %d with seqno: %llu ref_cnt: %u",
 		fd, dma_fence->seqno, kref_read(&dma_fence->refcount));
