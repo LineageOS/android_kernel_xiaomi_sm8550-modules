@@ -9654,7 +9654,7 @@ static int qseecom_init_dev(struct platform_device *pdev)
 	}
 	if (!qseecom.dev->dma_parms) {
 		qseecom.dev->dma_parms =
-			kzalloc(sizeof(*qseecom.dev->dma_parms), GFP_KERNEL);
+			devm_kzalloc(qseecom.dev, sizeof(*qseecom.dev->dma_parms), GFP_KERNEL);
 		if (!qseecom.dev->dma_parms) {
 			rc = -ENOMEM;
 			goto exit_del_cdev;
@@ -9692,8 +9692,6 @@ exit_unreg_chrdev_region:
 
 static void qseecom_deinit_dev(void)
 {
-	kfree(qseecom.dev->dma_parms);
-	qseecom.dev->dma_parms = NULL;
 	unregister_reboot_notifier(&(qseecom.reboot_nb));
 	cdev_del(&qseecom.cdev);
 	unregister_chrdev_region(qseecom.qseecom_device_no, 1);
