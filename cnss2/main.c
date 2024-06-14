@@ -3118,6 +3118,10 @@ int cnss_do_ramdump(struct cnss_plat_data *plat_priv)
 	struct qcom_dump_segment segment;
 	struct list_head head;
 
+	if (!dump_enabled()) {
+		cnss_pr_info("Dump collection is not enabled\n");
+		return 0;
+	}
 	INIT_LIST_HEAD(&head);
 	memset(&segment, 0, sizeof(segment));
 	segment.va = ramdump_info->ramdump_va;

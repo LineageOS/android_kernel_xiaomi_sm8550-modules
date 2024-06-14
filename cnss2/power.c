@@ -22,6 +22,7 @@
 
 #if IS_ENABLED(CONFIG_ARCH_QCOM)
 static struct cnss_vreg_cfg cnss_vreg_list[] = {
+	{"vdd-wlan-m2", 3300000, 3300000, 0, 0, 0},
 	{"vdd-wlan-core", 1300000, 1300000, 0, 0, 0},
 	{"vdd-wlan-io", 1800000, 1800000, 0, 0, 0},
 	{"vdd-wlan-io12", 1200000, 1200000, 0, 0, 0},
