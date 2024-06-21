@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021, 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021, 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -108,8 +108,8 @@ static void cnss_plat_ipc_logging_deinit(void)
 	}
 }
 
-void cnss_plat_ipc_debug_log_print(void *log_ctx, char *process, const char *fn,
-				   const char *log_level, char *fmt, ...)
+static void cnss_plat_ipc_debug_log_print(void *log_ctx, char *process, const char *fn,
+					  const char *log_level, char *fmt, ...)
 {
 	struct va_format vaf;
 	va_list va_args;
@@ -132,8 +132,8 @@ void cnss_plat_ipc_debug_log_print(void *log_ctx, char *process, const char *fn,
 static void cnss_plat_ipc_logging_init(void) {};
 static void cnss_plat_ipc_logging_deinit(void) {};
 
-void cnss_plat_ipc_debug_log_print(void *log_ctx, char *process, const char *fn,
-				   const char *log_level, char *fmt, ...)
+static void cnss_plat_ipc_debug_log_print(void *log_ctx, char *process, const char *fn,
+					  const char *log_level, char *fmt, ...)
 {
 	struct va_format vaf;
 	va_list va_args;
