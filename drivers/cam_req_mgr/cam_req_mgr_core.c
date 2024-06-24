@@ -4984,7 +4984,7 @@ int cam_req_mgr_schedule_request_v2(
 	}
 
 	if (sched_req->sync_mode == CAM_REQ_MGR_SYNC_MODE_SYNC) {
-		if ((sched_req->num_links <= 0) &&
+		if ((sched_req->num_links <= 0) ||
 			(sched_req->num_links > MAXIMUM_LINKS_PER_SESSION)) {
 			CAM_ERR(CAM_CRM, "link:0x%x req:%lld invalid num_links:%d",
 				link->link_hdl, sched_req->req_id, sched_req->num_links);
