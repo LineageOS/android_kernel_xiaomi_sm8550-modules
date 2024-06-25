@@ -1,9 +1,6 @@
 /* Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
-<<<<<<< HEAD   (e467bf datarmnet: Enabled datarmnet for trinket IOT)
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
-=======
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
->>>>>>> CHANGE (f58365 core: Increase the gso max size for rmnet)
+ * Copyright (c) 2021-2022, 2024 Qualcomm Innovation Center, Inc.
+ * All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
