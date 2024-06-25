@@ -3103,7 +3103,8 @@ int __icnss_register_driver(struct icnss_driver_ops *ops,
 	struct icnss_priv *priv = icnss_get_plat_priv();
 
 	if (!priv || !priv->pdev) {
-		ret = -ENODEV;
+		icnss_pr_vdbg("icnss2 is not ready for register driver\n");
+		ret = -EAGAIN;
 		goto out;
 	}
 
