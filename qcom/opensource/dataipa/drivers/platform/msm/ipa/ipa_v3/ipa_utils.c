@@ -12202,6 +12202,12 @@ void ipa3_force_close_coal(
 
 	int ep_idx, num_desc = 0;
 
+
+	if (ipa3_is_mhip_offload_enabled()) {
+		IPADBG("COAL not supported in the prime\n");
+		return;
+	}
+
 	if ( close_wan
 		 &&
 		 IPA_CLIENT_IS_MAPPED_VALID(IPA_CLIENT_APPS_WAN_COAL_CONS, ep_idx)
