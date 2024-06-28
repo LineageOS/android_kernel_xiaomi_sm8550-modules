@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "smcinvoke: %s: " fmt, __func__
@@ -68,7 +68,7 @@
 #define TZCB_ERR_RATELIMIT_BURST		1
 
 //print tzcb err per sec
-#define tzcb_err_ratelimited(fmt, ...) 	do {		\
+#define smci_err_ratelimited(fmt, ...) 	do {		\
 	static DEFINE_RATELIMIT_STATE(_rs, 		\
 			TZCB_ERR_RATELIMIT_INTERVAL,	\
 			TZCB_ERR_RATELIMIT_BURST);	\
@@ -273,7 +273,6 @@ struct smcinvoke_server_info {
 	DECLARE_HASHTABLE(responses_table, 4);
 	struct hlist_node hash;
 	struct list_head pending_cbobjs;
-	uint8_t is_server_suspended;
 };
 
 struct smcinvoke_cbobj {
@@ -488,7 +487,7 @@ static void smcinvoke_shmbridge_post_process(void)
 			do {
 				ret = qtee_shmbridge_deregister(handle);
 				if (unlikely(ret)) {
-					pr_err_ratelimited("SHM failed: ret:%d ptr:0x%x h:%#llx\n",
+					smci_err_ratelimited("SHM failed: ret:%d ptr:0x%x h:%#llx\n",
 							ret,
 							dmabuf_to_free,
 							handle);
@@ -525,7 +524,7 @@ static int smcinvoke_release_tz_object(struct qtee_shm *in_shm, struct qtee_shm 
 			&release_handles, context_type, in_shm, out_shm, false);
 	process_piggyback_data(out_buf, SMCINVOKE_TZ_MIN_BUF_SIZE);
 	if (ret) {
-		pr_err_ratelimited("Failed to release object(0x%x), ret:%d\n",
+		smci_err_ratelimited("Failed to release object(0x%x), ret:%d\n",
 				hdr.tzhandle, ret);
 	} else {
 		pr_debug("Released object(0x%x) successfully.\n",
@@ -606,7 +605,7 @@ static void smcinvoke_start_adci_thread(void)
 	do {
 		ret = IClientEnv_adciAccept(adci_rootEnv);
 		if (ret == OBJECT_ERROR_BUSY) {
-			pr_err_ratelimited("Secure side is busy,will retry after 5 ms, retry_count = %d\n",retry_count);
+			smci_err_ratelimited("Secure side is busy,will retry after 5 ms, retry_count = %d\n",retry_count);
 			msleep(SMCINVOKE_INTERFACE_BUSY_WAIT_MS);
 		}
 	} while ((ret == OBJECT_ERROR_BUSY) && (retry_count++ < SMCINVOKE_INTERFACE_MAX_RETRY));
@@ -724,7 +723,7 @@ static void smcinvoke_destroy_kthreads(void)
 		do {
 			ret = IClientEnv_adciShutdown(adci_rootEnv);
 			if (ret == OBJECT_ERROR_BUSY) {
-				pr_err_ratelimited("Secure side is busy,will retry after 5 ms, retry_count = %d\n",retry_count);
+				smci_err_ratelimited("Secure side is busy,will retry after 5 ms, retry_count = %d\n",retry_count);
 				msleep(SMCINVOKE_INTERFACE_BUSY_WAIT_MS);
 			}
 		} while ((ret == OBJECT_ERROR_BUSY) && (retry_count++ < SMCINVOKE_INTERFACE_MAX_RETRY));
@@ -1569,11 +1568,11 @@ static void process_tzcb_req(void *buf, size_t buf_len, struct file **arr_filp)
 					timeout_jiff);
 		}
 		if (ret == 0) {
-			if (srvr_info->is_server_suspended == 0) {
-				tzcb_err_ratelimited("CBobj timed out waiting on cbtxn :%d,cb-tzhandle:%d, retry:%d, op:%d counts :%d\n",
+			if (!freezing(current)) {
+				smci_err_ratelimited("CBobj timed out waiting on cbtxn :%d,cb-tzhandle:%d, retry:%d, op:%d counts :%d\n",
 						cb_txn->txn_id,cb_req->hdr.tzhandle, cbobj_retries,
 						cb_req->hdr.op, cb_req->hdr.counts);
-				tzcb_err_ratelimited("CBobj %d timedout pid %x,tid %x, srvr state=%d, srvr id:%u\n",
+				smci_err_ratelimited("CBobj %d timedout pid %x,tid %x, srvr state=%d, srvr id:%u\n",
 						cb_req->hdr.tzhandle, current->pid,
 						current->tgid, srvr_info->state,
 						srvr_info->server_id);
@@ -1592,7 +1591,7 @@ static void process_tzcb_req(void *buf, size_t buf_len, struct file **arr_filp)
 		 * should wait infinitely for the accept thread to come back with
 		 * response.
 		 */
-		if (srvr_info->is_server_suspended > 0) {
+		if (freezing(current)) {
 			cbobj_retries = 0;
 		} else {
 			cbobj_retries++;
@@ -1806,7 +1805,7 @@ static int prepare_send_scm_msg(const uint8_t *in_buf, phys_addr_t in_paddr,
 					&response_type, &data, in_shm, out_shm);
 
 			if (ret == -EBUSY) {
-				pr_err_ratelimited("Secure side is busy,will retry after 30 ms, retry_count = %d\n",retry_count);
+				smci_err_ratelimited("Secure side is busy,will retry after 30 ms, retry_count = %d\n",retry_count);
 				msleep(SMCINVOKE_SCM_EBUSY_WAIT_MS);
 			}
 
@@ -2207,7 +2206,6 @@ static long process_server_req(struct file *filp, unsigned int cmd,
 	hash_init(server_info->reqs_table);
 	hash_init(server_info->responses_table);
 	INIT_LIST_HEAD(&server_info->pending_cbobjs);
-	server_info->is_server_suspended = 0;
 
 	mutex_lock(&g_smcinvoke_lock);
 
@@ -2271,9 +2269,6 @@ static long process_accept_req(struct file *filp, unsigned int cmd,
 	if (server_info->state == SMCINVOKE_SERVER_STATE_DEFUNCT)
 		server_info->state = 0;
 
-	server_info->is_server_suspended = UNSET_BIT(server_info->is_server_suspended,
-				(current->pid)%DEFAULT_CB_OBJ_THREAD_CNT);
-
 	mutex_unlock(&g_smcinvoke_lock);
 
 	/* First check if it has response otherwise wait for req */
@@ -2293,7 +2288,7 @@ static long process_accept_req(struct file *filp, unsigned int cmd,
 		 * new cb requests.
 		 */
 		if (!cb_txn) {
-			pr_err_ratelimited("%s txn %d either invalid or removed from Q\n",
+			smci_err_ratelimited("%s txn %d either invalid or removed from Q\n",
 					__func__, user_args.txn_id);
 			goto start_waiting_for_requests;
 		}
@@ -2338,21 +2333,10 @@ start_waiting_for_requests:
 			mutex_lock(&g_smcinvoke_lock);
 
 			if(freezing(current)) {
-				pr_err_ratelimited("Server id :%d interrupted probaby due to suspend, pid:%d\n",
+				smci_err_ratelimited("Server id :%d interrupted probaby due to suspend, pid:%d\n",
 					server_info->server_id, current->pid);
-				/*
-				 * Each accept thread is identified by bits ranging from
-				 * 0 to DEFAULT_CBOBJ_THREAD_CNT-1. When an accept thread is
-				 * interrupted by a signal other than SIGUSR1,SIGKILL,SIGTERM,
-				 * set the corresponding bit of accept thread, indicating that
-				 * current accept thread's state to be "suspended"/ or something
-				 * that needs infinite timeout for invoke thread.
-				 */
-				server_info->is_server_suspended =
-						SET_BIT(server_info->is_server_suspended,
-							(current->pid)%DEFAULT_CB_OBJ_THREAD_CNT);
 			} else {
-				pr_err_ratelimited("Setting pid:%d, server id : %d state to defunct\n",
+				smci_err_ratelimited("Setting pid:%d, server id : %d state to defunct\n",
 						current->pid, server_info->server_id);
 						server_info->state = SMCINVOKE_SERVER_STATE_DEFUNCT;
 			}

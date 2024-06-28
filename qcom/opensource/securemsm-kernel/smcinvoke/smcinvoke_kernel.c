@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/file.h>
 #include <linux/fs.h>
@@ -412,6 +412,16 @@ static int __qseecom_start_app(struct qseecom_handle **handle,
 		goto exit_release_clientenv;
 	}
 
+	/*
+	 * IClientEnv_open can be success(ret = 0) but cxt->app_loader can still be null.
+	 * Add null sanity check.
+	 */
+	if (Object_isNull(cxt->app_loader) && (ret == OBJECT_OK)) {
+		pr_err("[%s][%d] cxt->app_loader is null, ret:%d\n", __func__, __LINE__, ret);
+		ret = OBJECT_ERROR_INVALID;
+		goto exit_release_clientenv;
+	}
+
 	/* load app*/
 	ret = load_app(cxt, app_name);
 	if (ret) {
@@ -600,8 +610,31 @@ char *firmware_request_from_smcinvoke(const char *appname, size_t *fw_size, stru
 		goto release_fw_entry00;
 	}
 
-	/*Total size of image will be the offset of last image + the size of last split image*/
-	*fw_size = fw_entrylast->size + offset[num_images-1];
+	/*Find the total image size*/
+	*fw_size = fw_entry00->size;
+	for (phi = 1; phi < num_images-1; phi++) {
+		snprintf(fw_name, ARRAY_SIZE(fw_name), "%s.b%02d", appname, phi);
+		rc = firmware_request_nowarn(&fw_entry, fw_name, class_dev);
+		if (rc) {
+			pr_err("Failed to locate blob %s\n", fw_name);
+			goto release_fw_entrylast;
+		}
+
+		if (*fw_size > U32_MAX - fw_entry->size) {
+			release_firmware(fw_entry);
+			goto release_fw_entrylast;
+		}
+
+		if((*fw_size) < (offset[phi] + fw_entry->size))
+			*fw_size = offset[phi] + fw_entry->size;
+		release_firmware(fw_entry);
+		fw_entry = NULL;
+	}
+
+	if((*fw_size) < (offset[phi] + fw_entrylast->size))
+		*fw_size = offset[phi] + fw_entrylast->size;
+
+
 
 	/*Allocate memory for the buffer that will hold the split image*/
 	rc = qtee_shmbridge_allocate_shm((*fw_size), shm);
