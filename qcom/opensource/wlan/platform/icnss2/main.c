@@ -46,7 +46,7 @@
 #include <linux/remoteproc.h>
 #include <linux/version.h>
 #include <trace/hooks/remoteproc.h>
-#ifdef SLATE_MODULE_ENABLED
+#ifdef CONFIG_SLATE_MODULE_ENABLED
 #include <linux/soc/qcom/slatecom_interface.h>
 #include <linux/soc/qcom/slate_events_bridge_intf.h>
 #include <uapi/linux/slatecom_interface.h>
@@ -115,7 +115,7 @@ uint64_t dynamic_feature_mask = ICNSS_DEFAULT_FEATURE_MASK;
 #define WLAN_EN_TEMP_THRESHOLD		5000
 #define WLAN_EN_DELAY			500
 
-#define ICNSS_RPROC_LEN			10
+#define ICNSS_RPROC_LEN			100
 static DEFINE_IDA(rd_minor_id);
 
 enum icnss_pdr_cause_index {
@@ -472,6 +472,17 @@ bool icnss_is_pdr(void)
 }
 EXPORT_SYMBOL(icnss_is_pdr);
 
+static bool icnss_is_smp2p_valid(struct icnss_priv *priv,
+			  enum smp2p_out_entry smp2p_entry)
+{
+	if (priv->device_id == WCN6750_DEVICE_ID ||
+	    priv->device_id == WCN6450_DEVICE_ID ||
+	    priv->wpss_supported)
+		return IS_ERR_OR_NULL(priv->smp2p_info[smp2p_entry].smem_state);
+	else
+		return 0;
+}
+
 static int icnss_send_smp2p(struct icnss_priv *priv,
 			    enum icnss_smp2p_msg_id msg_id,
 			    enum smp2p_out_entry smp2p_entry)
@@ -479,7 +490,7 @@ static int icnss_send_smp2p(struct icnss_priv *priv,
 	unsigned int value = 0;
 	int ret;
 
-	if (!priv || IS_ERR_OR_NULL(priv->smp2p_info[smp2p_entry].smem_state))
+	if (!priv || icnss_is_smp2p_valid(priv, smp2p_entry))
 		return -EINVAL;
 
 	/* No Need to check FW_DOWN for ICNSS_RESET_MSG */
@@ -810,7 +821,7 @@ retry:
 		qcom_smem_state_get(&priv->pdev->dev,
 				    icnss_smp2p_str[smp2p_entry],
 				    &priv->smp2p_info[smp2p_entry].smem_bit);
-	if (IS_ERR_OR_NULL(priv->smp2p_info[smp2p_entry].smem_state)) {
+	if (icnss_is_smp2p_valid(priv, smp2p_entry)) {
 		if (retry++ < SMP2P_GET_MAX_RETRY) {
 			error = PTR_ERR(priv->smp2p_info[smp2p_entry].smem_state);
 			icnss_pr_err("Failed to get smem state, ret: %d Entry: %s",
@@ -847,7 +858,7 @@ static enum wlfw_wlan_rf_subtype_v01 icnss_rf_subtype_value_to_type(u32 val)
 	}
 }
 
-#ifdef SLATE_MODULE_ENABLED
+#ifdef CONFIG_SLATE_MODULE_ENABLED
 static void icnss_send_wlan_boot_init(void)
 {
 	send_wlan_state(GMI_MGR_WLAN_BOOT_INIT);
@@ -2201,14 +2212,20 @@ static int icnss_wpss_notifier_nb(struct notifier_block *nb,
 	icnss_pr_vdbg("WPSS-Notify: event %s(%lu)\n",
 		      icnss_qcom_ssr_notify_state_to_str(code), code);
 
-	if (code == QCOM_SSR_AFTER_SHUTDOWN) {
-		icnss_pr_info("Collecting msa0 segment dump\n");
-		icnss_msa0_ramdump(priv);
+	switch (code) {
+	case QCOM_SSR_BEFORE_SHUTDOWN:
+		break;
+	case QCOM_SSR_AFTER_SHUTDOWN:
+		/* Collect ramdump only when there was a crash. */
+		if (notif->crashed) {
+			icnss_pr_info("Collecting msa0 segment dump\n");
+			icnss_msa0_ramdump(priv);
+		}
+		goto out;
+	default:
 		goto out;
 	}
 
-	if (code != QCOM_SSR_BEFORE_SHUTDOWN)
-		goto out;
 
 	if (priv->wpss_self_recovery_enabled)
 		del_timer(&priv->wpss_ssr_timer);
@@ -2395,7 +2412,7 @@ static int icnss_wpss_ssr_register_notifier(struct icnss_priv *priv)
 	return ret;
 }
 
-#ifdef SLATE_MODULE_ENABLED
+#ifdef CONFIG_SLATE_MODULE_ENABLED
 static int icnss_slate_event_notifier_nb(struct notifier_block *nb,
 					 unsigned long event, void *data)
 {
@@ -3400,6 +3417,8 @@ int icnss_get_soc_info(struct device *dev, struct icnss_soc_info *info)
 	info->rd_card_chain_cap = priv->rd_card_chain_cap;
 	info->phy_he_channel_width_cap = priv->phy_he_channel_width_cap;
 	info->phy_qam_cap = priv->phy_qam_cap;
+	memcpy(&info->dev_mem_info, &priv->dev_mem_info,
+	       sizeof(info->dev_mem_info));
 
 	return 0;
 }
@@ -5042,7 +5061,7 @@ static int icnss_pm_suspend(struct device *dev)
 	icnss_pr_vdbg("PM Suspend, state: 0x%lx\n", priv->state);
 
 	if (!priv->ops || !priv->ops->pm_suspend ||
-	    IS_ERR_OR_NULL(priv->smp2p_info[ICNSS_SMP2P_OUT_POWER_SAVE].smem_state) ||
+	    icnss_is_smp2p_valid(priv, ICNSS_SMP2P_OUT_POWER_SAVE) ||
 	    !test_bit(ICNSS_DRIVER_PROBED, &priv->state))
 		return 0;
 
@@ -5080,7 +5099,7 @@ static int icnss_pm_resume(struct device *dev)
 	icnss_pr_vdbg("PM resume, state: 0x%lx\n", priv->state);
 
 	if (!priv->ops || !priv->ops->pm_resume ||
-	    IS_ERR_OR_NULL(priv->smp2p_info[ICNSS_SMP2P_OUT_POWER_SAVE].smem_state) ||
+	    icnss_is_smp2p_valid(priv, ICNSS_SMP2P_OUT_POWER_SAVE) ||
 	    !test_bit(ICNSS_DRIVER_PROBED, &priv->state))
 		goto out;
 
@@ -5171,7 +5190,7 @@ static int icnss_pm_runtime_suspend(struct device *dev)
 	}
 
 	if (!priv->ops || !priv->ops->runtime_suspend ||
-	    IS_ERR_OR_NULL(priv->smp2p_info[ICNSS_SMP2P_OUT_POWER_SAVE].smem_state))
+	    icnss_is_smp2p_valid(priv, ICNSS_SMP2P_OUT_POWER_SAVE))
 		goto out;
 
 	icnss_pr_vdbg("Runtime suspend\n");
@@ -5205,7 +5224,7 @@ static int icnss_pm_runtime_resume(struct device *dev)
 	}
 
 	if (!priv->ops || !priv->ops->runtime_resume ||
-	    IS_ERR_OR_NULL(priv->smp2p_info[ICNSS_SMP2P_OUT_POWER_SAVE].smem_state))
+	    icnss_is_smp2p_valid(priv, ICNSS_SMP2P_OUT_POWER_SAVE))
 		goto out;
 
 	icnss_pr_vdbg("Runtime resume, state: 0x%lx\n", priv->state);

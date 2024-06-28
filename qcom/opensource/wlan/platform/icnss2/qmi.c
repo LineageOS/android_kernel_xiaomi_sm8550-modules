@@ -695,7 +695,7 @@ out:
 
 int wlfw_cap_send_sync_msg(struct icnss_priv *priv)
 {
-	int ret;
+	int ret = 0, i = 0;
 	struct wlfw_cap_req_msg_v01 *req;
 	struct wlfw_cap_resp_msg_v01 *resp;
 	struct qmi_txn txn;
@@ -772,6 +772,18 @@ int wlfw_cap_send_sync_msg(struct icnss_priv *priv)
 		strlcpy(priv->fw_version_info.fw_build_timestamp,
 				resp->fw_version_info.fw_build_timestamp,
 				WLFW_MAX_TIMESTAMP_LEN + 1);
+	}
+
+	if (resp->dev_mem_info_valid) {
+		for (i = 0; i < QMI_WLFW_MAX_DEV_MEM_NUM_V01; i++) {
+			priv->dev_mem_info[i].start =
+				resp->dev_mem_info[i].start;
+			priv->dev_mem_info[i].size =
+				resp->dev_mem_info[i].size;
+			icnss_pr_info("Device memory info[%d]: start = 0x%llx, size = 0x%llx\n",
+				      i, priv->dev_mem_info[i].start,
+				      priv->dev_mem_info[i].size);
+		}
 	}
 
 	if (resp->voltage_mv_valid) {
@@ -3509,6 +3521,7 @@ int icnss_wlfw_get_info_send_sync(struct icnss_priv *plat_priv, int type,
 	struct wlfw_get_info_resp_msg_v01 *resp;
 	struct qmi_txn txn;
 	int ret = 0;
+	int flags = GFP_KERNEL & ~__GFP_DIRECT_RECLAIM;
 
 	if (cmd_len > QMI_WLFW_MAX_DATA_SIZE_V01)
 		return -EINVAL;
@@ -3516,11 +3529,11 @@ int icnss_wlfw_get_info_send_sync(struct icnss_priv *plat_priv, int type,
 	if (test_bit(ICNSS_FW_DOWN, &plat_priv->state))
 		return -EINVAL;
 
-	req = kzalloc(sizeof(*req), GFP_KERNEL);
+	req = kzalloc(sizeof(*req), flags);
 	if (!req)
 		return -ENOMEM;
 
-	resp = kzalloc(sizeof(*resp), GFP_KERNEL);
+	resp = kzalloc(sizeof(*resp), flags);
 	if (!resp) {
 		kfree(req);
 		return -ENOMEM;

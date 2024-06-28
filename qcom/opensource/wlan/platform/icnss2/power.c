@@ -21,6 +21,7 @@ static struct icnss_vreg_cfg icnss_wcn6750_vreg_list[] = {
 	{"vdd-cx-mx", 824000, 952000, 0, 0, 0, false, true},
 	{"vdd-1.8-xo", 1872000, 1872000, 0, 0, 0, false, true},
 	{"vdd-1.3-rfa", 1256000, 1352000, 0, 0, 0, false, true},
+	{"vdd-ipa-2p2", 2200000, 2200000, 0, 0, 0, false, true},
 };
 
 static struct icnss_vreg_cfg icnss_adrestea_vreg_list[] = {

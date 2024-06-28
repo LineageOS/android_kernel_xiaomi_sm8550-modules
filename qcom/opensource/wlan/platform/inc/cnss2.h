@@ -463,4 +463,8 @@ extern int cnss_get_curr_therm_cdev_state(struct device *dev,
 extern int cnss_update_time_sync_period(struct device *dev,
 					 uint32_t time_sync_period);
 extern int cnss_reset_time_sync_period(struct device *dev);
+extern int cnss_register_driver_async_data_cb(struct device *dev, void *cb_ctx,
+					      int (*cb)(void *ctx,
+					      uint16_t type, void *event,
+					      int event_len));
 #endif /* _NET_CNSS2_H */
