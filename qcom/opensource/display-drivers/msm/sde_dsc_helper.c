@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  */
 
@@ -372,12 +372,13 @@ int sde_dsc_populate_dsc_config(struct drm_dsc_config *dsc, int scr_ver) {
 }
 
 int sde_dsc_populate_dsc_private_params(struct msm_display_dsc_info *dsc_info,
-		int intf_width)
+		int intf_width, bool widebus_en)
 {
 	int  mod_offset;
 	int slice_per_pkt, slice_per_intf;
 	int bytes_in_slice, total_bytes_per_intf;
 	u16 bpp;
+	u16 bpc;
 	u32 bytes_in_dsc_pair;
 	u32 total_bytes_in_dsc_pair;
 
@@ -421,12 +422,26 @@ int sde_dsc_populate_dsc_private_params(struct msm_display_dsc_info *dsc_info,
 		slice_per_pkt = 1;
 
 	bpp = DSC_BPP(dsc_info->config);
+	bpc = DSC_BPC(dsc_info->config);
 	bytes_in_slice = DIV_ROUND_UP(dsc_info->config.slice_width *
 			bpp, 8);
 	total_bytes_per_intf = bytes_in_slice * slice_per_intf;
 
 	dsc_info->eol_byte_num = total_bytes_per_intf % 3;
-	dsc_info->pclk_per_line =  DIV_ROUND_UP(total_bytes_per_intf, 3);
+
+	/*
+	 * In DATABUS-WIDEN mode, MDP always sends out 48-bit compressed data per pclk
+	 * and on average, DSI consumes an amount of compressed data equivalent to the
+	 * uncompressed pixel depth per pclk.
+	 *
+	 * In NON-DATABUS-WIDEN mode, MDP always sends out 24-bit compressed data per
+	 * pclk and DSI always consumes 24-bit compressed data per pclk.
+	 */
+	if (widebus_en)
+		dsc_info->pclk_per_line = DIV_ROUND_UP(total_bytes_per_intf * 8,
+				msm_get_src_bpc(dsc_info->chroma_format, bpc));
+	else
+		dsc_info->pclk_per_line = DIV_ROUND_UP(total_bytes_per_intf * 8, 24);
 	dsc_info->bytes_in_slice = bytes_in_slice;
 	dsc_info->bytes_per_pkt = bytes_in_slice * slice_per_pkt;
 	dsc_info->pkt_per_line = slice_per_intf / slice_per_pkt;
@@ -571,4 +586,3 @@ int sde_dsc_create_pps_buf_cmd(struct msm_display_dsc_info *dsc_info,
 
 	return 0;
 }
-

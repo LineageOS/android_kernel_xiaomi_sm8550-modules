@@ -11,6 +11,7 @@
 #include "sde_formats.h"
 #include "dsi_display.h"
 #include "sde_trace.h"
+#include <drm/drm_fixed.h>
 
 #define SDE_DEBUG_VIDENC(e, fmt, ...) SDE_DEBUG("enc%d intf%d " fmt, \
 		(e) && (e)->base.parent ? \
@@ -48,6 +49,7 @@ static void drm_mode_to_intf_timing_params(
 		struct intf_timing_params *timing)
 {
 	const struct sde_encoder_phys *phys_enc = &vid_enc->base;
+	s64 comp_ratio, width;
 
 	memset(timing, 0, sizeof(*timing));
 
@@ -124,7 +126,7 @@ static void drm_mode_to_intf_timing_params(
 	 */
 	if (phys_enc->hw_intf->cap->type == INTF_DP &&
 			(timing->wide_bus_en ||
-			(vid_enc->base.comp_ratio > 1))) {
+			(vid_enc->base.comp_ratio > MSM_DISPLAY_COMPRESSION_RATIO_NONE))) {
 		timing->width = timing->width >> 1;
 		timing->xres = timing->xres >> 1;
 		timing->h_back_porch = timing->h_back_porch >> 1;
@@ -132,7 +134,7 @@ static void drm_mode_to_intf_timing_params(
 		timing->hsync_pulse_width = timing->hsync_pulse_width >> 1;
 
 		if (vid_enc->base.comp_type == MSM_DISPLAY_COMPRESSION_DSC &&
-				(vid_enc->base.comp_ratio > 1)) {
+				(vid_enc->base.comp_ratio > MSM_DISPLAY_COMPRESSION_RATIO_NONE)) {
 			timing->extra_dto_cycles =
 				vid_enc->base.dsc_extra_pclk_cycle_cnt;
 			timing->width += vid_enc->base.dsc_extra_disp_width;
@@ -151,10 +153,11 @@ static void drm_mode_to_intf_timing_params(
 			(vid_enc->base.comp_type ==
 			MSM_DISPLAY_COMPRESSION_VDC))) {
 		// adjust active dimensions
-		timing->width = DIV_ROUND_UP(timing->width,
-			vid_enc->base.comp_ratio);
-		timing->xres = DIV_ROUND_UP(timing->xres,
-			vid_enc->base.comp_ratio);
+		width = drm_fixp_from_fraction(timing->width, 1);
+		comp_ratio = drm_fixp_from_fraction(vid_enc->base.comp_ratio, 100);
+		width = drm_fixp_div(width, comp_ratio);
+		timing->width = drm_fixp2int_ceil(width);
+		timing->xres = timing->width;
 	}
 
 	/*

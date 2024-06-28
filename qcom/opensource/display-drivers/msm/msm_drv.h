@@ -270,8 +270,11 @@ enum msm_display_wd_jitter_type {
 	MSM_DISPLAY_WD_LTJ_JITTER = BIT(2),
 };
 
-#define MSM_DISPLAY_COMPRESSION_RATIO_NONE 1
-#define MSM_DISPLAY_COMPRESSION_RATIO_MAX 5
+/**
+ * Scale macros so that compression ratio is a factor of 100 everywhere
+ */
+#define MSM_DISPLAY_COMPRESSION_RATIO_NONE 100
+#define MSM_DISPLAY_COMPRESSION_RATIO_MAX 500
 
 /**
  * enum msm_display_spr_pack_type - sub pixel rendering pack patterns supported
@@ -704,10 +707,16 @@ struct msm_display_vdc_info {
 #define DSC_BPP(config) ((config).bits_per_pixel >> 4)
 
 /**
+ * Bits/component
+ * returns the integer bpc value from the drm_dsc_config struct
+ */
+#define DSC_BPC(config) ((config).bits_per_component)
+
+/**
  * struct msm_compression_info - defined panel compression
  * @enabled:          enabled/disabled
  * @comp_type:        type of compression supported
- * @comp_ratio:       compression ratio
+ * @comp_ratio:       compression ratio multiplied by 100
  * @src_bpp:          bits per pixel before compression
  * @tgt_bpp:          bits per pixel after compression
  * @dsc_info:         dsc configuration if the compression

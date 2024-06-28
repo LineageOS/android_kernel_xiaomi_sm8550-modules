@@ -1575,7 +1575,7 @@ static int dp_panel_dsc_prepare_basic_params(
 	comp_info->comp_type = MSM_DISPLAY_COMPRESSION_DSC;
 	comp_info->tgt_bpp = DSC_TGT_BPP;
 	comp_info->src_bpp = dp_mode->timing.bpp;
-	comp_info->comp_ratio = dp_mode->timing.bpp / DSC_TGT_BPP;
+	comp_info->comp_ratio = mult_frac(100, dp_mode->timing.bpp, DSC_TGT_BPP);
 	comp_info->enabled = true;
 
 	return 0;
@@ -3001,7 +3001,7 @@ static void dp_panel_convert_to_dp_mode(struct dp_panel *dp_panel,
 	comp_info->src_bpp = default_bpp;
 	comp_info->tgt_bpp = default_bpp;
 	comp_info->comp_type = MSM_DISPLAY_COMPRESSION_NONE;
-	comp_info->comp_ratio = 1;
+	comp_info->comp_ratio = MSM_DISPLAY_COMPRESSION_RATIO_NONE;
 	comp_info->enabled = false;
 
 	/* As YUV was not supported now, so set the default format to RGB */
@@ -3036,7 +3036,7 @@ static void dp_panel_convert_to_dp_mode(struct dp_panel *dp_panel,
 		}
 
 		rc = sde_dsc_populate_dsc_private_params(&comp_info->dsc_info,
-				dp_mode->timing.h_active);
+				dp_mode->timing.h_active, dp_mode->timing.widebus_en);
 		if (rc) {
 			DP_DEBUG("failed populating other dsc params\n");
 			return;
