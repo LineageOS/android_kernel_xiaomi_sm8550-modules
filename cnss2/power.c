@@ -1415,13 +1415,21 @@ static int
 cnss_mbox_send_msg(struct cnss_plat_data *plat_priv, char *mbox_msg)
 {
 	struct qmp_pkt pkt;
+	int mbox_msg_size;
 	int ret = 0;
 
 	if (!plat_priv->mbox_chan)
 		return -ENODEV;
 
+	mbox_msg_size = strlen(mbox_msg) + 1;
+
+	if (mbox_msg_size > CNSS_MBOX_MSG_MAX_LEN) {
+		cnss_pr_err("message length greater than max length\n");
+		return -EINVAL;
+	}
+
 	cnss_pr_dbg("Sending AOP Mbox msg: %s\n", mbox_msg);
-	pkt.size = CNSS_MBOX_MSG_MAX_LEN;
+	pkt.size = mbox_msg_size;
 	pkt.data = mbox_msg;
 	ret = mbox_send_message(plat_priv->mbox_chan, &pkt);
 	if (ret < 0)
