@@ -464,7 +464,7 @@ int wcnss_prealloc_put(void *mem)
 		if (!cnss_pools[i].pool_ptrs) {
 			pr_err("%s mempool table is null\n",
 			       cnss_pools[i].name);
-			break;
+			return 0;
 		}
 		spin_lock_irqsave(&pool_table_lock, irq_flags);
 		ret = wcnss_free_pool_table_slot(cnss_pools[i], mem);
