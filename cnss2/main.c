@@ -700,6 +700,60 @@ bool cnss_audio_is_direct_link_supported(struct device *dev)
 }
 EXPORT_SYMBOL(cnss_audio_is_direct_link_supported);
 
+/**
+ * cnss_ipa_wlan_shared_smmu_supported: Check whether shared SMMU context bank
+ *                                      can be used between IPA and WLAN.
+ * @dev: Device
+ *
+ * Return: TRUE if supported, FALSE on failure or if not supported
+ */
+bool cnss_ipa_wlan_shared_smmu_supported(struct device *dev)
+{
+	struct cnss_plat_data *plat_priv = cnss_bus_dev_to_plat_priv(dev);
+	struct device_node *ipa_wlan_smmu_node;
+	struct device_node *cnss_iommu_group_node;
+	struct device_node *ipa_iommu_group_node;
+
+	if (!plat_priv) {
+		cnss_pr_err("plat_priv not available for IPA Shared CB cap\n");
+		return false;
+	}
+
+	ipa_wlan_smmu_node = of_find_compatible_node(NULL, NULL,
+						     "qcom,ipa-smmu-wlan-cb");
+	if (!ipa_wlan_smmu_node) {
+		cnss_pr_err("ipa-smmu-wlan-cb not enabled");
+		return false;
+	}
+
+	ipa_iommu_group_node = of_parse_phandle(ipa_wlan_smmu_node,
+						"qcom,iommu-group", 0);
+	of_node_put(ipa_wlan_smmu_node);
+
+	if (!ipa_iommu_group_node) {
+		cnss_pr_err("Unable to get ipa iommu group phandle");
+		return false;
+	}
+	of_node_put(ipa_iommu_group_node);
+
+	cnss_iommu_group_node = of_parse_phandle(dev->of_node,
+						 "qcom,iommu-group", 0);
+	if (!cnss_iommu_group_node) {
+		cnss_pr_err("Unable to get cnss iommu group phandle");
+		return false;
+	}
+	of_node_put(cnss_iommu_group_node);
+
+	if (cnss_iommu_group_node == ipa_iommu_group_node) {
+		plat_priv->ipa_shared_cb_enable = true;
+		cnss_pr_info("CNSS and IPA share IOMMU group");
+	} else {
+		cnss_pr_info("CNSS and IPA do not share IOMMU group");
+	}
+
+	return plat_priv->ipa_shared_cb_enable;
+}
+EXPORT_SYMBOL(cnss_ipa_wlan_shared_smmu_supported);
 
 void cnss_request_pm_qos(struct device *dev, u32 qos_val)
 {

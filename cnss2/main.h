@@ -649,6 +649,7 @@ struct cnss_plat_data {
 	bool no_bwscale;
 	bool sleep_clk;
 	struct wlchip_serial_id_v01 serial_id;
+	bool ipa_shared_cb_enable;
 };
 
 #if IS_ENABLED(CONFIG_ARCH_QCOM)
