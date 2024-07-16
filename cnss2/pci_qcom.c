@@ -139,6 +139,7 @@ static int cnss_pci_set_link_up(struct cnss_pci_data *pci_priv)
 static int cnss_pci_set_link_down(struct cnss_pci_data *pci_priv)
 {
 	struct pci_dev *pci_dev = pci_priv->pci_dev;
+	struct cnss_plat_data *plat_priv = pci_priv->plat_priv;
 	enum msm_pcie_pm_opt pm_ops;
 	u32 pm_options = PM_OPTIONS_DEFAULT;
 	int ret;
@@ -147,6 +148,10 @@ static int cnss_pci_set_link_down(struct cnss_pci_data *pci_priv)
 		cnss_pr_vdbg("Use PCIe DRV suspend\n");
 		pm_ops = MSM_PCIE_DRV_SUSPEND;
 	} else {
+		if (plat_priv && PCIE_SWITCH_NTN3 == plat_priv->pcie_switch_type) {
+			cnss_pr_dbg("Skip suspend from client side for pcie switch case\n");
+			return 0;
+		}
 		pm_ops = MSM_PCIE_SUSPEND;
 	}
 
