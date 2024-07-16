@@ -5275,8 +5275,32 @@ static struct platform_driver icnss_driver = {
 	},
 };
 
+/**
+ * icnss_has_valid_dt_node() - Check if valid device tree node present
+ *
+ * Valid device tree node means a node with "compatible" property from the
+ * device match table and "status" property is not disabled.
+ *
+ * Return: true if valid device tree node found, false if not found
+ */
+static bool icnss_has_valid_dt_node(void)
+{
+	struct device_node *dn = NULL;
+
+	for_each_matching_node(dn, icnss_dt_match) {
+		if (of_device_is_available(dn))
+			return true;
+	}
+
+	icnss_pr_info("No valid icnss2 dtsi entry\n");
+	return false;
+}
+
 static int __init icnss_initialize(void)
 {
+	if (!icnss_has_valid_dt_node())
+		return -ENODEV;
+
 	icnss_debug_init();
 	return platform_driver_register(&icnss_driver);
 }
