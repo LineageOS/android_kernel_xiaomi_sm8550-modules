@@ -5610,6 +5610,7 @@ deinit_misc:
 destroy_debugfs:
 	cnss_debugfs_destroy(plat_priv);
 deinit_dms:
+	cnss_cancel_dms_work();
 	cnss_dms_deinit(plat_priv);
 deinit_event_work:
 	cnss_event_work_deinit(plat_priv);
@@ -5642,10 +5643,10 @@ static int cnss_remove(struct platform_device *plat_dev)
 	cnss_bus_deinit(plat_priv);
 	cnss_misc_deinit(plat_priv);
 	cnss_debugfs_destroy(plat_priv);
+	cnss_cancel_dms_work();
 	cnss_dms_deinit(plat_priv);
 	cnss_qmi_deinit(plat_priv);
 	cnss_event_work_deinit(plat_priv);
-	cnss_cancel_dms_work();
 	cnss_remove_sysfs(plat_priv);
 	cnss_unregister_bus_scale(plat_priv);
 	cnss_unregister_esoc(plat_priv);
