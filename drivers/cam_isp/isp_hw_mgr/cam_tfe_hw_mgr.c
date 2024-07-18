@@ -187,7 +187,7 @@ static int cam_tfe_mgr_get_hw_caps_internal(void *hw_mgr_priv,
 	for (i = 0; i < CAM_TFE_CSID_HW_NUM_MAX; i++) {
 		if (!hw_mgr->csid_devices[i])
 			break;
-		if (query_isp->num_dev < i)
+		if (i >= query_isp->num_dev)
 			return -EINVAL;
 
 		query_isp->dev_caps[i].hw_type = CAM_ISP_TFE_HW_TFE;
