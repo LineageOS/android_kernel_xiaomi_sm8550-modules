@@ -115,7 +115,6 @@ uint64_t dynamic_feature_mask = ICNSS_DEFAULT_FEATURE_MASK;
 #define WLAN_EN_TEMP_THRESHOLD		5000
 #define WLAN_EN_DELAY			500
 
-#define ICNSS_RPROC_LEN			100
 static DEFINE_IDA(rd_minor_id);
 
 enum icnss_pdr_cause_index {
@@ -282,7 +281,7 @@ int icnss_driver_event_post(struct icnss_priv *priv,
 		return -EINVAL;
 	}
 
-	if (in_interrupt() || irqs_disabled())
+	if (in_interrupt() || !preemptible() || rcu_preempt_depth())
 		gfp = GFP_ATOMIC;
 
 	event = kzalloc(sizeof(*event), gfp);
@@ -1883,16 +1882,18 @@ static int icnss_subsys_restart_level(struct icnss_priv *priv, void *data)
 	int ret = 0;
 	struct icnss_subsys_restart_level_data *event_data = data;
 
-	if (!priv)
-		return -ENODEV;
-
 	if (!data)
 		return -EINVAL;
 
+	if (!priv) {
+		ret = -ENODEV;
+		goto out;
+	}
+
 	ret = wlfw_subsys_restart_level_msg(priv, event_data->restart_level);
 
+out:
 	kfree(data);
-
 	return ret;
 }
 
@@ -3102,7 +3103,8 @@ int __icnss_register_driver(struct icnss_driver_ops *ops,
 	struct icnss_priv *priv = icnss_get_plat_priv();
 
 	if (!priv || !priv->pdev) {
-		ret = -ENODEV;
+		icnss_pr_vdbg("icnss2 is not ready for register driver\n");
+		ret = -EAGAIN;
 		goto out;
 	}
 
@@ -4714,14 +4716,15 @@ static void rproc_restart_level_notifier(void *data, struct rproc *rproc)
 {
 	struct icnss_subsys_restart_level_data *restart_level_data;
 
-	icnss_pr_info("rproc name: %s recovery disable: %d",
-		      rproc->name, rproc->recovery_disabled);
+	icnss_pr_info("rproc name: %s(%zu) recovery disable: %d",
+		      rproc->name, strlen(rproc->name),
+		      rproc->recovery_disabled);
+	if (strnstr(rproc->name, "wpss", strlen(rproc->name))) {
+		restart_level_data = kzalloc(sizeof(*restart_level_data),
+					     GFP_ATOMIC);
+		if (!restart_level_data)
+			return;
 
-	restart_level_data = kzalloc(sizeof(*restart_level_data), GFP_ATOMIC);
-	if (!restart_level_data)
-		return;
-
-	if (strnstr(rproc->name, "wpss", ICNSS_RPROC_LEN)) {
 		if (rproc->recovery_disabled)
 			restart_level_data->restart_level = ICNSS_DISABLE_M3_SSR;
 		else
