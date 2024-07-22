@@ -132,6 +132,8 @@ int cnss_pci_set_dsp_link_status(struct cnss_pci_data *pci_priv,
 				 bool link_enable);
 int cnss_pci_get_dsp_link_status(struct cnss_pci_data *pci_priv);
 int cnss_pci_dsp_link_enable(struct cnss_pci_data *pci_priv);
+int cnss_pci_dsp_link_retrain(struct cnss_pci_data *pci_priv,
+			      u16 target_link_speed);
 #else
 int _cnss_pci_enumerate(struct cnss_plat_data *plat_priv, u32 rc_num)
 {
@@ -227,6 +229,12 @@ int cnss_pci_get_dsp_link_status(struct cnss_pci_data *pci_priv)
 }
 
 int cnss_pci_dsp_link_enable(struct cnss_pci_data *pci_priv)
+{
+	return -EOPNOTSUPP;
+}
+
+int cnss_pci_dsp_link_retrain(struct cnss_pci_data *pci_priv,
+			      u16 target_link_speed)
 {
 	return -EOPNOTSUPP;
 }

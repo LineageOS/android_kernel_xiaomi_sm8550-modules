@@ -466,6 +466,35 @@ int cnss_pci_dsp_link_enable(struct cnss_pci_data *pci_priv)
 
 	return ret;
 }
+
+#ifdef CONFIG_PCIE_SWITCH_RETRAIN_LINK_SUPPORT
+int cnss_pci_dsp_link_retrain(struct cnss_pci_data *pci_priv,
+			      u16 target_link_speed)
+{
+	int ret = 0;
+
+	if (!pci_priv)
+		return -ENODEV;
+
+	cnss_pr_dbg("Setting DSP <-> EP link speed:0x%x\n", target_link_speed);
+
+	ret = msm_pcie_retrain_port_link(pci_priv->pci_dev, target_link_speed);
+	if (ret) {
+		cnss_pr_err("Failed to retrain link, err = %d\n", ret);
+		return ret;
+	}
+
+	pci_priv->def_link_speed = target_link_speed;
+
+	return ret;
+}
+#else
+int cnss_pci_dsp_link_retrain(struct cnss_pci_data *pci_priv,
+			      u16 target_link_speed)
+{
+	return -EOPNOTSUPP;
+}
+#endif
 #else
 int cnss_pci_dsp_link_control(struct cnss_pci_data *pci_priv,
 			      bool link_enable)
@@ -485,6 +514,12 @@ int cnss_pci_get_dsp_link_status(struct cnss_pci_data *pci_priv)
 }
 
 int cnss_pci_dsp_link_enable(struct cnss_pci_data *pci_priv)
+{
+	return -EOPNOTSUPP;
+}
+
+int cnss_pci_dsp_link_retrain(struct cnss_pci_data *pci_priv,
+			      u16 target_link_speed)
 {
 	return -EOPNOTSUPP;
 }
