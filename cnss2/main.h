@@ -767,4 +767,6 @@ size_t cnss_get_platform_name(struct cnss_plat_data *plat_priv,
 			      char *buf, const size_t buf_len);
 int cnss_iommu_map(struct iommu_domain *domain, unsigned long iova,
 		   phys_addr_t paddr, size_t size, int prot);
+int cnss_select_pinctrl_enable(struct cnss_plat_data *plat_priv);
+int cnss_select_pinctrl_state(struct cnss_plat_data *plat_priv, bool state);
 #endif /* _CNSS_MAIN_H */

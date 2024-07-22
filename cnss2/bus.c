@@ -7,6 +7,7 @@
 #include "bus.h"
 #include "debug.h"
 #include "pci.h"
+#include "pci_platform.h"
 
 enum cnss_dev_bus_type cnss_get_dev_bus_type(struct device *dev)
 {
@@ -708,6 +709,68 @@ bool cnss_bus_is_smmu_s1_enabled(struct cnss_plat_data *plat_priv)
 		cnss_pr_err("Unsupported bus type: %d\n",
 			    plat_priv->bus_type);
 		return false;
+	}
+}
+
+int cnss_bus_dsp_link_control(struct cnss_plat_data *plat_priv,
+			      bool link_enable)
+{
+	if (!plat_priv || plat_priv->pcie_switch_type != PCIE_SWITCH_NTN3)
+		return -ENODEV;
+
+	switch (plat_priv->bus_type) {
+	case CNSS_BUS_PCI:
+		return cnss_pci_dsp_link_control(plat_priv->bus_priv, link_enable);
+	default:
+		cnss_pr_err("Unsupported bus type: %d\n",
+			    plat_priv->bus_type);
+		return -EINVAL;
+	}
+}
+
+int cnss_bus_set_dsp_link_status(struct cnss_plat_data *plat_priv,
+				 bool link_enable)
+{
+	if (!plat_priv || plat_priv->pcie_switch_type != PCIE_SWITCH_NTN3)
+		return -ENODEV;
+
+	switch (plat_priv->bus_type) {
+	case CNSS_BUS_PCI:
+		return cnss_pci_set_dsp_link_status(plat_priv->bus_priv, link_enable);
+	default:
+		cnss_pr_err("Unsupported bus type: %d\n",
+			    plat_priv->bus_type);
+		return -EINVAL;
+	}
+}
+
+int cnss_bus_get_dsp_link_status(struct cnss_plat_data *plat_priv)
+{
+	if (!plat_priv || plat_priv->pcie_switch_type != PCIE_SWITCH_NTN3)
+		return -ENODEV;
+
+	switch (plat_priv->bus_type) {
+	case CNSS_BUS_PCI:
+		return cnss_pci_get_dsp_link_status(plat_priv->bus_priv);
+	default:
+		cnss_pr_err("Unsupported bus type: %d\n",
+			    plat_priv->bus_type);
+		return -EINVAL;
+	}
+}
+
+int cnss_bus_dsp_link_enable(struct cnss_plat_data *plat_priv)
+{
+	if (!plat_priv || plat_priv->pcie_switch_type != PCIE_SWITCH_NTN3)
+		return -ENODEV;
+
+	switch (plat_priv->bus_type) {
+	case CNSS_BUS_PCI:
+		return cnss_pci_dsp_link_enable(plat_priv->bus_priv);
+	default:
+		cnss_pr_err("Unsupported bus type: %d\n",
+			    plat_priv->bus_type);
+		return -EINVAL;
 	}
 }
 
