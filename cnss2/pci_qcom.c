@@ -34,9 +34,32 @@ static struct cnss_msi_config msi_config_one_msi = {
 };
 #endif
 
+#define ENUM_RETRY_MAX_TIMES 8
+#define ENUM_RETRY_DELAY_MS 500
+
 int _cnss_pci_enumerate(struct cnss_plat_data *plat_priv, u32 rc_num)
 {
-	return msm_pcie_enumerate(rc_num);
+	u32 retry = 0;
+	int ret;
+
+	if (plat_priv->pcie_switch_type == PCIE_SWITCH_NTN3) {
+		while (retry++ < ENUM_RETRY_MAX_TIMES) {
+			ret = msm_pcie_enumerate(rc_num);
+			/* For PCIe switch platform, cnss_probe may called
+			 * before PCIe switch hardware ready, wait for
+			 * msm_pcie_enumerate complete.
+			 */
+			if (ret == -EPROBE_DEFER) {
+				cnss_pr_dbg("PCIe RC%d not ready, retry:%dth\n",
+					    rc_num, retry);
+				msleep(ENUM_RETRY_DELAY_MS);
+			}
+		}
+	} else {
+		return msm_pcie_enumerate(rc_num);
+	}
+
+	return ret;
 }
 
 int cnss_pci_assert_perst(struct cnss_pci_data *pci_priv)
