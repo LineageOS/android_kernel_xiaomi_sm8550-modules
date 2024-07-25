@@ -1426,6 +1426,8 @@ cnss_mbox_send_msg(struct cnss_plat_data *plat_priv, char *mbox_msg)
 	ret = mbox_send_message(plat_priv->mbox_chan, &pkt);
 	if (ret < 0)
 		cnss_pr_err("Failed to send AOP mbox msg: %s\n", mbox_msg);
+	else
+		ret = 0;
 
 	return ret;
 }
