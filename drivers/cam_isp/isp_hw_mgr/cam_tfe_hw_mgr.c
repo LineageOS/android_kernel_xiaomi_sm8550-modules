@@ -283,7 +283,8 @@ static int cam_tfe_mgr_get_hw_caps_v2(void *hw_mgr_priv,
 		return -EINVAL;
 	}
 
-	if (!tmp_query_isp_v2.num_dev) {
+	if (!tmp_query_isp_v2.num_dev ||
+			tmp_query_isp_v2.num_dev > CAM_TFE_CSID_HW_NUM_MAX) {
 		CAM_ERR(CAM_ISP, "Invalid Num of dev is %d query cap version %d",
 			tmp_query_isp_v2.num_dev, tmp_query_isp_v2.version);
 		rc = -EINVAL;
