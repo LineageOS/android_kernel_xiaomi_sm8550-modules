@@ -2215,12 +2215,14 @@ static int icnss_wpss_notifier_nb(struct notifier_block *nb,
 
 	switch (code) {
 	case QCOM_SSR_BEFORE_SHUTDOWN:
+		priv->notif_crashed = notif->crashed;
 		break;
 	case QCOM_SSR_AFTER_SHUTDOWN:
 		/* Collect ramdump only when there was a crash. */
-		if (notif->crashed) {
+		if (priv->notif_crashed) {
 			icnss_pr_info("Collecting msa0 segment dump\n");
 			icnss_msa0_ramdump(priv);
+			priv->notif_crashed = false;
 		}
 		goto out;
 	default:

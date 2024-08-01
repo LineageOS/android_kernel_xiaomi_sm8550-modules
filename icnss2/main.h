@@ -440,6 +440,7 @@ struct icnss_priv {
 	void *modem_notify_handler;
 	void *wpss_notify_handler;
 	void *wpss_early_notify_handler;
+	bool notif_crashed;
 	struct notifier_block modem_ssr_nb;
 	struct notifier_block wpss_ssr_nb;
 	struct notifier_block wpss_early_ssr_nb;
