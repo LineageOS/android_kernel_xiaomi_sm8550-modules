@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/debugfs.h>
@@ -5012,6 +5012,14 @@ static int __cam_isp_ctx_dump_in_top_state(
 	struct cam_hw_cmd_args              hw_cmd_args;
 	struct cam_isp_hw_cmd_args          isp_hw_cmd_args;
 
+	rc  = cam_mem_get_cpu_buf(dump_info->buf_handle,
+		&cpu_addr, &buf_len);
+	if (rc) {
+		CAM_ERR(CAM_ISP, "Invalid handle %u rc %d, ctx_idx: %u, link: 0x%x",
+			dump_info->buf_handle, rc, ctx->ctx_id, ctx->link_hdl);
+		return rc;
+	}
+
 	spin_lock_bh(&ctx->lock);
 
 	ctx_isp = (struct cam_isp_context *) ctx->ctx_priv;
@@ -5034,14 +5042,6 @@ static int __cam_isp_ctx_dump_in_top_state(
 	}
 	goto end;
 hw_dump:
-	rc  = cam_mem_get_cpu_buf(dump_info->buf_handle,
-		&cpu_addr, &buf_len);
-	if (rc) {
-		CAM_ERR(CAM_ISP, "Invalid handle %u rc %d",
-			dump_info->buf_handle, rc);
-		spin_unlock_bh(&ctx->lock);
-		return rc;
-	}
 	if (buf_len <= dump_info->offset) {
 		spin_unlock_bh(&ctx->lock);
 		CAM_WARN(CAM_ISP, "Dump buffer overshoot len %zu offset %zu",
