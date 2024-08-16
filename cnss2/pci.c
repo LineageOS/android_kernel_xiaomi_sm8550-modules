@@ -7255,9 +7255,6 @@ static int cnss_pci_register_mhi(struct cnss_pci_data *pci_priv)
 	if (cnss_pci_get_drv_supported(pci_priv))
 		cnss_mhi_controller_set_base(pci_priv, bar_start);
 
-	cnss_get_bwscal_info(plat_priv);
-	cnss_pr_dbg("no_bwscale: %d\n", plat_priv->no_bwscale);
-
 	/* BW scale CB needs to be set after registering MHI per requirement */
 	if (!plat_priv->no_bwscale)
 		cnss_mhi_controller_set_bw_scale_cb(pci_priv,
@@ -7607,8 +7604,11 @@ cnss_pci_restore_rc_speed(struct cnss_pci_data *pci_priv)
 		/* do nothing, keep Gen1*/
 		return;
 	case QCA6490_DEVICE_ID:
-		/* restore to Gen2 */
-		link_speed = PCI_EXP_LNKSTA_CLS_5_0GB;
+		if (plat_priv->no_bwscale)
+			link_speed = 0;
+		else
+			/* restore to Gen2 */
+			link_speed = PCI_EXP_LNKSTA_CLS_5_0GB;
 		break;
 	default:
 		/* The request 0 will reset maximum GEN speed to default */
@@ -7713,13 +7713,15 @@ static int cnss_pci_probe(struct pci_dev *pci_dev,
 	if (plat_priv->use_pm_domain)
 		dev->pm_domain = &cnss_pm_domain;
 
-	cnss_pci_restore_rc_speed(pci_priv);
-
 	ret = cnss_pci_get_dev_cfg_node(plat_priv);
 	if (ret) {
 		cnss_pr_err("Failed to get device cfg node, err = %d\n", ret);
 		goto reset_ctx;
 	}
+
+	cnss_get_bwscal_info(plat_priv);
+	cnss_pr_dbg("no_bwscale: %d\n", plat_priv->no_bwscale);
+	cnss_pci_restore_rc_speed(pci_priv);
 
 	cnss_get_sleep_clk_supported(plat_priv);
 
