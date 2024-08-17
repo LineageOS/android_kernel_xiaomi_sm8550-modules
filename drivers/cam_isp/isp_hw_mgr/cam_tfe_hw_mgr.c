@@ -187,7 +187,7 @@ static int cam_tfe_mgr_get_hw_caps_internal(void *hw_mgr_priv,
 	for (i = 0; i < CAM_TFE_CSID_HW_NUM_MAX; i++) {
 		if (!hw_mgr->csid_devices[i])
 			break;
-		if (query_isp->num_dev < i)
+		if (i >= query_isp->num_dev)
 			return -EINVAL;
 
 		query_isp->dev_caps[i].hw_type = CAM_ISP_TFE_HW_TFE;
@@ -283,7 +283,8 @@ static int cam_tfe_mgr_get_hw_caps_v2(void *hw_mgr_priv,
 		return -EINVAL;
 	}
 
-	if (!tmp_query_isp_v2.num_dev) {
+	if (!tmp_query_isp_v2.num_dev ||
+			tmp_query_isp_v2.num_dev > CAM_TFE_CSID_HW_NUM_MAX) {
 		CAM_ERR(CAM_ISP, "Invalid Num of dev is %d query cap version %d",
 			tmp_query_isp_v2.num_dev, tmp_query_isp_v2.version);
 		rc = -EINVAL;
