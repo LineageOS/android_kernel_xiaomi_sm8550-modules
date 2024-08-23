@@ -436,8 +436,8 @@ int icnss_vreg_unvote(struct icnss_priv *priv)
 	return 0;
 }
 
-int icnss_get_clk_single(struct icnss_priv *priv,
-			 struct icnss_clk_info *clk_info)
+static int icnss_get_clk_single(struct icnss_priv *priv,
+				struct icnss_clk_info *clk_info)
 {
 	struct device *dev = &priv->pdev->dev;
 	struct clk *clk;

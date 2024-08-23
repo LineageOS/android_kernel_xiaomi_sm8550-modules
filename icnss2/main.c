@@ -413,6 +413,217 @@ bool icnss_is_fw_ready(void)
 }
 EXPORT_SYMBOL(icnss_is_fw_ready);
 
+#if IS_ENABLED(CONFIG_INTERCONNECT)
+/**
+ * icnss_register_bus_scale() - Setup interconnect voting data
+ * @plat_priv: Platform data structure
+ *
+ * For different interconnect path configured in device tree setup voting data
+ * for list of bandwidth requirements.
+ *
+ * Result: 0 for success. -EINVAL if not configured
+ */
+static int icnss_register_bus_scale(struct icnss_priv *plat_priv)
+{
+	int ret = -EINVAL;
+	u32 idx, i, j, cfg_arr_size, *cfg_arr = NULL;
+	struct icnss_bus_bw_info *bus_bw_info, *tmp;
+	struct device *dev = &plat_priv->pdev->dev;
+
+	INIT_LIST_HEAD(&plat_priv->icc.list_head);
+	ret = of_property_read_u32(dev->of_node,
+				   "qcom,icc-path-count",
+				   &plat_priv->icc.path_count);
+	if (ret) {
+		icnss_pr_dbg("Platform Bus Interconnect path not configured\n");
+		return 0;
+	}
+
+	ret = of_property_read_u32(plat_priv->pdev->dev.of_node,
+				   "qcom,bus-bw-cfg-count",
+				   &plat_priv->icc.bus_bw_cfg_count);
+	if (ret) {
+		icnss_pr_err("Failed to get Bus BW Config table size\n");
+		goto cleanup;
+	}
+
+	cfg_arr_size = plat_priv->icc.path_count *
+			plat_priv->icc.bus_bw_cfg_count * ICNSS_ICC_VOTE_MAX;
+	cfg_arr = kcalloc(cfg_arr_size, sizeof(*cfg_arr), GFP_KERNEL);
+	if (!cfg_arr) {
+		icnss_pr_err("Failed to alloc cfg table mem\n");
+		ret = -ENOMEM;
+		goto cleanup;
+	}
+
+	ret = of_property_read_u32_array(plat_priv->pdev->dev.of_node,
+					 "qcom,bus-bw-cfg", cfg_arr,
+					 cfg_arr_size);
+	if (ret) {
+		icnss_pr_err("Invalid Bus BW Config Table\n");
+		goto cleanup;
+	}
+
+	icnss_pr_dbg("ICC Path_Count: %d BW_CFG_Count: %d\n",
+		     plat_priv->icc.path_count,
+		     plat_priv->icc.bus_bw_cfg_count);
+
+	for (idx = 0; idx < plat_priv->icc.path_count; idx++) {
+		bus_bw_info = devm_kzalloc(dev, sizeof(*bus_bw_info),
+					   GFP_KERNEL);
+		if (!bus_bw_info) {
+			ret = -ENOMEM;
+			goto out;
+		}
+
+		ret = of_property_read_string_index(dev->of_node,
+						    "interconnect-names", idx,
+						    &bus_bw_info->icc_name);
+		if (ret)
+			goto out;
+
+		bus_bw_info->icc_path =
+			of_icc_get(&plat_priv->pdev->dev,
+				   bus_bw_info->icc_name);
+
+		if (IS_ERR(bus_bw_info->icc_path))  {
+			ret = PTR_ERR(bus_bw_info->icc_path);
+			if (ret != -EPROBE_DEFER) {
+				icnss_pr_err("Failed to get Interconnect path for %s. Err: %d\n",
+					     bus_bw_info->icc_name, ret);
+				goto out;
+			}
+		}
+
+		bus_bw_info->cfg_table =
+			devm_kcalloc(dev, plat_priv->icc.bus_bw_cfg_count,
+				     sizeof(*bus_bw_info->cfg_table),
+				     GFP_KERNEL);
+		if (!bus_bw_info->cfg_table) {
+			ret = -ENOMEM;
+			goto out;
+		}
+
+		icnss_pr_dbg("ICC Vote CFG for path: %s\n",
+			     bus_bw_info->icc_name);
+
+		for (i = 0, j = (idx * plat_priv->icc.bus_bw_cfg_count *
+		     ICNSS_ICC_VOTE_MAX);
+		     i < plat_priv->icc.bus_bw_cfg_count;
+		     i++, j += 2) {
+			bus_bw_info->cfg_table[i].avg_bw = cfg_arr[j];
+			bus_bw_info->cfg_table[i].peak_bw = cfg_arr[j + 1];
+
+			icnss_pr_dbg("ICC Vote BW: %d avg: %d peak: %d\n",
+				     i, bus_bw_info->cfg_table[i].avg_bw,
+				     bus_bw_info->cfg_table[i].peak_bw);
+		}
+		list_add_tail(&bus_bw_info->list,
+			      &plat_priv->icc.list_head);
+	}
+	kfree(cfg_arr);
+	return 0;
+out:
+	list_for_each_entry_safe(bus_bw_info, tmp,
+				 &plat_priv->icc.list_head, list) {
+		list_del(&bus_bw_info->list);
+	}
+cleanup:
+	kfree(cfg_arr);
+	memset(&plat_priv->icc, 0, sizeof(plat_priv->icc));
+	return ret;
+}
+
+static void icnss_unregister_bus_scale(struct icnss_priv *plat_priv)
+{
+	struct icnss_bus_bw_info *bus_bw_info, *tmp;
+
+	list_for_each_entry_safe(bus_bw_info, tmp,
+				 &plat_priv->icc.list_head, list) {
+		list_del(&bus_bw_info->list);
+		if (bus_bw_info->icc_path)
+			icc_put(bus_bw_info->icc_path);
+	}
+	memset(&plat_priv->icc, 0, sizeof(plat_priv->icc));
+}
+
+/**
+ * icnss_setup_bus_bandwidth() - Setup interconnect vote for given bandwidth
+ * @plat_priv: Platform private data struct
+ * @bw: bandwidth
+ * @save: toggle flag to save bandwidth to current_bw_vote
+ *
+ * Setup bandwidth votes for configured interconnect paths
+ *
+ * Return: 0 for success
+ */
+static int icnss_setup_bus_bandwidth(struct icnss_priv *plat_priv,
+				     u32 bw, bool save)
+{
+	int ret = 0;
+	struct icnss_bus_bw_info *bus_bw_info;
+
+	if (!plat_priv->icc.path_count)
+		return -EOPNOTSUPP;
+
+	if (bw >= plat_priv->icc.bus_bw_cfg_count) {
+		icnss_pr_err("Invalid bus bandwidth Type: %d", bw);
+		return -EINVAL;
+	}
+
+	list_for_each_entry(bus_bw_info, &plat_priv->icc.list_head, list) {
+		ret = icc_set_bw(bus_bw_info->icc_path,
+				 bus_bw_info->cfg_table[bw].avg_bw,
+				 bus_bw_info->cfg_table[bw].peak_bw);
+		if (ret) {
+			icnss_pr_err("Could not set BW Cfg: %d, err = %d ICC Path: %s Val: %d %d\n",
+				     bw, ret, bus_bw_info->icc_name,
+				     bus_bw_info->cfg_table[bw].avg_bw,
+				     bus_bw_info->cfg_table[bw].peak_bw);
+			break;
+		}
+	}
+
+	if (ret == 0 && save)
+		plat_priv->icc.current_bw_vote = bw;
+
+	return ret;
+}
+
+int icnss_request_bus_bandwidth(struct device *dev, int bandwidth)
+{
+	struct icnss_priv *plat_priv = dev_get_drvdata(dev);
+
+	if (!plat_priv)
+		return -ENODEV;
+
+	if (bandwidth < 0)
+		return -EINVAL;
+
+	return icnss_setup_bus_bandwidth(plat_priv, (u32)bandwidth, true);
+}
+
+#else
+static int icnss_register_bus_scale(struct icnss_priv *plat_priv)
+{
+	return 0;
+}
+
+static void icnss_unregister_bus_scale(struct icnss_priv *plat_priv) {}
+
+static int icnss_setup_bus_bandwidth(struct icnss_priv *plat_priv,
+				     u32 bw, bool save)
+{
+	return 0;
+}
+
+int icnss_request_bus_bandwidth(struct device *dev, int bandwidth)
+{
+	return 0;
+}
+#endif /* CONFIG_INTERCONNECT */
+EXPORT_SYMBOL(icnss_request_bus_bandwidth);
+
 void icnss_block_shutdown(bool status)
 {
 	if (!penv)
@@ -1309,7 +1520,7 @@ static int icnss_driver_event_fw_init_done(struct icnss_priv *priv, void *data)
 	return ret;
 }
 
-int icnss_alloc_qdss_mem(struct icnss_priv *priv)
+static int icnss_alloc_qdss_mem(struct icnss_priv *priv)
 {
 	struct platform_device *pdev = priv->pdev;
 	struct icnss_fw_mem *qdss_mem = priv->qdss_mem;
@@ -1642,8 +1853,8 @@ static int icnss_fw_crashed(struct icnss_priv *priv,
 	return 0;
 }
 
-int icnss_update_hang_event_data(struct icnss_priv *priv,
-				 struct icnss_uevent_hang_data *hang_data)
+static int icnss_update_hang_event_data(struct icnss_priv *priv,
+					struct icnss_uevent_hang_data *hang_data)
 {
 	if (!priv->hang_event_data_va)
 		return -EINVAL;
@@ -1661,7 +1872,7 @@ int icnss_update_hang_event_data(struct icnss_priv *priv,
 	return 0;
 }
 
-int icnss_send_hang_event_data(struct icnss_priv *priv)
+static int icnss_send_hang_event_data(struct icnss_priv *priv)
 {
 	struct icnss_uevent_hang_data hang_data = {0};
 	int ret = 0xFF;
@@ -2215,12 +2426,14 @@ static int icnss_wpss_notifier_nb(struct notifier_block *nb,
 
 	switch (code) {
 	case QCOM_SSR_BEFORE_SHUTDOWN:
+		priv->notif_crashed = notif->crashed;
 		break;
 	case QCOM_SSR_AFTER_SHUTDOWN:
 		/* Collect ramdump only when there was a crash. */
-		if (notif->crashed) {
+		if (priv->notif_crashed) {
 			icnss_pr_info("Collecting msa0 segment dump\n");
 			icnss_msa0_ramdump(priv);
+			priv->notif_crashed = false;
 		}
 		goto out;
 	default:
@@ -2745,7 +2958,7 @@ fail_alloc_major:
 	return ret;
 }
 
-void *icnss_create_ramdump_device(struct icnss_priv *priv, const char *dev_name)
+static void *icnss_create_ramdump_device(struct icnss_priv *priv, const char *dev_name)
 {
 	int ret = 0;
 	struct icnss_ramdump_info *ramdump_info;
@@ -3759,14 +3972,14 @@ struct iommu_domain *icnss_smmu_get_domain(struct device *dev)
 EXPORT_SYMBOL(icnss_smmu_get_domain);
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0))
-int icnss_iommu_map(struct iommu_domain *domain,
-				   unsigned long iova, phys_addr_t paddr, size_t size, int prot)
+static int icnss_iommu_map(struct iommu_domain *domain,
+			   unsigned long iova, phys_addr_t paddr, size_t size, int prot)
 {
 		return iommu_map(domain, iova, paddr, size, prot);
 }
 #else
-int icnss_iommu_map(struct iommu_domain *domain,
-				   unsigned long iova, phys_addr_t paddr, size_t size, int prot)
+static int icnss_iommu_map(struct iommu_domain *domain,
+			   unsigned long iova, phys_addr_t paddr, size_t size, int prot)
 {
 		return iommu_map(domain, iova, paddr, size, prot, GFP_KERNEL);
 }
@@ -4815,9 +5028,13 @@ static int icnss_probe(struct platform_device *pdev)
 	if (ret)
 		goto out_free_resources;
 
-	ret = icnss_smmu_dt_parse(priv);
+	ret = icnss_register_bus_scale(priv);
 	if (ret)
 		goto out_free_resources;
+
+	ret = icnss_smmu_dt_parse(priv);
+	if (ret)
+		goto unreg_bus_scale;
 
 	spin_lock_init(&priv->event_lock);
 	spin_lock_init(&priv->on_off_lock);
@@ -4919,6 +5136,8 @@ out_destroy_wq:
 	destroy_workqueue(priv->event_wq);
 smmu_cleanup:
 	priv->iommu_domain = NULL;
+unreg_bus_scale:
+	icnss_unregister_bus_scale(priv);
 out_free_resources:
 	icnss_put_resources(priv);
 out_reset_drvdata:
@@ -4927,7 +5146,7 @@ out_reset_drvdata:
 	return ret;
 }
 
-void icnss_destroy_ramdump_device(struct icnss_ramdump_info *ramdump_info)
+static void icnss_destroy_ramdump_device(struct icnss_ramdump_info *ramdump_info)
 {
 
 	if (IS_ERR_OR_NULL(ramdump_info))
@@ -5275,8 +5494,32 @@ static struct platform_driver icnss_driver = {
 	},
 };
 
+/**
+ * icnss_has_valid_dt_node() - Check if valid device tree node present
+ *
+ * Valid device tree node means a node with "compatible" property from the
+ * device match table and "status" property is not disabled.
+ *
+ * Return: true if valid device tree node found, false if not found
+ */
+static bool icnss_has_valid_dt_node(void)
+{
+	struct device_node *dn = NULL;
+
+	for_each_matching_node(dn, icnss_dt_match) {
+		if (of_device_is_available(dn))
+			return true;
+	}
+
+	icnss_pr_info("No valid icnss2 dtsi entry\n");
+	return false;
+}
+
 static int __init icnss_initialize(void)
 {
+	if (!icnss_has_valid_dt_node())
+		return -ENODEV;
+
 	icnss_debug_init();
 	return platform_driver_register(&icnss_driver);
 }

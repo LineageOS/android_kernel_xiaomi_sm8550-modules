@@ -189,6 +189,7 @@ extern int icnss_wlan_disable(struct device *dev, enum icnss_driver_mode mode);
 extern void icnss_enable_irq(struct device *dev, unsigned int ce_id);
 extern void icnss_disable_irq(struct device *dev, unsigned int ce_id);
 extern int icnss_get_soc_info(struct device *dev, struct icnss_soc_info *info);
+extern int icnss_request_bus_bandwidth(struct device *dev, int bandwidth);
 extern int icnss_ce_free_irq(struct device *dev, unsigned int ce_id, void *ctx);
 extern int icnss_ce_request_irq(struct device *dev, unsigned int ce_id,
 	irqreturn_t (*handler)(int, void *),

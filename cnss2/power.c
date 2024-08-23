@@ -19,6 +19,7 @@
 #include "debug.h"
 #include "bus.h"
 #include <linux/soc/qcom/qcom_aoss.h>
+#include "pci_platform.h"
 
 #if IS_ENABLED(CONFIG_ARCH_QCOM)
 static struct cnss_vreg_cfg cnss_vreg_list[] = {
@@ -1008,8 +1009,8 @@ retry_gpio_req:
 	gpio_free(xo_clk_gpio);
 }
 
-static int cnss_select_pinctrl_state(struct cnss_plat_data *plat_priv,
-				     bool state)
+int cnss_select_pinctrl_state(struct cnss_plat_data *plat_priv,
+			      bool state)
 {
 	int ret = 0;
 	struct cnss_pinctrl_info *pinctrl_info;
@@ -1105,7 +1106,7 @@ out:
  *
  * Return: Status of pinctrl select operation. 0 - Success.
  */
-static int cnss_select_pinctrl_enable(struct cnss_plat_data *plat_priv)
+int cnss_select_pinctrl_enable(struct cnss_plat_data *plat_priv)
 {
 	int ret = 0, bt_en_gpio = plat_priv->pinctrl_info.bt_en_gpio;
 	u8 wlan_en_state = 0;
@@ -1157,6 +1158,7 @@ int cnss_get_input_gpio_value(struct cnss_plat_data *plat_priv, int gpio_num)
 int cnss_power_on_device(struct cnss_plat_data *plat_priv, bool reset)
 {
 	int ret = 0;
+	int dsp_link_status = -1;
 
 	if (plat_priv->powered_on) {
 		cnss_pr_dbg("Already powered up");
@@ -1168,6 +1170,12 @@ int cnss_power_on_device(struct cnss_plat_data *plat_priv, bool reset)
 		cnss_pr_dbg("Avoid WLAN Power On. WLAN HW Disbaled");
 		return -EINVAL;
 	}
+
+	/* For PCIe switch platform, disable DSP downstream link before power
+	 * on/off wlan device to avoid uncorrectable AER erro on DSP side.
+	 */
+	cnss_bus_set_dsp_link_status(plat_priv, true);
+	cnss_bus_dsp_link_control(plat_priv, false);
 
 	ret = cnss_vreg_on_type(plat_priv, CNSS_VREG_PRIM);
 	if (ret) {
@@ -1207,6 +1215,17 @@ int cnss_power_on_device(struct cnss_plat_data *plat_priv, bool reset)
 		goto clk_off;
 	}
 
+	/* For PCIe switch platform, wait for link train of DSP<->WLAN complete
+	 */
+	dsp_link_status = cnss_bus_get_dsp_link_status(plat_priv);
+	if (dsp_link_status == PCI_DSP_LINK_DISABLE) {
+		ret = cnss_bus_dsp_link_enable(plat_priv);
+		if (ret) {
+			cnss_pr_err("Failed to enable bus dsp link, err = %d\n", ret);
+			goto clk_off;
+		}
+	}
+
 	plat_priv->powered_on = true;
 	clear_bit(CNSS_POWER_OFF, &plat_priv->driver_state);
 	cnss_enable_dev_sol_irq(plat_priv);
@@ -1229,6 +1248,7 @@ void cnss_power_off_device(struct cnss_plat_data *plat_priv)
 		return;
 	}
 
+	cnss_bus_dsp_link_control(plat_priv, false);
 	set_bit(CNSS_POWER_OFF, &plat_priv->driver_state);
 	cnss_bus_shutdown_cleanup(plat_priv);
 	cnss_disable_dev_sol_irq(plat_priv);
@@ -1415,17 +1435,27 @@ static int
 cnss_mbox_send_msg(struct cnss_plat_data *plat_priv, char *mbox_msg)
 {
 	struct qmp_pkt pkt;
+	int mbox_msg_size;
 	int ret = 0;
 
 	if (!plat_priv->mbox_chan)
 		return -ENODEV;
 
+	mbox_msg_size = strlen(mbox_msg) + 1;
+
+	if (mbox_msg_size > CNSS_MBOX_MSG_MAX_LEN) {
+		cnss_pr_err("message length greater than max length\n");
+		return -EINVAL;
+	}
+
 	cnss_pr_dbg("Sending AOP Mbox msg: %s\n", mbox_msg);
-	pkt.size = CNSS_MBOX_MSG_MAX_LEN;
+	pkt.size = mbox_msg_size;
 	pkt.data = mbox_msg;
 	ret = mbox_send_message(plat_priv->mbox_chan, &pkt);
 	if (ret < 0)
 		cnss_pr_err("Failed to send AOP mbox msg: %s\n", mbox_msg);
+	else
+		ret = 0;
 
 	return ret;
 }
