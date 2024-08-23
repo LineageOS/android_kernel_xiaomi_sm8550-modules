@@ -4366,6 +4366,14 @@ static int cnss_pci_runtime_suspend(struct device *dev)
 	if (!plat_priv)
 		return -EAGAIN;
 
+	/* RuntimePM is not fully supported yet on PCIe switch platform.
+	 * Disable runtimePM for now.
+	 */
+	if (plat_priv->pcie_switch_type == PCIE_SWITCH_NTN3) {
+		cnss_pr_dbg("PCIe switch platform, reject RTPM\n");
+		return -EAGAIN;
+	}
+
 	if (!cnss_is_device_powered_on(pci_priv->plat_priv))
 		return -EAGAIN;
 
