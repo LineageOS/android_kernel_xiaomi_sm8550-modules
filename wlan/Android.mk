@@ -8,6 +8,7 @@ RMNET_WLAN_DLKM_PLATFORMS_LIST += kalama
 RMNET_WLAN_DLKM_PLATFORMS_LIST += bengal
 RMNET_WLAN_DLKM_PLATFORMS_LIST += monaco
 RMNET_WLAN_DLKM_PLATFORMS_LIST += crow
+RMNET_WLAN_DLKM_PLATFORMS_LIST += trinket
 
 ifeq ($(call is-board-platform-in-list, $(RMNET_WLAN_DLKM_PLATFORMS_LIST)),true)
 LOCAL_PATH := $(call my-dir)
