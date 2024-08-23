@@ -1653,6 +1653,26 @@ out:
 	return ret;
 }
 
+#define PCIE_SWITCH_CONFIG_SPACE_ACCESS_TIMEOUT 2000
+#define PCIE_SWITCH_CONFIG_SPACE_ACCESS_DELAY 20
+static int cnss_pci_set_power_state(struct cnss_pci_data *pci_priv,
+				    pci_power_t state)
+{
+	int timeout = PCIE_SWITCH_CONFIG_SPACE_ACCESS_TIMEOUT;
+	int ret;
+
+	do {
+		ret = pci_set_power_state(pci_priv->pci_dev, state);
+		if (ret == 0)
+			break;
+
+		msleep(PCIE_SWITCH_CONFIG_SPACE_ACCESS_DELAY);
+		timeout -= PCIE_SWITCH_CONFIG_SPACE_ACCESS_DELAY;
+	} while (timeout > 0);
+
+	return ret;
+}
+
 int cnss_resume_pci_link(struct cnss_pci_data *pci_priv)
 {
 	int ret = 0;
@@ -1676,7 +1696,7 @@ int cnss_resume_pci_link(struct cnss_pci_data *pci_priv)
 	pci_priv->pci_link_state = PCI_LINK_UP;
 
 	if (pci_priv->pci_dev->device != QCA6174_DEVICE_ID) {
-		ret = pci_set_power_state(pci_priv->pci_dev, PCI_D0);
+		ret = cnss_pci_set_power_state(pci_priv, PCI_D0);
 		if (ret) {
 			cnss_pr_err("Failed to set D0, err = %d\n", ret);
 			goto out;
