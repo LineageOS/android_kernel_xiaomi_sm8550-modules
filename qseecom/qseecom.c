@@ -8116,10 +8116,12 @@ long qseecom_ioctl(struct file *file,
 		break;
 	}
 	case QSEECOM_IOCTL_PERF_ENABLE_REQ:{
+		mutex_lock(&app_access_lock);
 		if ((data->type != QSEECOM_GENERIC) &&
 			(data->type != QSEECOM_CLIENT_APP)) {
 			pr_err("perf enable req: invalid handle (%d)\n",
 								data->type);
+			mutex_unlock(&app_access_lock);
 			ret = -EINVAL;
 			break;
 		}
@@ -8127,6 +8129,7 @@ long qseecom_ioctl(struct file *file,
 			(data->client.app_id == 0)) {
 			pr_err("perf enable req:invalid handle(%d) appid(%d)\n",
 					data->type, data->client.app_id);
+			mutex_unlock(&app_access_lock);
 			ret = -EINVAL;
 			break;
 		}
@@ -8141,13 +8144,16 @@ long qseecom_ioctl(struct file *file,
 				pr_err("Fail to vote for clocks %d\n", ret);
 		}
 		atomic_dec(&data->ioctl_count);
+		mutex_unlock(&app_access_lock);
 		break;
 	}
 	case QSEECOM_IOCTL_PERF_DISABLE_REQ:{
+		mutex_lock(&app_access_lock);
 		if ((data->type != QSEECOM_SECURE_SERVICE) &&
 			(data->type != QSEECOM_CLIENT_APP)) {
 			pr_err("perf disable req: invalid handle (%d)\n",
 								data->type);
+			mutex_unlock(&app_access_lock);
 			ret = -EINVAL;
 			break;
 		}
@@ -8155,6 +8161,7 @@ long qseecom_ioctl(struct file *file,
 			(data->client.app_id == 0)) {
 			pr_err("perf disable: invalid handle (%d)app_id(%d)\n",
 					data->type, data->client.app_id);
+			mutex_unlock(&app_access_lock);
 			ret = -EINVAL;
 			break;
 		}
@@ -8168,6 +8175,7 @@ long qseecom_ioctl(struct file *file,
 			mutex_unlock(&qsee_bw_mutex);
 		}
 		atomic_dec(&data->ioctl_count);
+		mutex_unlock(&app_access_lock);
 		break;
 	}
 
@@ -8177,16 +8185,19 @@ long qseecom_ioctl(struct file *file,
 			pr_debug("crypto clock is not handled by HLOS\n");
 			break;
 		}
+		mutex_lock(&app_access_lock);
 		if ((data->client.app_id == 0) ||
 			(data->type != QSEECOM_CLIENT_APP)) {
 			pr_err("set bus scale: invalid handle (%d) appid(%d)\n",
 					data->type, data->client.app_id);
+			mutex_unlock(&app_access_lock);
 			ret = -EINVAL;
 			break;
 		}
 		atomic_inc(&data->ioctl_count);
 		ret = qseecom_scale_bus_bandwidth(data, argp);
 		atomic_dec(&data->ioctl_count);
+		mutex_unlock(&app_access_lock);
 		break;
 	}
 	case QSEECOM_IOCTL_LOAD_EXTERNAL_ELF_REQ: {
