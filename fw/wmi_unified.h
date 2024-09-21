@@ -3520,6 +3520,11 @@ typedef struct {
 #define WMI_TARGET_CAP_QDATA_TX_LCE_FILTER_SUPPORT_SET(target_cap_flags, value)\
     WMI_SET_BITS(target_cap_flags, 15, 1, value)
 
+#define WMI_TARGET_CAP_MPDU_STATS_PER_TX_NSS_SUPPORT_GET(target_cap_flags) \
+    WMI_GET_BITS(target_cap_flags, 16, 1)
+#define WMI_TARGET_CAP_MPDU_STATS_PER_TX_NSS_SUPPORT_SET(target_cap_flags, value)\
+    WMI_SET_BITS(target_cap_flags, 16, 1, value)
+
 
 /*
  * wmi_htt_msdu_idx_to_htt_msdu_qtype GET/SET APIs
@@ -3666,7 +3671,8 @@ typedef struct {
      * Bit 13 - Support for multipass SAP
      * Bit 14 - Support for ML monitor mode
      * Bit 15 - Support for Qdata Tx LCE filter installation
-     * Bits 31:16 - Reserved
+     * Bit 16 - Support for MPDU stats per tx Nss capability
+     * Bits 31:17 - Reserved
      */
     A_UINT32 target_cap_flags;
 
@@ -24071,6 +24077,7 @@ typedef enum event_type_e {
     WOW_RTT_11AZ_EVENT,                   /* 32 + 13 */
     WOW_P2P_NOA_EVENT,                    /* 32 + 14 */
     WOW_XGAP_EVENT,                       /* 32 + 15 */
+    WOW_PAGE_FAULT_EVENT,                 /* 32 + 16 */
 } WOW_WAKE_EVENT_TYPE;
 
 typedef enum wake_reason_e {
@@ -24166,6 +24173,10 @@ typedef enum wake_reason_e {
     WOW_REASON_STX_WOW_HIGH_DUTY_CYCLE,
     /* WoW exit reason MCC lite */
     WOW_REASON_MCC_LITE,
+    /* P2P CLI detected BMISS from DFS master AP */
+    WOW_REASON_P2P_CLI_DFS_AP_BMISS_DETECTED,
+    /* if Page Fault blocking feature enabled and PF observed under WoW */
+    WOW_REASON_PF_BLOCKING_LAST_TIME,
 
     /* add new WOW_REASON_ defs before this line */
     WOW_REASON_MAX,
@@ -25849,6 +25860,11 @@ typedef enum
      */
     WMI_VENDOR_OUI_ACTION_FORCE_MLSR = 14,
 
+    /*
+     * Disable AUX learning and AUX listen if OUI matches
+     */
+    WMI_VENDOR_OUI_ACTION_DISABLE_AUXL = 15,
+
 
     /* Add any action before this line */
     WMI_VENDOR_OUI_ACTION_MAX_ACTION_ID
@@ -27491,16 +27507,19 @@ typedef struct
     A_UINT32 isLastResult;  /*is this event a last event of the whole batch scan*/
 }  wmi_batch_scan_result_event_fixed_param;
 
-typedef enum {
+typedef enum { /* DEPRECATED - DO NOT USE */
     /** beacons not received from P2P GO */
     WMI_P2P_GO_BMISS = 0,
     /** beacons not received from P2 GO's STA's connected AP */
     WMI_DFS_AP_BMISS = 1,
-} wmi_dfs_ap_bmiss_reason;
+} wmi_dfs_ap_bmiss_reason; /* DEPRECATED - DO NOT USE */
 
 typedef struct {
     A_UINT32 tlv_header;  /* TLV tag and len; tag equals WMITLV_TAG_STRUC_wmi_p2p_cli_dfs_ap_bmiss_fixed_param*/
     A_UINT32 vdev_id;
+    /* NOTE:
+     * The reason_code field is deprecated, and should be ignored.
+     */
     A_UINT32 reason_code; /* contains a wmi_dfs_ap_bmiss_reason value */
 } wmi_p2p_cli_dfs_ap_bmiss_fixed_param;
 
@@ -31529,6 +31548,8 @@ typedef struct {
     A_UINT32 vdev_id;
     /* picks values from WMI_USD_MODE_STATUS */
     A_UINT32 usd_mode_status;
+    /* Instance ID of the service */
+    A_UINT32 instance_id;
 } wmi_usd_service_event_fixed_param;
 
 typedef enum {
@@ -40434,6 +40455,17 @@ typedef struct {
      * than rssi_6g_threshold. If rssi_6g_threshold is 0, it should be ignored.
      */
     A_INT32 rssi_6g_threshold; /* units = dBm */
+    /** bss_load_alpha_pct
+     * This parameter is used for updating the exponential average of the
+     * BSS load:
+     * new avg BSS load =
+     *     new BSS load measurement * alpha / 100 +
+     *     old avg BSS load * (100 - alpha) / 100
+     * This parameter uses percent units.  E.g. if bss_load_alpha_pct == 10,
+     * the new average will be the sum of 10% of the new measurement + 90% of
+     * the old average.
+     */
+    A_UINT32 bss_load_alpha_pct;
 } wmi_roam_bss_load_config_cmd_fixed_param;
 
 /** Deauth roam trigger parameters */
@@ -40704,6 +40736,11 @@ typedef enum {
         WMI_ROAM_TRIGGER_SUB_REASON_PERIODIC_TIMER_AFTER_INACTIVITY,
     WMI_ROAM_TRIGGER_SUB_REASON_PERIODIC_TIMER_AFTER_INACTIVITY_CU,
     WMI_ROAM_TRIGGER_SUB_REASON_INACTIVITY_TIMER_CU,
+    /* MLD_EXTRA_PARTIAL_SCAN:
+     * FW triggers extra partial scan when all ml links are not found
+     * during first partial scan.
+     */
+    WMI_ROAM_TRIGGER_SUB_REASON_MLD_EXTRA_PARTIAL_SCAN,
 } WMI_ROAM_TRIGGER_SUB_REASON_ID;
 
 typedef enum wmi_roam_invoke_status_error {
@@ -47665,6 +47702,7 @@ typedef struct {
 #define WMI_PDEV_SET_CUSTOM_TX_PWR_MAX_CHAIN_NUM         4
 
 #define WMI_PDEV_SET_CUSTOM_TX_PWR_MAX_2G_RATE_NUM       18
+#define WMI_PDEV_SET_CUSTOM_TX_PWR_MAX_2G_RATE_NUM_EXT   8
 
 #define WMI_PDEV_SET_CUSTOM_TX_PWR_MAX_5G_6G_RATE_NUM    24
 
@@ -47678,14 +47716,14 @@ typedef struct {
      */
 
     /* currently 2GHz band has 2 chains (though space is allocated for up
-     * to 4 chains) and each chain has 18 rates.
+     * to 4 chains) and each chain has 18 rates and 8 extended rates.
      * bitmap_of_2GHz_band[0] -> chain 0 bitmap:
-     * |bit  0|bit  1|......|bit  17|
-     * |rate 0|rate 1|......|rate 17|
+     * |bit  0|bit  1|......|bit  17| bit   18 |......| bit   25 |
+     * |rate 0|rate 1|......|rate 17|ext rate 0|......|ext rate 7|
      *
      * bitmap_of_2GHz_band[1] -> chain 1 bitmap:
-     * |bit  0|bit  1|......|bit  17|
-     * |rate 0|rate 1|......|rate 17|
+     * |bit  0|bit  1|......|bit  17| bit   18 |......| bit   25 |
+     * |rate 0|rate 1|......|rate 17|ext rate 0|......|ext rate 7|
      *
      * bitmap_of_2GHz_band[2] -> reserved
      * bitmap_of_2GHz_band[3] -> reserved
@@ -48863,6 +48901,8 @@ typedef struct {
     A_UINT32 tlv_header;
     /* status takes values from WMI_MLO_TID_TO_LINK_MAP_STATUS */
     A_UINT32 status;
+    /* Vdev_id on which T2LM command request is received */
+    A_UINT32 vdev_id;
 } wmi_mlo_peer_tid_to_link_map_event_fixed_param;
 
 
