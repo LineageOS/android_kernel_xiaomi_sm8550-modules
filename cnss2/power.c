@@ -1620,7 +1620,7 @@ static inline bool cnss_aop_interface_ready(struct cnss_plat_data *plat_priv)
 int cnss_aop_pdc_reconfig(struct cnss_plat_data *plat_priv)
 {
 	u32 i;
-	int ret;
+	int ret = 0;
 
 	if (plat_priv->pdc_init_table_len <= 0 || !plat_priv->pdc_init_table)
 		return 0;
