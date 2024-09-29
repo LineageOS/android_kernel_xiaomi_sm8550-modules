@@ -1734,6 +1734,16 @@ static void cnss_pci_update_link_event(struct cnss_pci_data *pci_priv,
 	cnss_pci_call_driver_uevent(pci_priv, CNSS_BUS_EVENT, &bus_event);
 }
 
+#if IS_ENABLED(CONFIG_MHI_BUS_MISC)
+static inline void cnss_mhi_report_error(struct cnss_pci_data *pci_priv)
+{
+	if (pci_priv->mhi_ctrl)
+		mhi_report_error(pci_priv->mhi_ctrl);
+}
+#else
+static inline void cnss_mhi_report_error(struct cnss_pci_data *pci_priv) {}
+#endif
+
 void cnss_pci_handle_linkdown(struct cnss_pci_data *pci_priv)
 {
 	struct cnss_plat_data *plat_priv = pci_priv->plat_priv;
@@ -1753,10 +1763,8 @@ void cnss_pci_handle_linkdown(struct cnss_pci_data *pci_priv)
 	pci_priv->pci_link_down_ind = true;
 	spin_unlock_irqrestore(&pci_link_down_lock, flags);
 
-	if (pci_priv->mhi_ctrl) {
-		/* Notify MHI about link down*/
-		mhi_report_error(pci_priv->mhi_ctrl);
-	}
+	/* Notify MHI about link down*/
+	cnss_mhi_report_error(pci_priv);
 
 	if (pci_dev->device == QCA6174_DEVICE_ID)
 		disable_irq_nosync(pci_dev->irq);
