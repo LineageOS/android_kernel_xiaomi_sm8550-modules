@@ -116,6 +116,7 @@ uint64_t dynamic_feature_mask = ICNSS_DEFAULT_FEATURE_MASK;
 #define WLAN_EN_DELAY			500
 
 static DEFINE_IDA(rd_minor_id);
+static struct icnss_print_optimize print_optimize;
 
 enum icnss_pdr_cause_index {
 	ICNSS_FW_CRASH,
@@ -1384,6 +1385,7 @@ static int icnss_call_driver_shutdown(struct icnss_priv *priv)
 
 	icnss_pr_dbg("Calling driver shutdown state: 0x%lx\n", priv->state);
 
+	memset(&print_optimize, 0, sizeof(print_optimize));
 	priv->ops->shutdown(&priv->pdev->dev);
 	set_bit(ICNSS_SHUTDOWN_DONE, &priv->state);
 
@@ -1424,6 +1426,7 @@ static int icnss_pd_restart_complete(struct icnss_priv *priv)
 
 	icnss_block_shutdown(true);
 
+	memset(&print_optimize, 0, sizeof(print_optimize));
 	ret = priv->ops->reinit(&priv->pdev->dev);
 	if (ret < 0) {
 		icnss_fatal_err("Driver reinit failed: %d, state: 0x%lx\n",
@@ -1976,6 +1979,7 @@ static int icnss_driver_event_idle_shutdown(struct icnss_priv *priv,
 		icnss_pr_dbg("Calling driver idle shutdown, state: 0x%lx\n",
 								priv->state);
 		icnss_block_shutdown(true);
+		memset(&print_optimize, 0, sizeof(print_optimize));
 		ret = priv->ops->idle_shutdown(&priv->pdev->dev);
 		icnss_block_shutdown(false);
 	}
@@ -1999,6 +2003,7 @@ static int icnss_driver_event_idle_restart(struct icnss_priv *priv,
 		icnss_pr_dbg("Calling driver idle restart, state: 0x%lx\n",
 								priv->state);
 		icnss_block_shutdown(true);
+		memset(&print_optimize, 0, sizeof(print_optimize));
 		ret = priv->ops->idle_restart(&priv->pdev->dev);
 		icnss_block_shutdown(false);
 	}
@@ -3403,7 +3408,7 @@ EXPORT_SYMBOL(icnss_unregister_driver);
 
 static struct icnss_msi_config msi_config_wcn6750 = {
 	.total_vectors = 28,
-	.total_users = 2,
+	.total_users = MSI_USERS,
 	.users = (struct icnss_msi_user[]) {
 		{ .name = "CE", .num_vectors = 10, .base_vector = 0 },
 		{ .name = "DP", .num_vectors = 18, .base_vector = 10 },
@@ -3412,7 +3417,7 @@ static struct icnss_msi_config msi_config_wcn6750 = {
 
 static struct icnss_msi_config msi_config_wcn6450 = {
 	.total_vectors = 14,
-	.total_users = 2,
+	.total_users = MSI_USERS,
 	.users = (struct icnss_msi_user[]) {
 		{ .name = "CE", .num_vectors = 12, .base_vector = 0 },
 		{ .name = "DP", .num_vectors = 2, .base_vector = 12 },
@@ -3452,10 +3457,14 @@ int icnss_get_user_msi_assignment(struct device *dev, char *user_name,
 			*user_base_data = msi_config->users[idx].base_vector
 				+ priv->msi_base_data;
 			*base_vector = msi_config->users[idx].base_vector;
+			/*Add only single print for each user*/
+			if (print_optimize.msi_log_chk[idx]++)
+				goto skip_print;
 
 			icnss_pr_dbg("Assign MSI to user: %s, num_vectors: %d, user_base_data: %u, base_vector: %u\n",
 				    user_name, *num_vectors, *user_base_data,
 				    *base_vector);
+skip_print:
 
 			return 0;
 		}
