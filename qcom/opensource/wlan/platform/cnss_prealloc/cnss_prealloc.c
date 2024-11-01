@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012,2014-2017,2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -182,7 +182,7 @@ static void cnss_pool_deinit(void)
 	}
 }
 
-void cnss_assign_prealloc_pool(unsigned long device_id)
+static void cnss_assign_prealloc_pool(unsigned long device_id)
 {
 	pr_info("cnss_prealloc: assign cnss pool for device id 0x%lx", device_id);
 

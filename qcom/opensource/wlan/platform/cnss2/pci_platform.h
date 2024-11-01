@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
-/* Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved. */
+/* Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #ifndef _CNSS_PCI_PLATFORM_H
 #define _CNSS_PCI_PLATFORM_H
@@ -113,7 +113,8 @@ int cnss_pci_get_one_msi_mhi_irq_array_size(struct cnss_pci_data *pci_priv);
 bool cnss_pci_is_force_one_msi(struct cnss_pci_data *pci_priv);
 int cnss_pci_init_smmu(struct cnss_pci_data *pci_priv);
 void cnss_pci_update_drv_supported(struct cnss_pci_data *pci_priv);
-
+int cnss_pci_dsp_link_control(struct cnss_pci_data *pci_priv,
+			      bool link_enable);
 /**
  * _cnss_pci_get_reg_dump() - Dump PCIe RC registers for debug
  * @pci_priv: driver PCI bus context pointer
@@ -127,6 +128,12 @@ void cnss_pci_update_drv_supported(struct cnss_pci_data *pci_priv);
  */
 int _cnss_pci_get_reg_dump(struct cnss_pci_data *pci_priv,
 			   u8 *buf, u32 len);
+int cnss_pci_set_dsp_link_status(struct cnss_pci_data *pci_priv,
+				 bool link_enable);
+int cnss_pci_get_dsp_link_status(struct cnss_pci_data *pci_priv);
+int cnss_pci_dsp_link_enable(struct cnss_pci_data *pci_priv);
+int cnss_pci_dsp_link_retrain(struct cnss_pci_data *pci_priv,
+			      u16 target_link_speed);
 #else
 int _cnss_pci_enumerate(struct cnss_plat_data *plat_priv, u32 rc_num)
 {
@@ -204,6 +211,33 @@ void cnss_pci_update_drv_supported(struct cnss_pci_data *pci_priv)
 	pci_priv->drv_supported = false;
 }
 
+int cnss_pci_dsp_link_control(struct cnss_pci_data *pci_priv,
+			      bool link_enable)
+{
+	return -EOPNOTSUPP;
+}
+
+int cnss_pci_set_dsp_link_status(struct cnss_pci_data *pci_priv,
+				 bool link_enable)
+{
+	return -EOPNOTSUPP;
+}
+
+int cnss_pci_get_dsp_link_status(struct cnss_pci_data *pci_priv)
+{
+	return -EOPNOTSUPP;
+}
+
+int cnss_pci_dsp_link_enable(struct cnss_pci_data *pci_priv)
+{
+	return -EOPNOTSUPP;
+}
+
+int cnss_pci_dsp_link_retrain(struct cnss_pci_data *pci_priv,
+			      u16 target_link_speed)
+{
+	return -EOPNOTSUPP;
+}
 #endif /* CONFIG_PCI_MSM */
 
 static inline bool cnss_pci_get_drv_supported(struct cnss_pci_data *pci_priv)
