@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/ratelimit.h>
@@ -133,6 +133,7 @@ struct cam_sfe_bus_rd_priv {
 	void                               *tasklet_info;
 	uint32_t                            top_irq_shift;
 	uint32_t                            latency_buf_allocation;
+	uint32_t                            sys_cache_default_cfg;
 };
 
 static void cam_sfe_bus_rd_pxls_to_bytes(uint32_t pxls, uint32_t fmt,
@@ -416,7 +417,7 @@ static void cam_sfe_bus_rd_get_constraint_error(struct cam_sfe_bus_rd_priv *bus_
 	struct cam_isp_resource_node *sfe_bus_rd = NULL;
 	struct cam_sfe_bus_rd_data   *sfe_bus_rd_data = NULL;
 	struct cam_sfe_bus_rd_rm_resource_data *rm_rsrc_data = NULL;
-	uint32_t bus_rd_resc_type, cons_err;
+	uint32_t bus_rd_resc_type, cons_err, width_in_bytes = 0;
 	uint8_t *rm_name;
 	int i, j;
 
@@ -455,8 +456,18 @@ static void cam_sfe_bus_rd_get_constraint_error(struct cam_sfe_bus_rd_priv *bus_
 			CAM_ERR(CAM_SFE,
 				"Constraint Violation bitflag: 0x%x bus rd resc type: 0x%x",
 				cons_err, bus_rd_resc_type);
+
 			cam_sfe_bus_rd_print_constraint_error(bus_priv,
 				cons_err, rm_name);
+			cam_sfe_bus_rd_pxls_to_bytes(rm_rsrc_data->width,
+				rm_rsrc_data->unpacker_cfg, &width_in_bytes);
+			CAM_INFO(CAM_SFE, "SFE:%d RM:%d width:0x%x [in bytes: 0x%x] height:0x%x",
+				rm_rsrc_data->common_data->core_index, rm_rsrc_data->index,
+				rm_rsrc_data->width, width_in_bytes, rm_rsrc_data->height);
+			CAM_INFO(CAM_SFE, "SFE:%d RM:%d Stride:0x%x unpacker_cfg:%d hbi_count:%d",
+				rm_rsrc_data->common_data->core_index, rm_rsrc_data->index,
+				rm_rsrc_data->stride, rm_rsrc_data->unpacker_cfg,
+				rm_rsrc_data->hbi_count);
 		}
 	}
 }
@@ -547,7 +558,7 @@ static int cam_sfe_bus_start_rm(struct cam_isp_resource_node *rm_res)
 	uint32_t width_in_bytes = 0;
 	struct cam_sfe_bus_rd_rm_resource_data  *rm_data;
 	struct cam_sfe_bus_rd_common_data       *common_data;
-	const uint32_t enable_cons_violation = 11 << 2;
+	const uint32_t enable_cons_violation = CAM_SFE_BUS_RD_EN_CONS_ERR_CHECK;
 	uint32_t core_cfg_mask;
 
 	rm_data = rm_res->res_priv;
@@ -1411,7 +1422,7 @@ static int cam_sfe_bus_rd_config_rm(void *priv, void *cmd_args,
 		rm_data->height = height;
 		rm_data->width = width;
 		curr_cache_cfg = rm_data->cache_cfg;
-		rm_data->cache_cfg = 0x20;
+		rm_data->cache_cfg = bus_priv->sys_cache_default_cfg;
 		if ((!cache_dbg_cfg->disable_for_scratch) &&
 			(rm_data->enable_caching)) {
 			rm_data->cache_cfg =
@@ -1562,7 +1573,7 @@ static int cam_sfe_bus_rd_update_rm(void *priv, void *cmd_args,
 		rm_data->width = width;
 
 		curr_cache_cfg = rm_data->cache_cfg;
-		rm_data->cache_cfg = 0x20;
+		rm_data->cache_cfg = bus_priv->sys_cache_default_cfg;
 		if (rm_data->enable_caching) {
 			if ((cache_dbg_cfg->disable_for_scratch) &&
 				(update_buf->use_scratch_cfg))
@@ -2030,6 +2041,7 @@ int cam_sfe_bus_rd_init(
 		bus_rd_hw_info->constraint_error_info->cons_chk_en_avail;
 	bus_priv->top_irq_shift                 = bus_rd_hw_info->top_irq_shift;
 	bus_priv->latency_buf_allocation        = bus_rd_hw_info->latency_buf_allocation;
+	bus_priv->sys_cache_default_cfg         = bus_rd_hw_info->sys_cache_default_val;
 	bus_priv->bus_rd_hw_info = bus_rd_hw_info;
 
 	rc = cam_irq_controller_init(drv_name,
@@ -2045,7 +2057,8 @@ int cam_sfe_bus_rd_init(
 		rc = cam_sfe_bus_init_rm_resource(i, bus_priv, bus_hw_info,
 			&bus_priv->bus_client[i]);
 		if (rc < 0) {
-			CAM_ERR(CAM_SFE, "Init RM failed rc=%d", rc);
+			CAM_ERR(CAM_SFE, "Init RM failed for client:%d, rc=%d",
+				i, rc);
 			goto deinit_rm;
 		}
 	}
@@ -2054,7 +2067,8 @@ int cam_sfe_bus_rd_init(
 		rc = cam_sfe_bus_init_sfe_bus_read_resource(i, bus_priv,
 			bus_rd_hw_info);
 		if (rc < 0) {
-			CAM_ERR(CAM_SFE, "Init SFE RD failed rc=%d", rc);
+			CAM_ERR(CAM_SFE, "Init SFE RD failed for client:%d, rc=%d",
+				i, rc);
 			goto deinit_sfe_bus_rd;
 		}
 	}
@@ -2083,8 +2097,6 @@ int cam_sfe_bus_rd_init(
 	return rc;
 
 deinit_sfe_bus_rd:
-	if (i < 0)
-		i = CAM_SFE_BUS_RD_MAX;
 	for (--i; i >= 0; i--)
 		cam_sfe_bus_deinit_sfe_bus_rd_resource(
 			&bus_priv->sfe_bus_rd[i]);

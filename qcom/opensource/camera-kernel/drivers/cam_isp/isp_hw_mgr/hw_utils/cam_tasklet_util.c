@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -286,7 +287,7 @@ int cam_tasklet_start(void  *tasklet_info)
 	struct cam_tasklet_info       *tasklet = tasklet_info;
 	int i = 0;
 
-	if (atomic_cmpxchg(&tasklet->tasklet_active, 0, 1)) {
+	if (atomic_read(&tasklet->tasklet_active)) {
 		CAM_ERR(CAM_ISP, "Tasklet already active idx:%d",
 			tasklet->index);
 		return -EBUSY;
@@ -299,6 +300,8 @@ int cam_tasklet_start(void  *tasklet_info)
 			&tasklet->free_cmd_list);
 	}
 
+	atomic_set(&tasklet->tasklet_active, 1);
+
 	tasklet_enable(&tasklet->tasklet);
 
 	return 0;
@@ -308,9 +311,10 @@ void cam_tasklet_stop(void  *tasklet_info)
 {
 	struct cam_tasklet_info  *tasklet = tasklet_info;
 
-	if (!atomic_cmpxchg(&tasklet->tasklet_active, 1, 0))
+	if (!atomic_read(&tasklet->tasklet_active))
 		return;
 
+	atomic_set(&tasklet->tasklet_active, 0);
 	tasklet_kill(&tasklet->tasklet);
 	tasklet_disable(&tasklet->tasklet);
 	cam_tasklet_flush(tasklet);
@@ -331,12 +335,13 @@ static void cam_tasklet_action(unsigned long data)
 	struct cam_tasklet_info          *tasklet_info = NULL;
 	struct cam_tasklet_queue_cmd     *tasklet_cmd = NULL;
 	ktime_t                           tasklet_exec_start_time;
-
+	void                             *cb = NULL;
 	tasklet_info = (struct cam_tasklet_info *)data;
 
 	while (!cam_tasklet_dequeue_cmd(tasklet_info, &tasklet_cmd)) {
+		cb = (void *)tasklet_cmd->bottom_half_handler;
 		cam_common_util_thread_switch_delay_detect(
-			"Tasklet schedule",
+			"ISP Tasklet", "schedule", cb,
 			tasklet_cmd->tasklet_enqueue_ts,
 			CAM_TASKLET_SCHED_TIME_THRESHOLD);
 		tasklet_exec_start_time = ktime_get();
@@ -345,9 +350,9 @@ static void cam_tasklet_action(unsigned long data)
 			tasklet_cmd->payload);
 
 		cam_common_util_thread_switch_delay_detect(
-			"Tasklet execution",
+			"ISP Tasklet", "execution", cb,
 			tasklet_exec_start_time,
-			CAM_TASKLET_EXE_TIME_THRESHOLD);
+			CAM_TASKLET_SCHED_TIME_THRESHOLD);
 		cam_tasklet_put_cmd(tasklet_info, (void **)(&tasklet_cmd));
 	}
 }
