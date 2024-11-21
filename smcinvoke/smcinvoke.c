@@ -194,6 +194,9 @@ static bool legacy_smc_call;
 static int invoke_cmd;
 
 static long smcinvoke_ioctl(struct file *, unsigned int, unsigned long);
+#ifdef CONFIG_COMPAT
+static long smcinvoke_compat_ioctl(struct file *, unsigned int, unsigned long);
+#endif
 static int smcinvoke_open(struct inode *, struct file *);
 static int smcinvoke_release(struct inode *, struct file *);
 static int release_cb_server(uint16_t);
@@ -201,7 +204,9 @@ static int release_cb_server(uint16_t);
 static const struct file_operations g_smcinvoke_fops = {
 	.owner		= THIS_MODULE,
 	.unlocked_ioctl	= smcinvoke_ioctl,
-	.compat_ioctl	= smcinvoke_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl	= smcinvoke_compat_ioctl,
+#endif
 	.open		= smcinvoke_open,
 	.release	= smcinvoke_release,
 };
@@ -2607,7 +2612,13 @@ static long smcinvoke_ioctl(struct file *filp, unsigned int cmd,
 	trace_smcinvoke_ioctl(cmd, ret);
 	return ret;
 }
-
+#ifdef CONFIG_COMPAT
+static long smcinvoke_compat_ioctl(struct file * flip, unsigned int cmd,
+						unsigned long arg)
+{
+	return smcinvoke_ioctl(flip, cmd, arg);
+}
+#endif
 int get_root_fd(int *root_fd)
 {
 	if (!root_fd)
