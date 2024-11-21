@@ -1878,6 +1878,10 @@ typedef enum {
     /* Event to indicate xLNA is enabled */
     WMI_PDEV_ENABLE_XLNA_EVENTID,
 
+    /* Event to indicate ANN Power Boost update status from Target */
+    WMI_PDEV_POWER_BOOST_EVENTID,
+
+
     /* VDEV specific events */
     /** VDEV started event in response to VDEV_START request */
     WMI_VDEV_START_RESP_EVENTID = WMI_EVT_GRP_START_ID(WMI_GRP_VDEV),
@@ -3525,6 +3529,11 @@ typedef struct {
 #define WMI_TARGET_CAP_MPDU_STATS_PER_TX_NSS_SUPPORT_SET(target_cap_flags, value)\
     WMI_SET_BITS(target_cap_flags, 16, 1, value)
 
+#define WMI_TARGET_CAP_POWER_BOOST_SUPPORT_GET(target_cap_flags) \
+    WMI_GET_BITS(target_cap_flags, 17, 1)
+#define WMI_TARGET_CAP_POWER_BOOST_SUPPORT_SET(target_cap_flags) \
+    WMI_SET_BITS(target_cap_flags, 17, 1, value)
+
 
 /*
  * wmi_htt_msdu_idx_to_htt_msdu_qtype GET/SET APIs
@@ -3672,7 +3681,8 @@ typedef struct {
      * Bit 14 - Support for ML monitor mode
      * Bit 15 - Support for Qdata Tx LCE filter installation
      * Bit 16 - Support for MPDU stats per tx Nss capability
-     * Bits 31:17 - Reserved
+     * Bit 17 - Support for Power Boost capability
+     * Bits 31:18 - Reserved
      */
     A_UINT32 target_cap_flags;
 
@@ -5377,6 +5387,7 @@ typedef enum {
     WMI_VENDOR1_REQ1_VERSION_3_40   = 4,
     WMI_VENDOR1_REQ1_VERSION_4_00   = 5,
     WMI_VENDOR1_REQ1_VERSION_4_10   = 6,
+    WMI_VENDOR1_REQ1_VERSION_4_20   = 7,
 } WMI_VENDOR1_REQ1_VERSION;
 
 typedef enum {
@@ -5391,6 +5402,12 @@ typedef enum {
     WMI_HOST_BAND_CAP_5GHZ = 0x02,
     WMI_HOST_BAND_CAP_6GHZ = 0x04,
 } WMI_HOST_BAND_CAP;
+
+typedef enum {
+    WLAN_CONNECT_EXT_FEATURE_RSNO   = 0,
+
+    NUM_WLAN_CONNECT_EXT_FEATURES /* keep last */
+} wlan_connect_ext_features;
 
 /* HW features supported info */
 /* enum WMI_WIFI_STANDARD are possible values for WiFi standard bitfield */
@@ -16681,6 +16698,9 @@ typedef struct {
  *   wmi_vdev_create_mlo_params mlo_params[0,1];
  *       optional TLV, only present for MLO vdev;
  *       if the vdev is not MLO the array length should be 0.
+ *   wmi_vdev_create_wfdr2_mode_params wfdr2_mode[0,1];
+ *       picked as per WMI_VDEV_CREATE_WFDR2_MODES
+ *       to enable/disable NOA
  */
 } wmi_vdev_create_cmd_fixed_param;
 
@@ -16793,6 +16813,22 @@ typedef struct {
     /** MLD MAC address */
     wmi_mac_addr mld_macaddr;
 } wmi_vdev_create_mlo_params;
+
+/*
+ * this TLV structure is used to pass WFD R2 parameters on vdev create
+ * to enable/disable NOA
+ */
+typedef struct {
+    A_UINT32 tlv_header; /** TLV tag and len; */
+    A_UINT32 wfdr2_mode; /** WFD R2 modes as per WMI_VDEV_CREATE_WFDR2_MODES */
+}  wmi_vdev_create_wfdr2_mode_params;
+
+/** VDEV create WFD R2 modes */
+typedef enum {
+    WMI_VDEV_CREATE_WFDR2_MODE = 0,
+    WMI_VDEV_CREATE_WFDR2_PCC_MODE = 1,
+} WMI_VDEV_CREATE_WFDR2_MODES;
+
 
 /* this TLV structure used for pass mlo parameters on vdev start*/
 typedef struct {
@@ -18935,6 +18971,12 @@ typedef enum {
 
     /* Update TWT_UNAVAIL_MODE */
     WMI_VDEV_PARAM_TWT_UNAVAIL_MODE,                      /* 0xC6 */
+
+    /*
+     * Additional features supported for connection.
+     * Value is from enum wlan_connect_ext_features
+     */
+    WMI_VDEV_PARAM_CONNECT_EXT_FEATURES,                  /* 0xC7 */
 
 
     /*=== ADD NEW VDEV PARAM TYPES ABOVE THIS LINE ===
@@ -21243,6 +21285,7 @@ typedef struct {
 #define WMI_PEER_EXT_HE_CAPS_6GHZ_VALID        0x00000008  /* param he_caps_6ghz is valid or not */
 #define WMI_PEER_EXT_IS_QUALCOMM_NODE 0x00000010 /* Indicates if the peer connecting is a qualcomm node */
 #define WMI_PEER_EXT_IS_MESH_NODE 0x00000020 /* Indicates if the peer connecting is a mesh node */
+#define WMI_PEER_EXT_PROTECTED_TWT 0x00000040 /* Protected TWT operation Support field in Extended RSN Capabilities element */
 #define WMI_PEER_EXT_F_CRIT_PROTO_HINT_ENABLED 0x40000000
 
 /**
@@ -25865,6 +25908,15 @@ typedef enum
      */
     WMI_VENDOR_OUI_ACTION_DISABLE_AUXL = 15,
 
+    /*
+     * Used to downgrade to 2 link ML connection for specific AP matchs OUI.
+     * This is the preferred name, since it specifies that the downgraded
+     * number of links is 2.
+     */
+    WMI_VENDOR_OUI_ACTION_RESTRICT_MAX_2_MLO_LINKS = 16,
+    /* alias for the above (less suitable, since it is less precise) */
+    WMI_VENDOR_OUI_ACTION_RESTRICT_MAX_MLO_LINKS =
+        WMI_VENDOR_OUI_ACTION_RESTRICT_MAX_2_MLO_LINKS,
 
     /* Add any action before this line */
     WMI_VENDOR_OUI_ACTION_MAX_ACTION_ID
@@ -34008,6 +34060,28 @@ typedef enum {
       *  A_INT8 6G 320M Channel Center Freq 6265 CTL Limit Power OFDMA
       */
 
+    BIOS_PARAM_TYPE_PPAG_DATA,
+    /*
+     *  BIOS_PARAM_TYPE_PPAG_DATA Structure has 12 bytes as below,
+     *  antennaGain value unit is 0.25 dBm.
+     *  If Enable flag is 0, FW will not use PPAG antennaGain value of bios.
+     *
+     *  A_UINT8 version
+     *  A_UINT8 enableFlag
+     *  A_INT8  antennaGain[GAIN_BANDS]; // 9bytes
+     *  A_UINT8 reserved
+     *  ==================== A_INT8  antennaGain[GAIN_BANDS]; =================
+     * A_INT8 atennaGain for [2400, 2483)
+     * A_INT8 atennaGain for [5150, 5250)
+     * A_INT8 atennaGain for [5250, 5350)
+     * A_INT8 atennaGain for [5470, 5725)
+     * A_INT8 atennaGain for [5725, 5895)
+     * A_INT8 atennaGain for [5925, 6425)
+     * A_INT8 atennaGain for [6425, 6525)
+     * A_INT8 atennaGain for [6525, 6875)
+     * A_INT8 atennaGain for [6875, 7125)
+     *  ==============================================================
+     */
 
     BIOS_PARAM_TYPE_MAX,
 } bios_param_type_e;
@@ -37115,6 +37189,8 @@ typedef struct {
     A_UINT32 pout_reduction_25db;
     /* tx chain mask: Chain mask to apply based on the temp level */
     A_UINT32 tx_chain_mask;
+    /* duty cycle in ms for this level */
+    A_UINT32 duty_cycle;
 } wmi_therm_throt_level_config_info;
 
 typedef enum {
@@ -38072,6 +38148,7 @@ static INLINE A_UINT8 *wmi_id_to_name(A_UINT32 wmi_command)
         WMI_RETURN_STRING(WMI_SOC_TX_PACKET_CUSTOM_CLASSIFY_CMDID);
         WMI_RETURN_STRING(WMI_SET_AP_SUSPEND_RESUME_CMDID);
         WMI_RETURN_STRING(WMI_P2P_GO_DFS_AP_CONFIG_CMDID);
+        WMI_RETURN_STRING(WMI_USD_SERVICE_CMDID);
     }
 
     return (A_UINT8 *) "Invalid WMI cmd";
@@ -48904,6 +48981,47 @@ typedef struct {
     /* Vdev_id on which T2LM command request is received */
     A_UINT32 vdev_id;
 } wmi_mlo_peer_tid_to_link_map_event_fixed_param;
+
+typedef enum {
+    WMI_EVENT_POWER_BOOST_START_TRAINING = 0,
+    WMI_EVENT_POWER_BOOST_ABORT,
+    WMI_EVENT_POWER_BOOST_COMPLETE,
+
+    WMI_EVENT_POWER_BOOST_MAX
+} wmi_pdev_power_boost_event_type;
+
+typedef struct {
+    /* WMITLV_TAG_STRUC_wmi_pdev_power_boost_event_fixed_param */
+    A_UINT32 tlv_header;
+    /* to identify for which pdev the event is sent */
+    A_UINT32 pdev_id;
+    /* enum wmi_pdev_power_boost_event_type to update the power boost status */
+    A_UINT32 status;
+    /* training_stage:
+     * The training stage such as 1st, 2nd for which the I/Q samples are
+     * updated in DDR.
+     */
+    A_UINT32 training_stage;
+    /* MCS value for which the current DPD training has been done */
+    A_UINT32 mcs;
+    /* bandwidth:
+     * Bandwidth value in Mhz for which the current DPD training has been done
+     */
+    A_UINT32 bandwidth;
+    /* current target temperature while training the DPD packet in degree C */
+    A_INT32 temperature_degreeC;
+    /* primary channel frequency in MHz for which DPD training is done */
+    A_UINT32 primary_chan_mhz;
+    /** Center frequency 1 in MHz */
+    A_UINT32 band_center_freq1;
+    /** Center frequency 2 in MHz - valid only for 11ac/VHT 80+80 mode */
+    A_UINT32 band_center_freq2;
+    /* phy_mode:
+     * PHY mode as listed by enum WLAN_PHY_MODE, for which the current DPD
+     * training has been done
+     */
+    A_UINT32 phy_mode;
+} wmi_pdev_power_boost_event_fixed_param;
 
 
 
