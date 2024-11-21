@@ -41,6 +41,7 @@
 #define ICNSS_ENABLE_M3_SSR 1
 #define WLAN_RF_SLATE 0
 #define WLAN_RF_APACHE 1
+#define MSI_USERS                       2
 
 extern uint64_t dynamic_feature_mask;
 
@@ -374,6 +375,10 @@ struct icnss_msi_user {
 	char *name;
 	int num_vectors;
 	u32 base_vector;
+};
+
+struct icnss_print_optimize {
+	int msi_log_chk[MSI_USERS];
 };
 
 struct icnss_msi_config {

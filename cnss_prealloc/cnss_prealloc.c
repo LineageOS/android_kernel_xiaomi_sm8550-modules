@@ -17,17 +17,6 @@
 #else
 #include <net/cnss_prealloc.h>
 #endif
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
-/* Ideally header should be from standard include path. So this is not an
- * ideal way of header inclusion but use of slab struct to derive cache
- * from a mem ptr helps in avoiding additional tracking and/or adding headroom
- * of 8 bytes for cache in the beginning of buffer and wasting extra memory,
- * particulary in the case when size of memory requested falls around the edge
- * of a page boundary. We also have precedence of minidump_memory.c which
- * includes mm/slab.h using this style.
- */
-#include "../mm/slab.h"
-#endif
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("CNSS prealloc driver");
@@ -43,6 +32,8 @@ struct cnss_pool {
 	const char name[50];
 	mempool_t *mp;
 	struct kmem_cache *cache;
+	void **pool_ptrs;
+	int table_capacity;
 };
 
 /**
@@ -59,6 +50,8 @@ struct cnss_pool {
  *              if not merged with another pool.
  *      mp    : A pointer to memory pool. Updated during init.
  *      cache : A pointer to cache. Updated during init.
+ *      pool_ptrs: A table to keep track of memory allocated from the pool.
+ *      table_capacity: Total capacity of the tracker table for the pool.
  * 2. Always keep the table in increasing order
  * 3. Please keep the reserve pool as minimum as possible as it's always
  *    preallocated.
@@ -70,31 +63,32 @@ struct cnss_pool {
 
 /* size, min pool reserve, name, memorypool handler, cache handler*/
 static struct cnss_pool cnss_pools_default[] = {
-	{8 * 1024, 16, "cnss-pool-8k", NULL, NULL},
-	{16 * 1024, 16, "cnss-pool-16k", NULL, NULL},
-	{32 * 1024, 22, "cnss-pool-32k", NULL, NULL},
-	{64 * 1024, 38, "cnss-pool-64k", NULL, NULL},
-	{128 * 1024, 10, "cnss-pool-128k", NULL, NULL},
+	{8 * 1024, 16, "cnss-pool-8k", NULL, NULL, NULL},
+	{16 * 1024, 16, "cnss-pool-16k", NULL, NULL, NULL},
+	{32 * 1024, 22, "cnss-pool-32k", NULL, NULL, NULL},
+	{64 * 1024, 38, "cnss-pool-64k", NULL, NULL, NULL},
+	{128 * 1024, 10, "cnss-pool-128k", NULL, NULL, NULL},
 };
 
 static struct cnss_pool cnss_pools_adrastea[] = {
-	{8 * 1024, 2, "cnss-pool-8k", NULL, NULL},
-	{16 * 1024, 10, "cnss-pool-16k", NULL, NULL},
-	{32 * 1024, 8, "cnss-pool-32k", NULL, NULL},
-	{64 * 1024, 4, "cnss-pool-64k", NULL, NULL},
-	{128 * 1024, 2, "cnss-pool-128k", NULL, NULL},
+	{8 * 1024, 2, "cnss-pool-8k", NULL, NULL, NULL},
+	{16 * 1024, 10, "cnss-pool-16k", NULL, NULL, NULL},
+	{32 * 1024, 8, "cnss-pool-32k", NULL, NULL, NULL},
+	{64 * 1024, 4, "cnss-pool-64k", NULL, NULL, NULL},
+	{128 * 1024, 2, "cnss-pool-128k", NULL, NULL, NULL},
 };
 
 static struct cnss_pool cnss_pools_wcn6750[] = {
-	{8 * 1024, 2, "cnss-pool-8k", NULL, NULL},
-	{16 * 1024, 8, "cnss-pool-16k", NULL, NULL},
-	{32 * 1024, 11, "cnss-pool-32k", NULL, NULL},
-	{64 * 1024, 15, "cnss-pool-64k", NULL, NULL},
-	{128 * 1024, 4, "cnss-pool-128k", NULL, NULL},
+	{8 * 1024, 2, "cnss-pool-8k", NULL, NULL, NULL},
+	{16 * 1024, 8, "cnss-pool-16k", NULL, NULL, NULL},
+	{32 * 1024, 11, "cnss-pool-32k", NULL, NULL, NULL},
+	{64 * 1024, 15, "cnss-pool-64k", NULL, NULL, NULL},
+	{128 * 1024, 4, "cnss-pool-128k", NULL, NULL, NULL},
 };
 
 struct cnss_pool *cnss_pools;
 unsigned int cnss_prealloc_pool_size = ARRAY_SIZE(cnss_pools_default);
+spinlock_t pool_table_lock;
 
 /**
  * cnss_pool_alloc_threshold() - Allocation threshold
@@ -150,10 +144,22 @@ static int cnss_pool_init(void)
 			continue;
 		}
 
+		cnss_pools[i].table_capacity = cnss_pools[i].min;
+		cnss_pools[i].pool_ptrs = kmalloc(cnss_pools[i].min * sizeof(void *),
+						  GFP_KERNEL);
+
+		if (!cnss_pools[i].pool_ptrs) {
+			pr_err("cnss_prealloc: failed to create mempool %s of min size %d * %zu\n",
+			       cnss_pools[i].name, cnss_pools[i].min,
+			       cnss_pools[i].size);
+			WARN_ON(1);
+		}
 		pr_info("cnss_prealloc: created mempool %s of min size %d * %zu\n",
 			cnss_pools[i].name, cnss_pools[i].min,
 			cnss_pools[i].size);
 	}
+
+	spin_lock_init(&pool_table_lock);
 
 	return 0;
 }
@@ -179,6 +185,8 @@ static void cnss_pool_deinit(void)
 		kmem_cache_destroy(cnss_pools[i].cache);
 		cnss_pools[i].mp = NULL;
 		cnss_pools[i].cache = NULL;
+		kfree(cnss_pools[i].pool_ptrs);
+		cnss_pools[i].pool_ptrs = NULL;
 	}
 }
 
@@ -220,43 +228,191 @@ void cnss_deinitialize_prealloc_pool(void)
 }
 EXPORT_SYMBOL(cnss_deinitialize_prealloc_pool);
 
-/**
- * cnss_pool_get_index() - Get the index of memory pool
- * @mem: Allocated memory
- *
- * Returns the index of the memory pool which fits the reqested memory. The
- * complexity of this check is O(num of memory pools). Returns a negative
- * value with error code in case of failure.
- *
- */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
-static int cnss_pool_get_index(void *mem)
+void wcnss_check_pool_lists(void)
 {
-	struct slab *slab;
-	struct kmem_cache *cache;
+	void **pool;
 	int i;
+	size_t ptr_idx;
+	int count;
 
-	if (!virt_addr_valid(mem))
-		return -EINVAL;
+	pr_info("wcnss enter pool check\n");
 
-	/* mem -> slab -> cache */
-	slab = virt_to_slab(mem);
-	if (!slab)
-		return -ENOENT;
-
-	cache = slab->slab_cache;
-	if (!cache)
-		return -ENOENT;
-
-	/* Check if memory belongs to a pool */
 	for (i = 0; i < cnss_prealloc_pool_size; i++) {
-		if (cnss_pools[i].cache == cache)
-			return i;
+		pool = cnss_pools[i].pool_ptrs;
+		count = cnss_pools[i].table_capacity;
+		for (ptr_idx = 0; ptr_idx < count; ptr_idx++) {
+			if (pool[ptr_idx]) {
+				pr_err("%p not freed in %s pool at index %zu\n",
+					pool[ptr_idx], cnss_pools[i].name,
+					ptr_idx);
+				WARN_ON(1);
+			}
+		}
+	}
+}
+EXPORT_SYMBOL(wcnss_check_pool_lists);
+
+static int wcnss_find_pool_table_slot(int pool, void *mem)
+{
+	void **pool_table;
+	size_t ptr_idx;
+	int new_capacity;
+
+	pool_table = cnss_pools[pool].pool_ptrs;
+	for (ptr_idx = 0; ptr_idx < cnss_pools[pool].table_capacity; ptr_idx++) {
+		if (!pool_table[ptr_idx]) {
+			pool_table[ptr_idx] = mem;
+			return 0;
+		}
 	}
 
-	return -ENOENT;
+	new_capacity = cnss_pools[pool].table_capacity + 1;
+
+
+	cnss_pools[pool].pool_ptrs = krealloc(cnss_pools[pool].pool_ptrs,
+					      new_capacity * sizeof(void *),
+					      GFP_ATOMIC);
+
+	if (!cnss_pools[pool].pool_ptrs) {
+		pr_debug("%s pool is full, failed to increase table size to %d\n",
+			 cnss_pools[pool].name, cnss_pools[pool].table_capacity);
+		return -EPERM;
+	}
+
+	cnss_pools[pool].pool_ptrs[ptr_idx] = mem;
+	cnss_pools[pool].table_capacity += 1;
+
+	pr_debug("%s pool is full, increasing table size to %d\n",
+		 cnss_pools[pool].name, cnss_pools[pool].table_capacity);
+
+	return 0;
 }
-#else /* (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)) */
+
+static int wcnss_free_pool_table_slot(struct cnss_pool mempool, void *mem)
+{
+	void **pool_table;
+	size_t ptr_idx;
+
+	pool_table = mempool.pool_ptrs;
+	for (ptr_idx = 0; ptr_idx < mempool.table_capacity; ptr_idx++) {
+		if (pool_table[ptr_idx] == mem) {
+			pool_table[ptr_idx] = NULL;
+			return ptr_idx;
+		}
+	}
+
+	pr_debug("wcnss prealloc put ptr %p not found in %s pool mem addr %p\n",
+		 mem, mempool.name, mempool.pool_ptrs);
+
+	return -EPERM;
+}
+
+/**
+ * wcnss_prealloc_get() - Get preallocated memory from a pool
+ * @size: Size to allocate
+ *
+ * Memory pool is chosen based on the size. If memory is not available in a
+ * given pool it goes to next higher sized pool until it succeeds.
+ *
+ * Return: A void pointer to allocated memory
+ */
+void *wcnss_prealloc_get(size_t size)
+{
+
+	void *mem = NULL;
+	gfp_t gfp_mask = __GFP_ZERO;
+	unsigned long irq_flags;
+	int i;
+	int ret = 0;
+
+	if (!cnss_pools)
+		return mem;
+
+	if (in_interrupt() || !preemptible() || rcu_preempt_depth())
+		gfp_mask |= GFP_ATOMIC;
+	else
+		gfp_mask |= GFP_KERNEL;
+
+	if (size >= cnss_pool_alloc_threshold()) {
+
+		for (i = 0; i < cnss_prealloc_pool_size; i++) {
+			if (cnss_pools[i].size >= size && cnss_pools[i].mp) {
+				if (!cnss_pools[i].pool_ptrs) {
+					pr_err("%s mempool table is null\n",
+					       cnss_pools[i].name);
+					mem = NULL;
+					break;
+				}
+				mem = mempool_alloc(cnss_pools[i].mp, gfp_mask);
+				if (mem) {
+					spin_lock_irqsave(&pool_table_lock,
+							  irq_flags);
+					ret = wcnss_find_pool_table_slot(i, mem);
+					spin_unlock_irqrestore(&pool_table_lock,
+							       irq_flags);
+					break;
+				}
+			}
+		}
+	}
+	if (ret < 0) {
+		mempool_free(mem, cnss_pools[i].mp);
+		mem = NULL;
+	}
+
+	if (!mem && size >= cnss_pool_alloc_threshold()) {
+		pr_err("cnss_prealloc: not available for size %zu, flag %x\n",
+		       size, gfp_mask);
+	}
+
+	return mem;
+}
+EXPORT_SYMBOL(wcnss_prealloc_get);
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0))
+/**
+ * wcnss_prealloc_put() - Relase allocated memory
+ * @mem: Allocated memory
+ *
+ * Free the memory got by wcnss_prealloc_get() to slab or pool reserve if memory
+ * pool doesn't have enough elements.
+ *
+ * Return: 1 - success
+ *         0 - fail
+ */
+int wcnss_prealloc_put(void *mem)
+{
+	int i;
+	int ret;
+	unsigned long irq_flags;
+
+	if (!mem || !cnss_pools)
+		return 0;
+
+	for (i = 0; i < cnss_prealloc_pool_size; i++) {
+		if (cnss_pools[i].mp) {
+			if (!cnss_pools[i].pool_ptrs) {
+				pr_err("%s mempool table is null\n",
+				       cnss_pools[i].name);
+				break;
+			}
+			spin_lock_irqsave(&pool_table_lock, irq_flags);
+			ret = wcnss_free_pool_table_slot(cnss_pools[i],
+							 mem);
+			spin_unlock_irqrestore(&pool_table_lock,
+					       irq_flags);
+
+			if (ret >= 0) {
+				mempool_free(mem, cnss_pools[i].mp);
+				return 1;
+			}
+		}
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(wcnss_prealloc_put);
+#else
 static int cnss_pool_get_index(void *mem)
 {
 	struct page *page;
@@ -283,51 +439,6 @@ static int cnss_pool_get_index(void *mem)
 
 	return -ENOENT;
 }
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)) */
-
-/**
- * wcnss_prealloc_get() - Get preallocated memory from a pool
- * @size: Size to allocate
- *
- * Memory pool is chosen based on the size. If memory is not available in a
- * given pool it goes to next higher sized pool until it succeeds.
- *
- * Return: A void pointer to allocated memory
- */
-void *wcnss_prealloc_get(size_t size)
-{
-
-	void *mem = NULL;
-	gfp_t gfp_mask = __GFP_ZERO;
-	int i;
-
-	if (!cnss_pools)
-		return mem;
-
-	if (in_interrupt() || !preemptible() || rcu_preempt_depth())
-		gfp_mask |= GFP_ATOMIC;
-	else
-		gfp_mask |= GFP_KERNEL;
-
-	if (size >= cnss_pool_alloc_threshold()) {
-
-		for (i = 0; i < cnss_prealloc_pool_size; i++) {
-			if (cnss_pools[i].size >= size && cnss_pools[i].mp) {
-				mem = mempool_alloc(cnss_pools[i].mp, gfp_mask);
-				if (mem)
-					break;
-			}
-		}
-	}
-
-	if (!mem && size >= cnss_pool_alloc_threshold()) {
-		pr_debug("cnss_prealloc: not available for size %zu, flag %x\n",
-			 size, gfp_mask);
-	}
-
-	return mem;
-}
-EXPORT_SYMBOL(wcnss_prealloc_get);
 
 /**
  * wcnss_prealloc_put() - Relase allocated memory
@@ -342,19 +453,32 @@ EXPORT_SYMBOL(wcnss_prealloc_get);
 int wcnss_prealloc_put(void *mem)
 {
 	int i;
+	int ret;
+	unsigned long irq_flags;
 
 	if (!mem || !cnss_pools)
 		return 0;
 
 	i = cnss_pool_get_index(mem);
 	if (i >= 0 && i < cnss_prealloc_pool_size && cnss_pools[i].mp) {
-		mempool_free(mem, cnss_pools[i].mp);
-		return 1;
+		if (!cnss_pools[i].pool_ptrs) {
+			pr_err("%s mempool table is null\n",
+			       cnss_pools[i].name);
+			return 0;
+		}
+		spin_lock_irqsave(&pool_table_lock, irq_flags);
+		ret = wcnss_free_pool_table_slot(cnss_pools[i], mem);
+		spin_unlock_irqrestore(&pool_table_lock, irq_flags);
+		if (ret >= 0) {
+			mempool_free(mem, cnss_pools[i].mp);
+			return 1;
+		}
 	}
 
 	return 0;
 }
 EXPORT_SYMBOL(wcnss_prealloc_put);
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)) */
 
 /* Not implemented. Make use of Linux SLAB features. */
 void wcnss_prealloc_check_memory_leak(void) {}

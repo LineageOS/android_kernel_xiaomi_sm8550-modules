@@ -326,7 +326,7 @@ static struct icnss_vreg_cfg *get_vreg_list(u32 *vreg_list_size,
 		return icnss_wcn6450_vreg_list;
 
 	default:
-		icnss_pr_err("Unsupported device_id 0x%x\n", device_id);
+		icnss_pr_err("Unsupported device_id 0x%lx\n", device_id);
 		*vreg_list_size = 0;
 		return NULL;
 	}
