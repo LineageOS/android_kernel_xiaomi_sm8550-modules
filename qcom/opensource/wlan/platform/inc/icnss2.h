@@ -247,4 +247,8 @@ extern void icnss_allow_l1(struct device *dev);
 extern int icnss_get_mhi_state(struct device *dev);
 extern int icnss_is_pci_ep_awake(struct device *dev);
 extern unsigned long icnss_get_device_config(void);
+extern int icnss_register_driver_async_data_cb(struct device *dev, void *cb_ctx,
+					       int (*cb)(void *ctx,
+					       uint16_t type, void *event,
+					       int event_len));
 #endif /* _ICNSS_WLAN_H_ */

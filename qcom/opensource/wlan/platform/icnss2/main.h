@@ -41,6 +41,7 @@
 #define ICNSS_ENABLE_M3_SSR 1
 #define WLAN_RF_SLATE 0
 #define WLAN_RF_APACHE 1
+#define MSI_USERS                       2
 
 extern uint64_t dynamic_feature_mask;
 
@@ -376,6 +377,10 @@ struct icnss_msi_user {
 	u32 base_vector;
 };
 
+struct icnss_print_optimize {
+	int msi_log_chk[MSI_USERS];
+};
+
 struct icnss_msi_config {
 	int total_vectors;
 	int total_users;
@@ -528,6 +533,9 @@ struct icnss_priv {
 	struct icnss_fw_mem qdss_mem[QMI_WLFW_MAX_NUM_MEM_SEG_V01];
 	void *get_info_cb_ctx;
 	int (*get_info_cb)(void *ctx, void *event, int event_len);
+	void *get_driver_async_data_ctx;
+	int (*get_driver_async_data_cb)(void *ctx, uint16_t type, void *event,
+					int event_len);
 	atomic_t soc_wake_ref_count;
 	phys_addr_t hang_event_data_pa;
 	void __iomem *hang_event_data_va;

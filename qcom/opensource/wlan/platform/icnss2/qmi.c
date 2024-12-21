@@ -568,6 +568,9 @@ int wlfw_ind_register_send_sync_msg(struct icnss_priv *priv)
 		req->m3_dump_upload_segments_req_enable = 1;
 	}
 
+	req->async_data_enable_valid = 1;
+	req->async_data_enable = 1;
+
 	priv->stats.ind_register_req++;
 
 	ret = qmi_txn_init(&priv->qmi, &txn,
@@ -2725,6 +2728,32 @@ static void icnss_wlfw_respond_get_info_ind_cb(struct qmi_handle *qmi,
 				       ind_msg->data_len);
 }
 
+static void icnss_wlfw_driver_async_data_ind_cb(struct qmi_handle *qmi,
+						struct sockaddr_qrtr *sq,
+						struct qmi_txn *txn,
+						const void *data)
+{
+	struct icnss_priv *plat_priv =
+			container_of(qmi, struct icnss_priv, qmi);
+	const struct wlfw_driver_async_data_ind_msg_v01 *ind_msg = data;
+
+	icnss_pr_vdbg("Received QMI WLFW driver async data indication\n");
+
+	if (!txn) {
+		icnss_pr_err("Spurious indication\n");
+		return;
+	}
+
+	icnss_pr_vdbg("Extract message with event length: %d, type: %d\n",
+		      ind_msg->data_len, ind_msg->type);
+
+	if (plat_priv->get_driver_async_data_ctx &&
+	    plat_priv->get_driver_async_data_cb)
+		plat_priv->get_driver_async_data_cb(
+			plat_priv->get_driver_async_data_ctx, ind_msg->type,
+			(void *)ind_msg->data, ind_msg->data_len);
+}
+
 static void icnss_wlfw_m3_dump_upload_segs_req_ind_cb(struct qmi_handle *qmi,
 						      struct sockaddr_qrtr *sq,
 						      struct qmi_txn *txn,
@@ -3106,6 +3135,14 @@ static struct qmi_msg_handler wlfw_msg_handlers[] = {
 		.decoded_size =
 		sizeof(struct wlfw_wfc_call_twt_config_ind_msg_v01),
 		.fn = icnss_wlfw_process_twt_cfg_ind
+	},
+	{
+		.type = QMI_INDICATION,
+		.msg_id = QMI_WLFW_DRIVER_ASYNC_DATA_IND_V01,
+		.ei = wlfw_driver_async_data_ind_msg_v01_ei,
+		.decoded_size =
+		sizeof(struct wlfw_driver_async_data_ind_msg_v01),
+		.fn = icnss_wlfw_driver_async_data_ind_cb
 	},
 	{}
 };

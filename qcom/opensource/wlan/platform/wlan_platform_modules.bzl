@@ -9,7 +9,7 @@ _default_module_enablement_list = [
     "wlan_firmware_service",
 ]
 
-_cnss2_enabled_target = ["anorak", "niobe", "pineapple", "sun"]
+_cnss2_enabled_target = ["neo-la", "anorak", "niobe", "pineapple", "sun"]
 _icnss2_enabled_target = ["blair", "pineapple", "monaco", "pitti", "volcano"]
 
 def _get_module_list(target, variant):
@@ -85,7 +85,7 @@ def _define_modules_for_target_variant(target, variant):
             "//msm-kernel:all_headers",
             ":wlan-platform-headers",
         ]
-        if target != "anorak":
+        if target != "anorak" and target != "neo-la":
             deps.append("//vendor/qcom/opensource/securemsm-kernel:{}_smcinvoke_dlkm".format(tv))
 
         ddk_module(
