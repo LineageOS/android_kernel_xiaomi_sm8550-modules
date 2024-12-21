@@ -5682,7 +5682,7 @@ void lim_process_tpe_ie_from_beacon(struct mac_context *mac,
 
 	status = lim_strip_and_decode_eht_cap(buf, buf_len, &bcn_ie->eht_cap,
 					      bcn_ie->he_cap,
-					      session->curr_op_freq);
+					      session->curr_op_freq, false);
 	if (status != QDF_STATUS_SUCCESS) {
 		pe_err("Failed to extract eht cap");
 		return;
@@ -5944,6 +5944,10 @@ void lim_calculate_tpc(struct mac_context *mac,
 						       local_constraint);
 			else
 				max_tx_power = reg_max - local_constraint;
+
+			if (!max_tx_power)
+				max_tx_power = reg_max;
+
 		}
 		/* If TPE is present */
 		if (is_tpe_present && !skip_tpe) {
