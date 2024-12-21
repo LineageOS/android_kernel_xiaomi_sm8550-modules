@@ -1469,7 +1469,6 @@ static int cam_context_user_dump(struct cam_context *ctx,
 	struct cam_context_dump_header  *hdr;
 	uint8_t                         *dst;
 	uint64_t                        *addr, *start;
-	uint32_t                         min_len;
 	size_t                           buf_len, remain_len;
 	uintptr_t                        cpu_addr;
 	uint32_t                         local_len;
@@ -1507,18 +1506,16 @@ static int cam_context_user_dump(struct cam_context *ctx,
 		return -ENOSPC;
 	}
 
+	/* Dump context info */
 	remain_len = buf_len - dump_args->offset;
-	min_len = sizeof(struct cam_context_dump_header) +
-		(CAM_CTXT_DUMP_NUM_WORDS + req->num_in_map_entries +
-		(req->num_out_map_entries * 2)) * sizeof(uint64_t);
-
-	if (remain_len < min_len) {
-		CAM_WARN(CAM_CTXT, "dump buffer exhaust remain %zu min %u",
-			remain_len, min_len);
+	if (remain_len < sizeof(struct cam_context_dump_header)) {
+		CAM_WARN(CAM_CTXT,
+			"No sufficient space in dump buffer for headers, remain buf size: %d, header size: %d",
+			remain_len, sizeof(struct cam_context_dump_header));
+		cam_mem_put_cpu_buf(dump_args->buf_handle);
 		return -ENOSPC;
 	}
 
-	/* Dump context info */
 	dst = (uint8_t *)cpu_addr + dump_args->offset;
 	hdr = (struct cam_context_dump_header *)dst;
 	local_len =
@@ -1542,6 +1539,15 @@ static int cam_context_user_dump(struct cam_context *ctx,
 	if (!list_empty(&ctx->wait_req_list)) {
 		list_for_each_entry_safe(req, req_temp, &ctx->wait_req_list, list) {
 			for (i = 0; i < req->num_out_map_entries; i++) {
+				remain_len = buf_len - dump_args->offset;
+				if (remain_len < sizeof(struct cam_context_dump_header)) {
+					CAM_WARN(CAM_CTXT,
+						"No sufficient space in dump buffer for headers, remain buf size: %d, header size: %d",
+						remain_len, sizeof(struct cam_context_dump_header));
+					cam_mem_put_cpu_buf(dump_args->buf_handle);
+					return -ENOSPC;
+				}
+
 				dst = (uint8_t *)cpu_addr + dump_args->offset;
 				hdr = (struct cam_context_dump_header *)dst;
 				local_len = dump_args->offset +
@@ -1574,6 +1580,15 @@ static int cam_context_user_dump(struct cam_context *ctx,
 	if (!list_empty(&ctx->pending_req_list)) {
 		list_for_each_entry_safe(req, req_temp, &ctx->pending_req_list, list) {
 			for (i = 0; i < req->num_out_map_entries; i++) {
+				remain_len = buf_len - dump_args->offset;
+				if (remain_len < sizeof(struct cam_context_dump_header)) {
+					CAM_WARN(CAM_CTXT,
+						"No sufficient space in dump buffer for headers, remain buf size: %d, header size: %d",
+						remain_len, sizeof(struct cam_context_dump_header));
+					cam_mem_put_cpu_buf(dump_args->buf_handle);
+					return -ENOSPC;
+				}
+
 				dst = (uint8_t *)cpu_addr + dump_args->offset;
 				hdr = (struct cam_context_dump_header *)dst;
 				local_len = dump_args->offset +
@@ -1606,6 +1621,15 @@ static int cam_context_user_dump(struct cam_context *ctx,
 	if (!list_empty(&ctx->active_req_list)) {
 		list_for_each_entry_safe(req, req_temp, &ctx->active_req_list, list) {
 			for (i = 0; i < req->num_out_map_entries; i++) {
+				remain_len = buf_len - dump_args->offset;
+				if (remain_len < sizeof(struct cam_context_dump_header)) {
+					CAM_WARN(CAM_CTXT,
+						"No sufficient space in dump buffer for headers, remain buf size: %d, header size: %d",
+						remain_len, sizeof(struct cam_context_dump_header));
+					cam_mem_put_cpu_buf(dump_args->buf_handle);
+					return -ENOSPC;
+				}
+
 				dst = (uint8_t *)cpu_addr + dump_args->offset;
 				hdr = (struct cam_context_dump_header *)dst;
 				local_len = dump_args->offset +
