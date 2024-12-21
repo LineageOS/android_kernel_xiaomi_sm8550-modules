@@ -3,7 +3,7 @@
 LOCAL_PATH := $(call my-dir)
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama bengal crow kona trinket qcs605), true)
+ifeq ($(call is-board-platform-in-list,taro kalama bengal crow kona trinket qcs605 scuba bengal_515 bengal_515_32go), true)
 
 BT_SELECT := CONFIG_MSM_BT_POWER=m
 #ifdef CONFIG_SLIMBUS
