@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -117,10 +117,22 @@ struct peer_disconnect_stats_param {
 };
 
 /**
+ * struct wlan_mlme_tx_ops - structure of mlme tx function pointers
+ * @send_csa_event_status_ind: Tx ops function to send csa event indication
+ *
+ */
+struct wlan_mlme_tx_ops {
+	QDF_STATUS
+		(*send_csa_event_status_ind)(struct wlan_objmgr_vdev *vdev,
+					     uint8_t csa_status);
+};
+
+/**
  * struct wlan_mlme_psoc_ext_obj -MLME ext psoc priv object
  * @cfg:     cfg items
  * @rso_tx_ops: Roam Tx ops to send roam offload commands to firmware
  * @rso_rx_ops: Roam Rx ops to receive roam offload events from firmware
+ * @mlme_tx_ops: mlme tx ops
  * @wfa_testcmd: WFA config tx ops to send to FW
  * @disconnect_stats_param: Peer disconnect stats related params for SAP case
  * @scan_requester_id: mlme scan requester id
@@ -129,6 +141,7 @@ struct wlan_mlme_psoc_ext_obj {
 	struct wlan_mlme_cfg cfg;
 	struct wlan_cm_roam_tx_ops rso_tx_ops;
 	struct wlan_cm_roam_rx_ops rso_rx_ops;
+	struct wlan_mlme_tx_ops mlme_tx_ops;
 	struct wlan_mlme_wfa_cmd wfa_testcmd;
 	struct peer_disconnect_stats_param disconnect_stats_param;
 	wlan_scan_requester scan_requester_id;
@@ -222,7 +235,9 @@ struct wlan_mlme_roam_state_info {
  * @roam_trigger_bitmap: Master bitmap of roaming triggers. If the bitmap is
  *  zero, roaming module will be deinitialized at firmware for this vdev.
  * @supplicant_disabled_roaming: Enable/disable roam scan in firmware; will be
- *  used by supplicant to do roam invoke after disabling roam scan in firmware
+ *  used by supplicant to do roam invoke after disabling roam scan in firmware,
+ *  it is only effective for current connection, it will be cleared during new
+ *  connection.
  */
 struct wlan_mlme_roaming_config {
 	uint32_t roam_trigger_bitmap;
@@ -396,6 +411,7 @@ struct connect_chan_info {
  * @ext_cap_ie: Ext CAP IE
  * @assoc_btm_cap: BSS transition management cap used in (re)assoc req
  * @chan_info_orig: store channel info at the time of association
+ * @force_20mhz_in_24ghz: Only 20 MHz BW allowed in 2.4 GHz
  */
 struct mlme_connect_info {
 	uint8_t timing_meas_cap;
@@ -422,6 +438,7 @@ struct mlme_connect_info {
 	uint8_t ext_cap_ie[DOT11F_IE_EXTCAP_MAX_LEN + 2];
 	bool assoc_btm_cap;
 	struct connect_chan_info chan_info_orig;
+	bool force_20mhz_in_24ghz;
 };
 
 /** struct wait_for_key_timer - wait for key timer object
@@ -1448,4 +1465,16 @@ bool wlan_vdev_is_sae_auth_type(struct wlan_objmgr_vdev *vdev);
  */
 uint16_t wlan_get_rand_from_lst_for_freq(uint16_t *freq_lst,
 					 uint8_t num_chan);
+
+/**
+ * wlan_mlme_send_csa_event_status_ind_cmd() - send csa event status indication
+ * @vdev: vdev obj
+ * @csa_status: csa status
+ *
+ *  Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_send_csa_event_status_ind_cmd(struct wlan_objmgr_vdev *vdev,
+					uint8_t csa_status);
+
 #endif

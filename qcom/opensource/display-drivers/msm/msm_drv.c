@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -977,11 +977,6 @@ static int msm_drm_component_init(struct device *dev)
 
 	drm_mode_config_reset(ddev);
 
-	ret = drm_dev_register(ddev, 0);
-	if (ret)
-		goto fail;
-	priv->registered = true;
-
 	if (kms && kms->funcs && kms->funcs->cont_splash_config) {
 		ret = kms->funcs->cont_splash_config(kms, NULL);
 		if (ret) {
@@ -989,6 +984,11 @@ static int msm_drm_component_init(struct device *dev)
 			goto fail;
 		}
 	}
+
+	ret = drm_dev_register(ddev, 0);
+	if (ret)
+		goto fail;
+	priv->registered = true;
 
 #if IS_ENABLED(CONFIG_DRM_FBDEV_EMULATION)
 	if (fbdev)

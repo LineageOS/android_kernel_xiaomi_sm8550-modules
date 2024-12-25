@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -6275,6 +6275,10 @@ int dsi_display_dev_remove(struct platform_device *pdev)
 	}
 
 	display = platform_get_drvdata(pdev);
+	if (!display || !display->panel_node) {
+		DSI_ERR("invalid display\n");
+		return -EINVAL;
+	}
 
 	/* decrement ref count */
 	of_node_put(display->panel_node);
@@ -7246,12 +7250,23 @@ int dsi_display_get_modes_helper(struct dsi_display *display,
 
 		memset(&display_mode, 0, sizeof(display_mode));
 
+		display_mode.priv_info = kzalloc(sizeof(*display_mode.priv_info), GFP_KERNEL);
+		if (!display_mode.priv_info) {
+			rc = -ENOMEM;
+			return rc;
+		}
+
+		/* Setup widebus support */
+		display_mode.priv_info->widebus_support = ctrl->ctrl->hw.widebus_support;
+
 		rc = dsi_panel_get_mode(display->panel, mode_idx,
 						&display_mode,
 						topology_override);
 		if (rc) {
 			DSI_ERR("[%s] failed to get mode idx %d from panel\n",
 				   display->name, mode_idx);
+			kfree(display_mode.priv_info);
+			display_mode.priv_info = NULL;
 			rc = -EINVAL;
 			return rc;
 		}
@@ -7279,9 +7294,18 @@ int dsi_display_get_modes_helper(struct dsi_display *display,
 		else
 			nondsc_modes++;
 
-		/* Setup widebus support */
-		display_mode.priv_info->widebus_support =
-				ctrl->ctrl->hw.widebus_support;
+		/*
+		 * Update the host_config.dst_format for compressed RGB101010 pixel format
+		 * when there is no widebus support.
+		 */
+		if (host->dst_format == DSI_PIXEL_FORMAT_RGB101010 &&
+				display_mode.timing.dsc_enabled &&
+				!display_mode.priv_info->widebus_support) {
+			host->dst_format = DSI_PIXEL_FORMAT_RGB888;
+			DSI_DEBUG("updated dst_format from %d to %d\n",
+					DSI_PIXEL_FORMAT_RGB101010, host->dst_format);
+		}
+
 		num_dfps_rates = ((!dfps_caps.dfps_support ||
 			!support_video_mode) ? 1 : dfps_caps.dfps_list_len);
 
@@ -7959,12 +7983,6 @@ int dsi_display_set_mode(struct dsi_display *display,
 			rc = -ENOMEM;
 			goto error;
 		}
-	}
-
-	rc = dsi_display_restore_bit_clk(display, &adj_mode);
-	if (rc) {
-		DSI_ERR("[%s] bit clk rate cannot be restored\n", display->name);
-		goto error;
 	}
 
 	rc = dsi_display_validate_mode_set(display, &adj_mode, flags);

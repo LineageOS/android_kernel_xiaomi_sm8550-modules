@@ -51,3 +51,10 @@ config WCNSS_MEM_PRE_ALLOC
 	  This feature enable cld wlan driver to use pre allocated memory
 	  for it's internal usage and release it to back to pre allocated pool.
 	  This memory is allocated at the cold boot time.
+
+config SLATE_MODULE_ENABLED
+	bool "Enable Slate usage"
+	depends on ICNSS2
+	help
+	  Enable slate compilation.
+	  This config enables slate code for compilation.

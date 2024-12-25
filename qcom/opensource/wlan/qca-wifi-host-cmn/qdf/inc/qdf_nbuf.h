@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1325,6 +1325,7 @@ qdf_nbuf_unmap_nbytes_single_paddr(qdf_device_t osdev, qdf_nbuf_t buf,
 				   qdf_dma_addr_t phy_addr, qdf_dma_dir_t dir,
 				   int nbytes)
 {
+	__qdf_record_nbuf_nbytes(__qdf_nbuf_get_end_offset(buf), dir, false);
 	__qdf_mem_unmap_nbytes_single(osdev, phy_addr, dir, nbytes);
 }
 #endif /* NBUF_MAP_UNMAP_DEBUG */
@@ -5079,18 +5080,6 @@ void qdf_nbuf_add_rx_frag_debug(qdf_frag_t buf, qdf_nbuf_t nbuf,
 				unsigned int truesize, bool take_frag_ref,
 				const char *func, uint32_t line);
 
-#define qdf_nbuf_ref_frag(f) \
-	qdf_nbuf_ref_frag_debug(f, __func__, __LINE__)
-
-/**
- * qdf_nbuf_ref_frag_debug() - get frag reference
- * @buf: Frag pointer needs to be taken reference.
- * @func: Caller function name
- * @line: Caller function line no.
- *
- * Return: none
- */
-void qdf_nbuf_ref_frag_debug(qdf_frag_t buf, const char *func, uint32_t line);
 
 /**
  * qdf_net_buf_debug_acquire_frag() - Add frag nodes to frag debug tracker
@@ -5189,17 +5178,6 @@ static inline void qdf_nbuf_add_rx_frag(qdf_frag_t buf, qdf_nbuf_t nbuf,
 {
 	__qdf_nbuf_add_rx_frag(buf, nbuf, offset,
 			       frag_len, truesize, take_frag_ref);
-}
-
-/**
- * qdf_nbuf_ref_frag() - get frag reference
- * @buf: Frag pointer needs to be taken reference.
- *
- * Return: void
- */
-static inline void qdf_nbuf_ref_frag(qdf_frag_t buf)
-{
-	__qdf_nbuf_ref_frag(buf);
 }
 
 static inline void qdf_net_buf_debug_acquire_frag(qdf_nbuf_t buf,

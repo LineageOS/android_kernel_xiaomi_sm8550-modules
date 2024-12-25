@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2016-2021, The Linux Foundation. All rights reserved. */
-/* Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved. */
+/* Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved. */
 
 
 #include <linux/err.h>
@@ -73,6 +73,15 @@ static const struct file_operations cnss_pin_connect_fops = {
 	.llseek		= seq_lseek,
 };
 
+static u64 cnss_get_serial_id(struct cnss_plat_data *plat_priv)
+{
+	u32 msb = plat_priv->serial_id.serial_id_msb;
+	u32 lsb = plat_priv->serial_id.serial_id_lsb;
+
+	msb &= 0xFFFF;
+	return (((u64)msb << 32) | lsb);
+}
+
 static int cnss_stats_show_state(struct seq_file *s,
 				 struct cnss_plat_data *plat_priv)
 {
@@ -80,6 +89,8 @@ static int cnss_stats_show_state(struct seq_file *s,
 	int skip = 0;
 	unsigned long state;
 
+	seq_printf(s, "\nSerial Number: 0x%llx",
+		   cnss_get_serial_id(plat_priv));
 	seq_printf(s, "\nState: 0x%lx(", plat_priv->driver_state);
 	for (i = 0, state = plat_priv->driver_state; state != 0;
 	     state >>= 1, i++) {
@@ -174,6 +185,9 @@ static int cnss_stats_show_state(struct seq_file *s,
 		case CNSS_DRIVER_REGISTERED:
 			seq_puts(s, "DRIVER REGISTERED");
 			continue;
+		case CNSS_POWER_OFF:
+			seq_puts(s, "POWER OFF");
+			continue;
 		}
 
 		seq_printf(s, "UNKNOWN-%d", i);
@@ -262,6 +276,8 @@ static ssize_t cnss_dev_boot_debug_write(struct file *fp,
 					     0, NULL);
 		clear_bit(CNSS_DRIVER_DEBUG, &plat_priv->driver_state);
 	} else if (sysfs_streq(cmd, "assert_host_sol")) {
+		pci_priv = plat_priv->bus_priv;
+		cnss_auto_resume(&pci_priv->pci_dev->dev);
 		ret = cnss_set_host_sol_value(plat_priv, 1);
 	} else if (sysfs_streq(cmd, "deassert_host_sol")) {
 		ret = cnss_set_host_sol_value(plat_priv, 0);
@@ -321,6 +337,10 @@ static int cnss_dev_boot_debug_show(struct seq_file *s, void *data)
 	seq_puts(s, "\npdc_update usage:");
 	seq_puts(s, "1. echo pdc_update {class: wlan_pdc ss: <pdc_ss>, res: <vreg>.<mode>, <seq>: <val>} > <debugfs_path>/cnss/dev_boot\n");
 	seq_puts(s, "2. echo pdc_update {class: wlan_pdc ss: <pdc_ss>, res: pdc, enable: <val>} > <debugfs_path>/cnss/dev_boot\n");
+	seq_puts(s, "assert_host_sol: Assert host sol\n");
+	seq_puts(s, "deassert_host_sol: Deassert host sol\n");
+	seq_puts(s, "dev_check: Check whether HW is disabled or not\n");
+	seq_puts(s, "dev_enable: Enable HW\n");
 
 	return 0;
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -97,6 +97,20 @@ static int cam_ife_mgr_prog_default_settings(
 
 static int cam_ife_mgr_cmd_get_sof_timestamp(struct cam_ife_hw_mgr_ctx *ife_ctx,
 	uint64_t *time_stamp, uint64_t *boot_time_stamp, uint64_t *prev_time_stamp);
+
+
+static int cam_ife_mgr_get_first_valid_csid_id(void)
+{
+	int i = 0;
+
+	for (i = 0; i < CAM_IFE_CSID_HW_NUM_MAX; i++) {
+		if (g_ife_hw_mgr.csid_devices[i]) {
+			CAM_DBG(CAM_ISP, "valid csid_id %d", i);
+			return i;
+		}
+	}
+	return 0;
+}
 
 static int cam_ife_mgr_update_core_info_to_cpas(struct cam_ife_hw_mgr_ctx           *ctx,
 	bool set_port)
@@ -382,6 +396,8 @@ static int cam_ife_mgr_handle_reg_dump(struct cam_ife_hw_mgr_ctx *ctx,
 	bool user_triggered_dump)
 {
 	int rc = 0, i;
+	uintptr_t cpu_addr = 0;
+	size_t    buf_size = 0;
 
 	if (!num_reg_dump_buf || !reg_dump_buf_desc) {
 		CAM_DBG(CAM_ISP,
@@ -396,24 +412,53 @@ static int cam_ife_mgr_handle_reg_dump(struct cam_ife_hw_mgr_ctx *ctx,
 			"Reg dump values might be from more than one request");
 
 	for (i = 0; i < num_reg_dump_buf; i++) {
-		CAM_DBG(CAM_ISP, "Reg dump cmd meta data: %u req_type: %u",
-			reg_dump_buf_desc[i].meta_data, meta_type);
+                rc = cam_packet_util_validate_cmd_desc(&reg_dump_buf_desc[i]);
+                if (rc)
+                        return rc;
+
+		CAM_DBG(CAM_ISP, "Reg dump cmd meta data: %u req_type: %u ctx_idx: %u req:%llu",
+			reg_dump_buf_desc[i].meta_data, meta_type, ctx->ctx_index,
+			ctx->applied_req_id);
 		if (reg_dump_buf_desc[i].meta_data == meta_type) {
+			if (in_serving_softirq()) {
+				cpu_addr = ctx->reg_dump_cmd_buf_addr_len[i].cpu_addr;
+				buf_size = ctx->reg_dump_cmd_buf_addr_len[i].buf_size;
+			} else {
+				rc = cam_mem_get_cpu_buf(reg_dump_buf_desc[i].mem_handle,
+					&cpu_addr, &buf_size);
+				if (rc) {
+					CAM_ERR(CAM_ISP,
+						"Failed in Get cpu addr, rc=%d, mem_handle =%d",
+						rc, reg_dump_buf_desc[i].mem_handle);
+					return rc;
+				}
+			}
+			if (!cpu_addr || (buf_size == 0)) {
+				CAM_ERR(CAM_ISP, "Invalid cpu_addr=%pK mem_handle=%d",
+					(void *)cpu_addr, reg_dump_buf_desc[i].mem_handle);
+				if (!in_serving_softirq())
+					cam_mem_put_cpu_buf(reg_dump_buf_desc[i].mem_handle);
+				return rc;
+			}
+
 			rc = cam_soc_util_reg_dump_to_cmd_buf(ctx,
 				&reg_dump_buf_desc[i],
 				ctx->applied_req_id,
 				cam_ife_mgr_regspace_data_cb,
 				soc_dump_args,
-				user_triggered_dump);
+				user_triggered_dump, cpu_addr, buf_size);
 			if (rc) {
 				CAM_ERR(CAM_ISP,
-					"Reg dump failed at idx: %d, rc: %d req_id: %llu meta type: %u",
-					i, rc, ctx->applied_req_id, meta_type);
+					"Reg dump failed at idx: %d, rc: %d req_id: %llu meta type: %u ctx_idx: %u",
+					i, rc, ctx->applied_req_id, meta_type, ctx->ctx_index);
+				if (!in_serving_softirq())
+					cam_mem_put_cpu_buf(reg_dump_buf_desc[i].mem_handle);
 				return rc;
 			}
+			if (!in_serving_softirq())
+				cam_mem_put_cpu_buf(reg_dump_buf_desc[i].mem_handle);
 		}
 	}
-
 	return rc;
 }
 
@@ -673,8 +718,7 @@ static inline bool cam_ife_hw_mgr_is_ife_out_port(uint32_t res_id)
 	bool is_ife_out = false;
 
 	if ((res_id >= CAM_ISP_IFE_OUT_RES_BASE) &&
-		(res_id <= (CAM_ISP_IFE_OUT_RES_BASE +
-		max_ife_out_res)))
+		(res_id < (CAM_ISP_IFE_OUT_RES_BASE + max_ife_out_res)))
 		is_ife_out = true;
 
 	return is_ife_out;
@@ -2672,6 +2716,7 @@ static int cam_ife_hw_mgr_acquire_res_sfe_src(
 	uint32_t                             sfe_res_id = 0;
 	struct cam_ife_hw_mgr               *hw_mgr;
 	struct cam_isp_hw_mgr_res           *csid_res_map[CAM_ISP_HW_SFE_IN_MAX];
+	int valid_id = 0;
 
 	hw_mgr = ife_ctx->hw_mgr;
 	list_for_each_entry(csid_res, &ife_ctx->res_list_ife_csid, list) {
@@ -2718,9 +2763,11 @@ static int cam_ife_hw_mgr_acquire_res_sfe_src(
 		 * 1. No read count
 		 * 2. Dynamic switch from SHDR-->HDR and HDR-->SHDR is possible
 		 */
+		valid_id = cam_ife_mgr_get_first_valid_csid_id();
 		if ((!(sfe_required_res & BIT(CAM_ISP_HW_SFE_IN_PIX))) &&
 			(!in_port->ife_rd_count || in_port->dynamic_hdr_switch_en) &&
-			(BIT(csid_res->res_id) == hw_mgr->csid_hw_caps[0].sfe_ipp_input_rdi_res)) {
+			(BIT(csid_res->res_id) ==
+			hw_mgr->csid_hw_caps[valid_id].sfe_ipp_input_rdi_res)) {
 			sfe_required_res |= BIT(CAM_ISP_HW_SFE_IN_PIX);
 			csid_res_map[CAM_ISP_HW_SFE_IN_PIX] = csid_res;
 		}
@@ -3492,13 +3539,14 @@ static bool cam_ife_hw_mgr_is_need_csid_ipp(
 {
 	struct cam_ife_hw_mgr   *hw_mgr;
 	bool                     need = true;
-
+	int valid_id = 0;
 	hw_mgr = ife_ctx->hw_mgr;
 
+	valid_id = cam_ife_mgr_get_first_valid_csid_id();
 	if (!(in_port->ipp_count || in_port->lcr_count))
 		need =  false;
 	else if (ife_ctx->ctx_type == CAM_IFE_CTX_TYPE_SFE &&
-		((hw_mgr->csid_hw_caps[0].sfe_ipp_input_rdi_res && !in_port->usage_type) ||
+		((hw_mgr->csid_hw_caps[valid_id].sfe_ipp_input_rdi_res && !in_port->usage_type) ||
 		in_port->ife_rd_count))
 		need =  false;
 
@@ -3816,11 +3864,13 @@ static int cam_ife_hw_mgr_get_csid_rdi_for_sfe_ipp_input(
 	struct cam_ife_hw_mgr   *hw_mgr;
 	uint32_t                 res_id = CAM_IFE_PIX_PATH_RES_MAX;
 	int                      rc = 0;
+	int                      valid_id;
 
 	hw_mgr = ife_ctx->hw_mgr;
 
-	if (hw_mgr->csid_hw_caps[0].sfe_ipp_input_rdi_res && !in_port->usage_type)
-		res_id = ffs(hw_mgr->csid_hw_caps[0].sfe_ipp_input_rdi_res) - 1;
+	valid_id = cam_ife_mgr_get_first_valid_csid_id();
+	if (hw_mgr->csid_hw_caps[valid_id].sfe_ipp_input_rdi_res && !in_port->usage_type)
+		res_id = ffs(hw_mgr->csid_hw_caps[valid_id].sfe_ipp_input_rdi_res) - 1;
 
 	if ((res_id != CAM_IFE_PIX_PATH_RES_MAX) && (!(BIT(res_id) & (*acquired_rdi_res)))) {
 		rc  = cam_ife_hw_mgr_acquire_csid_rdi_util(ife_ctx,
@@ -5155,6 +5205,7 @@ static int cam_ife_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 	ife_ctx->common.sec_pf_evt_cb = acquire_args->sec_pf_evt_cb;
 	ife_ctx->try_recovery_cnt = 0;
 	ife_ctx->recovery_req_id = 0;
+	ife_ctx->flags.skip_reg_dump_buf_put = false;
 
 	acquire_hw_info =
 		(struct cam_isp_acquire_hw_info *)acquire_args->acquire_info;
@@ -6779,6 +6830,12 @@ static int cam_ife_mgr_stop_hw(void *hw_mgr_priv, void *stop_hw_args)
 	mutex_unlock(&g_ife_hw_mgr.ctx_mutex);
 
 end:
+	if (!stop_isp->is_internal_stop && !ctx->flags.skip_reg_dump_buf_put) {
+		for (i = 0; i < ctx->num_reg_dump_buf; i++)
+			cam_mem_put_cpu_buf(ctx->reg_dump_buf_desc[i].mem_handle);
+		ctx->num_reg_dump_buf = 0;
+	}
+	ctx->flags.skip_reg_dump_buf_put = false;
 	ctx->flags.dump_on_error = false;
 	ctx->flags.dump_on_flush = false;
 	return rc;
@@ -7445,10 +7502,8 @@ static int cam_ife_mgr_release_hw(void *hw_mgr_priv,
 	ctx->cdm_handle = 0;
 	ctx->cdm_hw_idx = -1;
 	ctx->cdm_ops = NULL;
-	ctx->num_reg_dump_buf = 0;
 	ctx->ctx_type = CAM_IFE_CTX_TYPE_NONE;
 	ctx->ctx_config = 0;
-	ctx->num_reg_dump_buf = 0;
 	ctx->last_cdm_done_req = 0;
 	ctx->left_hw_idx = CAM_IFE_CSID_HW_NUM_MAX;
 	ctx->right_hw_idx = CAM_IFE_CSID_HW_NUM_MAX;
@@ -11706,6 +11761,27 @@ static int cam_ife_mgr_prepare_hw_update(void *hw_mgr_priv,
 				prepare->reg_dump_buf_desc,
 				sizeof(struct cam_cmd_buf_desc) *
 				prepare->num_reg_dump_buf);
+			/*
+			 * save the address for error/flush cases to avoid
+			 * invoking mutex(cpu get/put buf) in tasklet/atomic context.
+			 */
+			for (i = 0; i < ctx->num_reg_dump_buf; i++) {
+				rc = cam_mem_get_cpu_buf(ctx->reg_dump_buf_desc[i].mem_handle,
+					&(ctx->reg_dump_cmd_buf_addr_len[i].cpu_addr),
+					&(ctx->reg_dump_cmd_buf_addr_len[i].buf_size));
+
+				if (rc) {
+					CAM_ERR(CAM_ISP,
+						"Failed in get_cpu_addr i=%d rc=%d, cpu_addr=%pK",
+						i, rc,
+						(void *)ctx->reg_dump_cmd_buf_addr_len[i].cpu_addr);
+					for (--i; i >= 0; i--)
+						cam_mem_put_cpu_buf(
+							ctx->reg_dump_buf_desc[i].mem_handle);
+					ctx->flags.skip_reg_dump_buf_put = true;
+					return rc;
+				}
+			}
 		}
 
 		/* Per req reg dump */

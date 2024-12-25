@@ -482,6 +482,11 @@ endif
 ifeq ($(CONFIG_WLAN_SYSFS_BITRATES), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_bitrates.o
 endif
+
+ifeq ($(CONFIG_WLAN_SYSFS_RF_TEST_MODE), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_rf_test_mode.o
+endif
+
 endif # CONFIG_WLAN_SYSFS
 
 ifeq ($(CONFIG_QCACLD_FEATURE_FW_STATE), y)
@@ -943,8 +948,14 @@ CLD_WMI_MC_CP_STATS_OBJS :=	$(WMI_DIR)/src/wmi_unified_mc_cp_stats_tlv.o \
 				$(WMI_DIR)/src/wmi_unified_mc_cp_stats_api.o
 endif
 
+ifeq ($(CONFIG_QCA_TARGET_IF_MLME), y)
+CLD_WMI_MLME_OBJS += $(WMI_DIR)/src/wmi_unified_mlme_tlv.o \
+		     $(WMI_DIR)/src/wmi_unified_mlme_api.o
+endif
+
 CLD_WMI_OBJS :=	$(CLD_WMI_ROAM_OBJS) \
-		$(CLD_WMI_MC_CP_STATS_OBJS)
+		$(CLD_WMI_MC_CP_STATS_OBJS) \
+		$(CLD_WMI_MLME_OBJS)
 
 $(call add-wlan-objs,cld_wmi,$(CLD_WMI_OBJS))
 
@@ -1763,10 +1774,15 @@ $(call add-wlan-objs,wlan_pre_cac,$(WLAN_PRE_CAC_OBJS))
 CLD_TARGET_IF_DIR := components/target_if
 
 CLD_TARGET_IF_INC := -I$(WLAN_ROOT)/$(CLD_TARGET_IF_DIR)/pmo/inc \
-	 -I$(WLAN_ROOT)/$(CLD_TARGET_IF_DIR)/pmo/src
+		-I$(WLAN_ROOT)/$(CLD_TARGET_IF_DIR)/pmo/src \
+		-I$(WLAN_ROOT)/$(CLD_TARGET_IF_DIR)/mlme/inc
+
+ifeq ($(CONFIG_QCA_TARGET_IF_MLME), y)
+CLD_TARGET_IF_OBJ := $(CLD_TARGET_IF_DIR)/mlme/src/target_if_mlme.o
+endif
 
 ifeq ($(CONFIG_POWER_MANAGEMENT_OFFLOAD), y)
-CLD_TARGET_IF_OBJ := $(CLD_TARGET_IF_DIR)/pmo/src/target_if_pmo_arp.o \
+CLD_TARGET_IF_OBJ += $(CLD_TARGET_IF_DIR)/pmo/src/target_if_pmo_arp.o \
 		$(CLD_TARGET_IF_DIR)/pmo/src/target_if_pmo_gtk.o \
 		$(CLD_TARGET_IF_DIR)/pmo/src/target_if_pmo_hw_filter.o \
 		$(CLD_TARGET_IF_DIR)/pmo/src/target_if_pmo_lphb.o \
@@ -3259,6 +3275,7 @@ INCS +=		$(COAP_WMI_INC)
 ccflags-y += $(INCS)
 
 cppflags-y +=	-DANI_OS_TYPE_ANDROID=6 \
+		-D__ANDROID_COMMON_KERNEL__ \
 		-Wall\
 		-Werror\
 		-D__linux__
@@ -3273,6 +3290,7 @@ cppflags-$(CONFIG_FEATURE_WLAN_SCAN_PNO) += -DFEATURE_WLAN_SCAN_PNO
 cppflags-$(CONFIG_WLAN_FEATURE_PACKET_FILTERING) += -DWLAN_FEATURE_PACKET_FILTERING
 cppflags-$(CONFIG_DHCP_SERVER_OFFLOAD) += -DDHCP_SERVER_OFFLOAD
 cppflags-$(CONFIG_WLAN_NS_OFFLOAD) += -DWLAN_NS_OFFLOAD
+ccflags-$(CONFIG_QCA_TARGET_IF_MLME) += -DQCA_TARGET_IF_MLME
 cppflags-$(CONFIG_WLAN_DYNAMIC_ARP_NS_OFFLOAD) += -DFEATURE_WLAN_DYNAMIC_ARP_NS_OFFLOAD
 cppflags-$(CONFIG_WLAN_FEATURE_ICMP_OFFLOAD) += -DWLAN_FEATURE_ICMP_OFFLOAD
 cppflags-$(CONFIG_FEATURE_WLAN_RA_FILTERING) += -DFEATURE_WLAN_RA_FILTERING
@@ -3531,6 +3549,7 @@ cppflags-$(CONFIG_WIFI_MONITOR_SUPPORT) += -DWIFI_MONITOR_SUPPORT
 cppflags-$(CONFIG_QCA_MONITOR_PKT_SUPPORT) += -DQCA_MONITOR_PKT_SUPPORT
 cppflags-$(CONFIG_MONITOR_MODULARIZED_ENABLE) += -DMONITOR_MODULARIZED_ENABLE
 cppflags-$(CONFIG_DP_PKT_ADD_TIMESTAMP) += -DCONFIG_DP_PKT_ADD_TIMESTAMP
+ccflags-$(CONFIG_WLAN_SYSFS_RF_TEST_MODE) += -DFEATURE_SYSFS_RF_TEST_MODE
 
 ifeq ($(CONFIG_LEAK_DETECTION), y)
 cppflags-y += \

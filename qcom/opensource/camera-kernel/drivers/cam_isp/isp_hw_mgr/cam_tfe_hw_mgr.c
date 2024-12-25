@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -137,6 +137,8 @@ static int cam_tfe_mgr_handle_reg_dump(struct cam_tfe_hw_mgr_ctx *ctx,
 	bool user_triggered_dump)
 {
 	int rc = -EINVAL, i;
+	uintptr_t cpu_addr = 0;
+	size_t    buf_size = 0;
 
 	if (!num_reg_dump_buf || !reg_dump_buf_desc) {
 		CAM_DBG(CAM_ISP,
@@ -151,21 +153,49 @@ static int cam_tfe_mgr_handle_reg_dump(struct cam_tfe_hw_mgr_ctx *ctx,
 			"Reg dump values might be from more than one request");
 
 	for (i = 0; i < num_reg_dump_buf; i++) {
+		rc = cam_packet_util_validate_cmd_desc(&reg_dump_buf_desc[i]);
+		if (rc)
+			return rc;
+
 		CAM_DBG(CAM_ISP, "Reg dump cmd meta data: %u req_type: %u",
 			reg_dump_buf_desc[i].meta_data, meta_type);
 		if (reg_dump_buf_desc[i].meta_data == meta_type) {
+			if (in_serving_softirq()) {
+				cpu_addr = ctx->reg_dump_cmd_buf_addr_len[i].cpu_addr;
+				buf_size = ctx->reg_dump_cmd_buf_addr_len[i].buf_size;
+			} else {
+				rc = cam_mem_get_cpu_buf(reg_dump_buf_desc[i].mem_handle,
+					&cpu_addr, &buf_size);
+				if (rc) {
+					CAM_ERR(CAM_ISP,
+						"Failed in Get cpu addr, rc=%d, mem_handle =%d",
+						rc, reg_dump_buf_desc[i].mem_handle);
+					return rc;
+				}
+			}
+			if (!cpu_addr || (buf_size == 0)) {
+				CAM_ERR(CAM_ISP, "Invalid cpu_addr=%pK mem_handle=%d",
+					(void *)cpu_addr, reg_dump_buf_desc[i].mem_handle);
+				if (!in_serving_softirq())
+					cam_mem_put_cpu_buf(reg_dump_buf_desc[i].mem_handle);
+				return rc;
+			}
 			rc = cam_soc_util_reg_dump_to_cmd_buf(ctx,
 				&reg_dump_buf_desc[i],
 				ctx->applied_req_id,
 				cam_tfe_mgr_regspace_data_cb,
 				soc_dump_args,
-				user_triggered_dump);
+				user_triggered_dump, cpu_addr, buf_size);
 			if (rc) {
 				CAM_ERR(CAM_ISP,
 					"Reg dump failed at idx: %d, rc: %d req_id: %llu meta type: %u",
 					i, rc, ctx->applied_req_id, meta_type);
+				if (!in_serving_softirq())
+					cam_mem_put_cpu_buf(reg_dump_buf_desc[i].mem_handle);
 				return rc;
 			}
+			if (!in_serving_softirq())
+				cam_mem_put_cpu_buf(reg_dump_buf_desc[i].mem_handle);
 		}
 	}
 
@@ -187,7 +217,7 @@ static int cam_tfe_mgr_get_hw_caps_internal(void *hw_mgr_priv,
 	for (i = 0; i < CAM_TFE_CSID_HW_NUM_MAX; i++) {
 		if (!hw_mgr->csid_devices[i])
 			break;
-		if (query_isp->num_dev < i)
+		if (i >= query_isp->num_dev)
 			return -EINVAL;
 
 		query_isp->dev_caps[i].hw_type = CAM_ISP_TFE_HW_TFE;
@@ -283,7 +313,8 @@ static int cam_tfe_mgr_get_hw_caps_v2(void *hw_mgr_priv,
 		return -EINVAL;
 	}
 
-	if (!tmp_query_isp_v2.num_dev) {
+	if (!tmp_query_isp_v2.num_dev ||
+			tmp_query_isp_v2.num_dev > CAM_TFE_CSID_HW_NUM_MAX) {
 		CAM_ERR(CAM_ISP, "Invalid Num of dev is %d query cap version %d",
 			tmp_query_isp_v2.num_dev, tmp_query_isp_v2.version);
 		rc = -EINVAL;
@@ -2149,6 +2180,8 @@ static int cam_tfe_mgr_acquire_get_unified_structure_v2(
 					CAM_ISP_TFE_FLAG_SHDR_SLAVE_EN;
 	in_port->is_shdr_master  =  in->feature_flag &
 					CAM_ISP_TFE_FLAG_SHDR_MASTER_EN;
+	in_port->epd_supported  =  in->feature_flag &
+					CAM_ISP_TFE_FLAG_EPD_SUPPORT;
 
 
 	if (in_port->bayer_bin && in_port->qcfa_bin) {
@@ -2343,6 +2376,7 @@ static int cam_tfe_mgr_acquire_hw(void *hw_mgr_priv, void *acquire_hw_args)
 	tfe_ctx->current_mup = 0;
 	tfe_ctx->try_recovery_cnt = 0;
 	tfe_ctx->recovery_req_id = 0;
+	tfe_ctx->skip_reg_dump_buf_put = false;
 
 	acquire_hw_info = (struct cam_isp_tfe_acquire_hw_info *)
 		acquire_args->acquire_info;
@@ -2974,6 +3008,7 @@ static int cam_tfe_mgr_config_hw(void *hw_mgr_priv,
 	struct cam_tfe_hw_mgr_ctx *ctx;
 	struct cam_isp_prepare_hw_update_data *hw_update_data;
 	bool is_cdm_hung = false;
+	unsigned long rem_jiffies = 0;
 
 	if (!hw_mgr_priv || !config_hw_args) {
 		CAM_ERR(CAM_ISP, "Invalid arguments");
@@ -3154,12 +3189,13 @@ static int cam_tfe_mgr_config_hw(void *hw_mgr_priv,
 		goto end;
 
 	for (i = 0; i < CAM_TFE_HW_CONFIG_WAIT_MAX_TRY; i++) {
-		rc = cam_common_wait_for_completion_timeout(
+		rem_jiffies = cam_common_wait_for_completion_timeout(
 			&ctx->config_done_complete,
 			msecs_to_jiffies(
 			CAM_TFE_HW_CONFIG_TIMEOUT));
-		if (rc <= 0) {
-			if (!cam_cdm_detect_hang_error(ctx->cdm_handle)) {
+		if (rem_jiffies <= 0) {
+			rc = cam_cdm_detect_hang_error(ctx->cdm_handle);
+			if (rc == 0) {
 				CAM_ERR(CAM_ISP,
 					"CDM workqueue delay detected, wait for some more time req_id=%llu rc=%d ctx_index %d",
 					cfg->request_id, rc,
@@ -3171,24 +3207,21 @@ static int cam_tfe_mgr_config_hw(void *hw_mgr_priv,
 					CAM_DEFAULT_VALUE,
 					CAM_DEFAULT_VALUE, rc);
 				continue;
-			}
+			} else {
+				CAM_ERR(CAM_ISP,
+					"cfg_done completn timeout cdm_hang=%d req=%llu ctx_idx=%d",
+					true, cfg->request_id,
+					ctx->ctx_index);
+				cam_req_mgr_debug_delay_detect();
+				trace_cam_delay_detect("ISP",
+					"config done completion timeout",
+					cfg->request_id, ctx->ctx_index,
+					CAM_DEFAULT_VALUE, CAM_DEFAULT_VALUE,
+					rc);
 
-			CAM_ERR(CAM_ISP,
-				"config done completion timeout for req_id=%llu rc=%d ctx_index %d",
-				cfg->request_id, rc,
-				ctx->ctx_index);
-
-			cam_req_mgr_debug_delay_detect();
-			trace_cam_delay_detect("ISP",
-				"config done completion timeout",
-				cfg->request_id, ctx->ctx_index,
-				CAM_DEFAULT_VALUE, CAM_DEFAULT_VALUE,
-				rc);
-
-			if (rc == 0)
 				rc = -ETIMEDOUT;
-
-			goto end;
+				break;
+			}
 		} else {
 			rc = 0;
 			if (hw_update_data->mup_en)
@@ -3201,7 +3234,7 @@ static int cam_tfe_mgr_config_hw(void *hw_mgr_priv,
 	}
 
 	if ((i == CAM_TFE_HW_CONFIG_WAIT_MAX_TRY) && (rc == 0))
-		rc = -ETIMEDOUT;
+		CAM_DBG(CAM_ISP, "Wq delayed but IRQ CDM done");
 
 end:
 	CAM_DBG(CAM_ISP, "Exit: Config Done: %llu",  cfg->request_id);
@@ -3448,6 +3481,12 @@ static int cam_tfe_mgr_stop_hw(void *hw_mgr_priv, void *stop_hw_args)
 	ctx->packet = NULL;
 
 end:
+	if (!ctx->skip_reg_dump_buf_put) {
+		for (i = 0; i < ctx->num_reg_dump_buf; i++)
+			cam_mem_put_cpu_buf(ctx->reg_dump_buf_desc[i].mem_handle);
+		ctx->num_reg_dump_buf = 0;
+	}
+	ctx->skip_reg_dump_buf_put = false;
 	return rc;
 }
 
@@ -4028,7 +4067,6 @@ static int cam_tfe_mgr_release_hw(void *hw_mgr_priv,
 	ctx->cdm_ops = NULL;
 	ctx->init_done = false;
 	ctx->is_dual = false;
-	ctx->num_reg_dump_buf = 0;
 	ctx->last_cdm_done_req = 0;
 	ctx->is_shdr = false;
 	ctx->is_shdr_slave = false;
@@ -5450,6 +5488,26 @@ static int cam_tfe_mgr_prepare_hw_update(void *hw_mgr_priv,
 				prepare->reg_dump_buf_desc,
 				sizeof(struct cam_cmd_buf_desc) *
 				prepare->num_reg_dump_buf);
+			/*
+			 * save the address for error/flush cases to avoid
+			 * invoking mutex(cpu get/put buf) in tasklet/atomic context.
+			 */
+			for (i = 0; i < ctx->num_reg_dump_buf; i++) {
+				rc = cam_mem_get_cpu_buf(ctx->reg_dump_buf_desc[i].mem_handle,
+					&(ctx->reg_dump_cmd_buf_addr_len[i].cpu_addr),
+					&(ctx->reg_dump_cmd_buf_addr_len[i].buf_size));
+				if (rc) {
+					CAM_ERR(CAM_ISP,
+						"Failed in Get cpu addr, rc=%d,i=%d cpu_addr=%pK",
+						rc, i,
+						(void *)ctx->reg_dump_cmd_buf_addr_len[i].cpu_addr);
+					for (--i; i >= 0; i--)
+						cam_mem_put_cpu_buf(
+							ctx->reg_dump_buf_desc[i].mem_handle);
+					ctx->skip_reg_dump_buf_put = true;
+					return rc;
+				}
+			}
 		} else {
 			prepare_hw_data->num_reg_dump_buf =
 				prepare->num_reg_dump_buf;

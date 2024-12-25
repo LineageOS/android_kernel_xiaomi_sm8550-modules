@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -53,7 +53,7 @@
 #include "wlan_reg_ucfg_api.h"
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_dfs_utils_api.h>
-#include "wlan_crypto_global_def.h"
+#include "wlan_crypto_def_i.h"
 #include "wlan_crypto_global_api.h"
 #include "wlan_cm_bss_score_param.h"
 
@@ -2150,22 +2150,20 @@ uint32_t scm_get_last_scan_time_per_channel(struct wlan_objmgr_vdev *vdev,
 	return 0;
 }
 
-QDF_STATUS
+struct scan_cache_entry *
 scm_scan_get_scan_entry_by_mac_freq(struct wlan_objmgr_pdev *pdev,
 				    struct qdf_mac_addr *bssid,
-				    uint16_t freq,
-				    struct scan_cache_entry
-				    *cache_entry)
+				    uint16_t freq)
 {
 	struct scan_filter *scan_filter;
 	qdf_list_t *list = NULL;
 	struct scan_cache_node *first_node = NULL;
 	qdf_list_node_t *cur_node = NULL;
-	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	struct scan_cache_entry *scan_entry = NULL;
 
 	scan_filter = qdf_mem_malloc(sizeof(*scan_filter));
 	if (!scan_filter)
-		return QDF_STATUS_E_NOMEM;
+		return NULL;
 	scan_filter->num_of_bssid = 1;
 	scan_filter->chan_freq_list[0] = freq;
 	scan_filter->num_of_channels = 1;
@@ -2174,7 +2172,9 @@ scm_scan_get_scan_entry_by_mac_freq(struct wlan_objmgr_pdev *pdev,
 	list = scm_get_scan_result(pdev, scan_filter);
 	qdf_mem_free(scan_filter);
 	if (!list || (list && !qdf_list_size(list))) {
-		status = QDF_STATUS_E_INVAL;
+		scm_debug("Scan entry for bssid:"
+			  QDF_MAC_ADDR_FMT "and freq %d not found",
+			  QDF_MAC_ADDR_REF(bssid->bytes), freq);
 		goto done;
 	}
 	/*
@@ -2189,18 +2189,14 @@ scm_scan_get_scan_entry_by_mac_freq(struct wlan_objmgr_pdev *pdev,
 				      struct scan_cache_node,
 				      node);
 
-	if (first_node && first_node->entry) {
-		qdf_mem_copy(cache_entry,
-			     first_node->entry,
-			     sizeof(struct scan_cache_entry));
-		status = QDF_STATUS_SUCCESS;
-	}
+	if (first_node && first_node->entry)
+		scan_entry = util_scan_copy_cache_entry(first_node->entry);
 
 done:
 	if (list)
 		scm_purge_scan_results(list);
 
-	return status;
+	return scan_entry;
 }
 
 QDF_STATUS
@@ -2324,4 +2320,75 @@ exit:
 		scm_purge_scan_results(list);
 
 	return scan_entry;
+}
+
+bool scm_scan_entries_contain_cmn_akm(struct scan_cache_entry *entry1,
+				      struct scan_cache_entry *entry2)
+{
+	wlan_crypto_key_mgmt akm_type;
+	uint32_t key_mgmt;
+	struct security_info *entry1_sec_info, *entry2_sec_info;
+
+	/* For Open security, allow connection */
+	if (!entry1->ie_list.rsn && !entry2->ie_list.rsn)
+		return true;
+
+	/* If only one is open connection, remove the partner link */
+	if (!entry1->ie_list.rsn || !entry2->ie_list.rsn)
+		return false;
+
+	entry1_sec_info = &entry1->neg_sec_info;
+	entry2_sec_info = &entry2->neg_sec_info;
+
+	/* Check if MFPC is equal */
+	if ((entry1_sec_info->rsn_caps & WLAN_CRYPTO_RSN_CAP_MFP_ENABLED) ^
+	    (entry2_sec_info->rsn_caps & WLAN_CRYPTO_RSN_CAP_MFP_ENABLED)) {
+		scm_debug("MFPC capability is not equal 0x%x, 0x%x",
+			  entry1_sec_info->rsn_caps, entry2_sec_info->rsn_caps);
+		return false;
+	}
+
+	/* Check UC cipher suite */
+	if (!UCAST_CIPHER_MATCH(entry1_sec_info, entry2_sec_info)) {
+		scm_debug("Intersected UC cipher bitmap NULL 0x%x, 0x%x",
+			  entry1_sec_info->ucastcipherset,
+			  entry2_sec_info->ucastcipherset);
+		return false;
+	}
+
+	/* Check MC cipher suite */
+	if (!MCAST_CIPHER_MATCH(entry1_sec_info, entry2_sec_info)) {
+		scm_debug("Intersected MC cipher bitmap NULL 0x%x, 0x%x",
+			  entry1_sec_info->mcastcipherset,
+			  entry2_sec_info->mcastcipherset);
+		return false;
+	}
+
+	/* Check AKM suite */
+	key_mgmt = entry1_sec_info->key_mgmt;
+	akm_type = wlan_crypto_get_secure_akm_available(key_mgmt);
+	if (akm_type == WLAN_CRYPTO_KEY_MGMT_MAX) {
+		scm_debug("No matching AKM 0x%x", key_mgmt);
+		return false;
+	} else if (!HAS_KEY_MGMT(entry2_sec_info, akm_type)) {
+		scm_debug("Intersected AKM bitmap NULL 0x%x, 0x%x",
+			  entry1_sec_info->key_mgmt, entry2_sec_info->key_mgmt);
+		return false;
+	} else {
+		key_mgmt = 0x0;
+		QDF_SET_PARAM(key_mgmt, akm_type);
+	}
+
+	/* If not SAE AKM no need to check H2E capability match */
+	if (!WLAN_CRYPTO_IS_AKM_SAE(key_mgmt))
+		return true;
+
+	/* If SAE_H2E capability is not equal then treat as mismatch */
+	if (util_scan_entry_sae_h2e_capable(entry1) ^
+	    util_scan_entry_sae_h2e_capable(entry2)) {
+		scm_debug("SAE-H2E capability mismatch");
+		return false;
+	}
+
+	return true;
 }

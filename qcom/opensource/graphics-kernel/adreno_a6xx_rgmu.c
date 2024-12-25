@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk-provider.h>
@@ -514,6 +514,8 @@ static int a6xx_rgmu_disable_gdsc(struct adreno_device *adreno_dev)
 	struct a6xx_rgmu_device *rgmu = to_a6xx_rgmu(adreno_dev);
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 
+	kgsl_mmu_send_tlb_hint(&device->mmu, true);
+
 	/* Wait up to 5 seconds for the regulator to go off */
 	if (kgsl_regulator_disable_wait(rgmu->cx_gdsc, 5000))
 		return 0;
@@ -586,6 +588,7 @@ static int a6xx_rgmu_enable_clks(struct adreno_device *adreno_dev)
 static int a6xx_rgmu_enable_gdsc(struct adreno_device *adreno_dev)
 {
 	struct a6xx_rgmu_device *rgmu = to_a6xx_rgmu(adreno_dev);
+	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	int ret;
 
 	if (IS_ERR_OR_NULL(rgmu->cx_gdsc))
@@ -596,6 +599,7 @@ static int a6xx_rgmu_enable_gdsc(struct adreno_device *adreno_dev)
 		dev_err(&rgmu->pdev->dev,
 			"Fail to enable CX gdsc:%d\n", ret);
 
+	kgsl_mmu_send_tlb_hint(&device->mmu, false);
 	return ret;
 }
 
@@ -735,9 +739,6 @@ static int a6xx_gpu_boot(struct adreno_device *adreno_dev)
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	int ret;
 
-	/* Clear any GPU faults that might have been left over */
-	adreno_clear_gpu_fault(adreno_dev);
-
 	adreno_set_active_ctxs_null(adreno_dev);
 
 	ret = kgsl_mmu_start(device);
@@ -816,6 +817,9 @@ static int a6xx_rgmu_boot(struct adreno_device *adreno_dev)
 	}
 
 	a6xx_rgmu_irq_enable(adreno_dev);
+
+	/* Clear any GPU faults that might have been left over */
+	adreno_clear_gpu_fault(adreno_dev);
 
 	ret = a6xx_rgmu_fw_start(adreno_dev, GMU_COLD_BOOT);
 	if (ret)

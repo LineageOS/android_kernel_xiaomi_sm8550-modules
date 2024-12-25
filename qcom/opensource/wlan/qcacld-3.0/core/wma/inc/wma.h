@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -885,6 +885,7 @@ struct wma_wlm_stats_data {
  * @pe_roam_synch_cb: pe callback for firmware Roam Sync events
  * @csr_roam_auth_event_handle_cb: CSR callback for target authentication
  * offload event.
+ * @pe_roam_set_ie_cb: PE callback to set IEs to firmware.
  * @wmi_cmd_rsp_wake_lock: wmi command response wake lock
  * @wmi_cmd_rsp_runtime_lock: wmi command response bus lock
  * @active_uc_apf_mode: Setting that determines how APF is applied in
@@ -1012,6 +1013,9 @@ typedef struct {
 					uint8_t *deauth_disassoc_frame,
 					uint16_t deauth_disassoc_frame_len,
 					uint16_t reason_code);
+	QDF_STATUS (*pe_roam_set_ie_cb)(struct mac_context *mac_ctx,
+					uint8_t vdev_id, uint16_t dot11_mode,
+					enum QDF_OPMODE device_mode);
 	qdf_wake_lock_t wmi_cmd_rsp_wake_lock;
 	qdf_runtime_lock_t wmi_cmd_rsp_runtime_lock;
 	qdf_runtime_lock_t sap_prevent_runtime_pm_lock;
@@ -1707,6 +1711,29 @@ QDF_STATUS wma_peer_unmap_conf_cb(uint8_t vdev_id,
 
 bool wma_objmgr_peer_exist(tp_wma_handle wma,
 			   uint8_t *peer_addr, uint8_t *peer_vdev_id);
+
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+/**
+ * wma_peer_tbl_trans_add_entry() - Add peer transition to peer history
+ * @peer: Object manager peer pointer
+ * @is_create: Set to %true if @peer is getting created
+ * @peer_info: Info of peer setup on @peer create,
+ *               %NULL if @is_create is %false.
+ *
+ * Adds new entry to peer history about the transition of peer in the system.
+ * The APIs has to be called to keep record of create and delete of peer.
+ *
+ * Returns: void
+ */
+void wma_peer_tbl_trans_add_entry(struct wlan_objmgr_peer *peer, bool is_create,
+				  struct cdp_peer_setup_info *peer_info);
+#else
+static inline void
+wma_peer_tbl_trans_add_entry(struct wlan_objmgr_peer *peer, bool is_create,
+			     struct cdp_peer_setup_info *peer_info)
+{
+}
+#endif
 
 /**
  * wma_get_cca_stats() - send request to fw to get CCA

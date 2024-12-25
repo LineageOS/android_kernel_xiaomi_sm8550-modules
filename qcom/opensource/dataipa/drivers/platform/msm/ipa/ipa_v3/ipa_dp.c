@@ -102,6 +102,8 @@
 
 #define IPA_QMAP_ID_BYTE 0
 
+#define IPA_TX_MAX_DESC (50)
+
 #define IPA_MEM_ALLOC_RETRY 5
 
 static int ipa3_tx_switch_to_intr_mode(struct ipa3_sys_context *sys);
@@ -391,6 +393,15 @@ static void ipa3_wq_write_done_status(int src_pipe,
 	ipa3_write_done_common(sys, tx_pkt);
 }
 
+static void ipa3_tasklet_schd_work(struct work_struct *work)
+{
+	struct ipa3_sys_context *sys;
+
+	sys = container_of(work, struct ipa3_sys_context, tasklet_work);
+	if (atomic_read(&sys->xmit_eot_cnt))
+		tasklet_schedule(&sys->tasklet);
+}
+
 /**
  * ipa_write_done() - this function will be (eventually) called when a Tx
  * operation is complete
@@ -408,6 +419,7 @@ static void ipa3_tasklet_write_done(unsigned long data)
 	struct ipa3_sys_context *sys;
 	struct ipa3_tx_pkt_wrapper *this_pkt;
 	bool xmit_done = false;
+	unsigned int max_tx_pkt = 0;
 
 	sys = (struct ipa3_sys_context *)data;
 	spin_lock_bh(&sys->spinlock);
@@ -419,11 +431,22 @@ static void ipa3_tasklet_write_done(unsigned long data)
 			spin_unlock_bh(&sys->spinlock);
 			ipa3_write_done_common(sys, this_pkt);
 			spin_lock_bh(&sys->spinlock);
+			max_tx_pkt++;
 			if (xmit_done)
 				break;
 		}
+		/* If TX packets processing continuously in tasklet other
+		 * softirqs are not able to run on that core which is leading
+		 * to watchdog bark. For avoiding these scenarios exit from
+		 * tasklet after reaching max limit.
+		 */
+		 if (max_tx_pkt >= IPA_TX_MAX_DESC)
+			 break;
 	}
 	spin_unlock_bh(&sys->spinlock);
+
+	if (max_tx_pkt >= IPA_TX_MAX_DESC)
+		queue_work(sys->tasklet_wq, &sys->tasklet_work);
 }
 
 static int ipa3_napi_poll_tx_complete(struct ipa3_sys_context *sys, int budget)
@@ -1393,6 +1416,8 @@ static void ipa3_tasklet_find_freepage(unsigned long data)
 
 	sys = (struct ipa3_sys_context *)data;
 
+	if(sys->page_recycle_repl == NULL)
+		return;
 	INIT_LIST_HEAD(&temp_head);
 	spin_lock_bh(&sys->common_sys->spinlock);
 	list_for_each_entry_safe(rx_pkt, tmp,
@@ -1525,6 +1550,18 @@ int ipa3_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl)
 			goto fail_wq2;
 		}
 
+		snprintf(buff, IPA_RESOURCE_NAME_MAX, "ipataskletwq%d",
+				sys_in->client);
+
+		ep->sys->tasklet_wq = alloc_workqueue(buff,
+				WQ_MEM_RECLAIM | WQ_UNBOUND | WQ_SYSFS, 1);
+		if (!ep->sys->tasklet_wq) {
+			IPAERR("failed to create rep wq for client %d\n",
+					sys_in->client);
+			result = -EFAULT;
+			goto fail_wq_tasklet;
+		}
+
 		snprintf(buff, IPA_RESOURCE_NAME_MAX, "ipafreepagewq%d",
 				sys_in->client);
 
@@ -1596,9 +1633,12 @@ int ipa3_setup_sys_pipe(struct ipa_sys_connect_params *sys_in, u32 *clnt_hdl)
 		tx_completion_func = &ipa3_aux_napi_tx_complete;
 
 	atomic_set(&ep->sys->xmit_eot_cnt, 0);
-	if (IPA_CLIENT_IS_PROD(sys_in->client))
+	if (IPA_CLIENT_IS_PROD(sys_in->client)) {
 		tasklet_init(&ep->sys->tasklet, ipa3_tasklet_write_done,
 				(unsigned long) ep->sys);
+		INIT_WORK(&ep->sys->tasklet_work,
+			ipa3_tasklet_schd_work);
+	}
 	if (sys_in->client == IPA_CLIENT_APPS_WAN_LOW_LAT_CONS)
 		tasklet_init(&ep->sys->tasklet, ipa3_tasklet_rx_notify,
 				(unsigned long) ep->sys);
@@ -1910,6 +1950,8 @@ fail_pm:
 	if (ep->sys->freepage_wq)
 		destroy_workqueue(ep->sys->freepage_wq);
 fail_wq3:
+	destroy_workqueue(ep->sys->tasklet_wq);
+fail_wq_tasklet:
 	destroy_workqueue(ep->sys->repl_wq);
 fail_wq2:
 	destroy_workqueue(ep->sys->wq);
@@ -2118,7 +2160,8 @@ int ipa3_teardown_sys_pipe(u32 clnt_hdl)
 	}
 	if (ep->sys->repl_wq)
 		flush_workqueue(ep->sys->repl_wq);
-
+	if (ep->sys->tasklet_wq)
+		flush_workqueue(ep->sys->tasklet_wq);
 	if (ep->sys->repl_hdlr == ipa3_replenish_rx_page_recycle) {
 		cancel_delayed_work_sync(&ep->sys->common_sys->freepage_work);
 		tasklet_kill(&ep->sys->common_sys->tasklet_find_freepage);

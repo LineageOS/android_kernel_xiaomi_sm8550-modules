@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved. */
+/* Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved. */
 
 #include "pci_platform.h"
 #include "debug.h"
@@ -15,28 +15,32 @@ static struct cnss_msi_config msi_config = {
 	},
 };
 
-#ifdef CONFIG_ONE_MSI_VECTOR
-/**
- * All the user share the same vector and msi data
- * For MHI user, we need pass IRQ array information to MHI component
- * MHI_IRQ_NUMBER is defined to specify this MHI IRQ array size
- */
-#define MHI_IRQ_NUMBER 3
-static struct cnss_msi_config msi_config_one_msi = {
-	.total_vectors = 1,
-	.total_users = 4,
-	.users = (struct cnss_msi_user[]) {
-		{ .name = "MHI", .num_vectors = 1, .base_vector = 0 },
-		{ .name = "CE", .num_vectors = 1, .base_vector = 0 },
-		{ .name = "WAKE", .num_vectors = 1, .base_vector = 0 },
-		{ .name = "DP", .num_vectors = 1, .base_vector = 0 },
-	},
-};
-#endif
+#define ENUM_RETRY_MAX_TIMES 8
+#define ENUM_RETRY_DELAY_MS 500
 
 int _cnss_pci_enumerate(struct cnss_plat_data *plat_priv, u32 rc_num)
 {
-	return msm_pcie_enumerate(rc_num);
+	u32 retry = 0;
+	int ret;
+
+	if (plat_priv->pcie_switch_type == PCIE_SWITCH_NTN3) {
+		while (retry++ < ENUM_RETRY_MAX_TIMES) {
+			ret = msm_pcie_enumerate(rc_num);
+			/* For PCIe switch platform, cnss_probe may called
+			 * before PCIe switch hardware ready, wait for
+			 * msm_pcie_enumerate complete.
+			 */
+			if (ret == -EPROBE_DEFER) {
+				cnss_pr_dbg("PCIe RC%d not ready, retry:%dth\n",
+					    rc_num, retry);
+				msleep(ENUM_RETRY_DELAY_MS);
+			}
+		}
+	} else {
+		return msm_pcie_enumerate(rc_num);
+	}
+
+	return ret;
 }
 
 int cnss_pci_assert_perst(struct cnss_pci_data *pci_priv)
@@ -139,6 +143,7 @@ static int cnss_pci_set_link_up(struct cnss_pci_data *pci_priv)
 static int cnss_pci_set_link_down(struct cnss_pci_data *pci_priv)
 {
 	struct pci_dev *pci_dev = pci_priv->pci_dev;
+	struct cnss_plat_data *plat_priv = pci_priv->plat_priv;
 	enum msm_pcie_pm_opt pm_ops;
 	u32 pm_options = PM_OPTIONS_DEFAULT;
 	int ret;
@@ -147,6 +152,10 @@ static int cnss_pci_set_link_down(struct cnss_pci_data *pci_priv)
 		cnss_pr_vdbg("Use PCIe DRV suspend\n");
 		pm_ops = MSM_PCIE_DRV_SUSPEND;
 	} else {
+		if (plat_priv && PCIE_SWITCH_NTN3 == plat_priv->pcie_switch_type) {
+			cnss_pr_dbg("Skip suspend from client side for pcie switch case\n");
+			return 0;
+		}
 		pm_ops = MSM_PCIE_SUSPEND;
 	}
 
@@ -403,6 +412,128 @@ retry:
 	return ret;
 }
 
+#ifdef CONFIG_PCIE_SWITCH_SUPPORT
+int cnss_pci_dsp_link_control(struct cnss_pci_data *pci_priv,
+			      bool link_enable)
+{
+	if (!pci_priv)
+		return -ENODEV;
+
+	pci_priv->pci_dsp_link_status = link_enable;
+	return msm_pcie_dsp_link_control(pci_priv->pci_dev, link_enable);
+}
+
+int cnss_pci_set_dsp_link_status(struct cnss_pci_data *pci_priv,
+				 bool link_enable)
+{
+	if (!pci_priv)
+		return -ENODEV;
+
+	pci_priv->pci_dsp_link_status = link_enable;
+
+	return 0;
+}
+
+int cnss_pci_get_dsp_link_status(struct cnss_pci_data *pci_priv)
+{
+	if (!pci_priv)
+		return -ENODEV;
+
+	return pci_priv->pci_dsp_link_status;
+}
+
+int cnss_pci_dsp_link_enable(struct cnss_pci_data *pci_priv)
+{
+	int ret = 0;
+	int retry_count = 0;
+	struct cnss_plat_data *plat_priv;
+
+	if (!pci_priv)
+		return -ENODEV;
+
+	plat_priv = pci_priv->plat_priv;
+	/* For PCIe switch platform, wait for link train of DSP<->WLAN complete
+	 */
+	while (retry_count++ < DSP_LINK_ENABLE_RETRY_COUNT_MAX) {
+		ret = cnss_pci_dsp_link_control(pci_priv, true);
+		if (!ret)
+			break;
+
+		cnss_pci_dsp_link_control(pci_priv, false);
+		cnss_pr_err("DSP<->WLAN link train failed, retry...\n");
+		cnss_select_pinctrl_state(plat_priv, false);
+		usleep_range(DSP_LINK_ENABLE_DELAY_TIME_US_MIN,
+			     DSP_LINK_ENABLE_DELAY_TIME_US_MAX);
+		ret = cnss_select_pinctrl_enable(plat_priv);
+		if (ret) {
+			cnss_pr_err("Failed to select pinctrl state, err = %d\n", ret);
+			return ret;
+		}
+		usleep_range(DSP_LINK_ENABLE_DELAY_TIME_US_MIN,
+			     DSP_LINK_ENABLE_DELAY_TIME_US_MAX);
+	}
+
+	return ret;
+}
+
+#ifdef CONFIG_PCIE_SWITCH_RETRAIN_LINK_SUPPORT
+int cnss_pci_dsp_link_retrain(struct cnss_pci_data *pci_priv,
+			      u16 target_link_speed)
+{
+	int ret = 0;
+
+	if (!pci_priv)
+		return -ENODEV;
+
+	cnss_pr_dbg("Setting DSP <-> EP link speed:0x%x\n", target_link_speed);
+
+	ret = msm_pcie_retrain_port_link(pci_priv->pci_dev, target_link_speed);
+	if (ret) {
+		cnss_pr_err("Failed to retrain link, err = %d\n", ret);
+		return ret;
+	}
+
+	pci_priv->def_link_speed = target_link_speed;
+
+	return ret;
+}
+#else
+int cnss_pci_dsp_link_retrain(struct cnss_pci_data *pci_priv,
+			      u16 target_link_speed)
+{
+	return -EOPNOTSUPP;
+}
+#endif
+#else
+int cnss_pci_dsp_link_control(struct cnss_pci_data *pci_priv,
+			      bool link_enable)
+{
+	return -EOPNOTSUPP;
+}
+
+int cnss_pci_set_dsp_link_status(struct cnss_pci_data *pci_priv,
+				 bool link_enable)
+{
+	return -EOPNOTSUPP;
+}
+
+int cnss_pci_get_dsp_link_status(struct cnss_pci_data *pci_priv)
+{
+	return -EOPNOTSUPP;
+}
+
+int cnss_pci_dsp_link_enable(struct cnss_pci_data *pci_priv)
+{
+	return -EOPNOTSUPP;
+}
+
+int cnss_pci_dsp_link_retrain(struct cnss_pci_data *pci_priv,
+			      u16 target_link_speed)
+{
+	return -EOPNOTSUPP;
+}
+#endif
+
 int cnss_pci_prevent_l1(struct device *dev)
 {
 	struct pci_dev *pci_dev = to_pci_dev(dev);
@@ -464,84 +595,6 @@ int cnss_pci_get_msi_assignment(struct cnss_pci_data *pci_priv)
 
 	return 0;
 }
-
-#ifdef CONFIG_ONE_MSI_VECTOR
-int cnss_pci_get_one_msi_assignment(struct cnss_pci_data *pci_priv)
-{
-	pci_priv->msi_config = &msi_config_one_msi;
-
-	return 0;
-}
-
-bool cnss_pci_fallback_one_msi(struct cnss_pci_data *pci_priv,
-			       int *num_vectors)
-{
-	struct pci_dev *pci_dev = pci_priv->pci_dev;
-	struct cnss_msi_config *msi_config;
-
-	cnss_pci_get_one_msi_assignment(pci_priv);
-	msi_config = pci_priv->msi_config;
-	if (!msi_config) {
-		cnss_pr_err("one msi_config is NULL!\n");
-		return false;
-	}
-	*num_vectors = pci_alloc_irq_vectors(pci_dev,
-					     msi_config->total_vectors,
-					     msi_config->total_vectors,
-					     PCI_IRQ_MSI);
-	if (*num_vectors < 0) {
-		cnss_pr_err("Failed to get one MSI vector!\n");
-		return false;
-	}
-	cnss_pr_dbg("request MSI one vector\n");
-
-	return true;
-}
-
-bool cnss_pci_is_one_msi(struct cnss_pci_data *pci_priv)
-{
-	return pci_priv && pci_priv->msi_config &&
-	       (pci_priv->msi_config->total_vectors == 1);
-}
-
-int cnss_pci_get_one_msi_mhi_irq_array_size(struct cnss_pci_data *pci_priv)
-{
-	return MHI_IRQ_NUMBER;
-}
-
-bool cnss_pci_is_force_one_msi(struct cnss_pci_data *pci_priv)
-{
-	struct cnss_plat_data *plat_priv = pci_priv->plat_priv;
-
-	return test_bit(FORCE_ONE_MSI, &plat_priv->ctrl_params.quirks);
-}
-#else
-int cnss_pci_get_one_msi_assignment(struct cnss_pci_data *pci_priv)
-{
-	return 0;
-}
-
-bool cnss_pci_fallback_one_msi(struct cnss_pci_data *pci_priv,
-			       int *num_vectors)
-{
-	return false;
-}
-
-bool cnss_pci_is_one_msi(struct cnss_pci_data *pci_priv)
-{
-	return false;
-}
-
-int cnss_pci_get_one_msi_mhi_irq_array_size(struct cnss_pci_data *pci_priv)
-{
-	return 0;
-}
-
-bool cnss_pci_is_force_one_msi(struct cnss_pci_data *pci_priv)
-{
-	return false;
-}
-#endif
 
 static int cnss_pci_smmu_fault_handler(struct iommu_domain *domain,
 				       struct device *dev, unsigned long iova,

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -47,16 +47,13 @@ void wlan_scan_get_feature_info(struct wlan_objmgr_psoc *psoc,
  * @pdev: pointer to pdev object
  * @bssid: pointer to mac addr
  * @freq: frequency for scan filter
- * @cache_entry: pointer to scan cache_entry
  *
- * Return: success if scan entry is found in scan db
+ * Return: scan entry if found, else NULL
  */
-QDF_STATUS
+struct scan_cache_entry *
 wlan_scan_get_scan_entry_by_mac_freq(struct wlan_objmgr_pdev *pdev,
 				     struct qdf_mac_addr *bssid,
-				     uint16_t freq,
-				     struct scan_cache_entry
-				     *cache_entry);
+				     uint16_t freq);
 
 /**
  * wlan_scan_cfg_set_active_2g_dwelltime() - API to set scan active 2g dwelltime
@@ -545,4 +542,11 @@ QDF_STATUS
 wlan_scan_get_mld_addr_by_link_addr(struct wlan_objmgr_pdev *pdev,
 				    struct qdf_mac_addr *link_addr,
 				    struct qdf_mac_addr *mld_mac_addr);
+
+static inline bool
+wlan_scan_entries_contain_cmn_akm(struct scan_cache_entry *entry1,
+				  struct scan_cache_entry *entry2)
+{
+	return scm_scan_entries_contain_cmn_akm(entry1, entry2);
+}
 #endif

@@ -217,6 +217,7 @@ enum sde_prop {
 	MACROTILE_MODE,
 	UBWC_BW_CALC_VERSION,
 	PIPE_ORDER_VERSION,
+	DDR_TYPE,
 	SEC_SID_MASK,
 	BASE_LAYER,
 	TRUSTED_VM_ENV,
@@ -617,6 +618,7 @@ static struct sde_prop_type sde_prop[] = {
 			PROP_TYPE_U32},
 	{PIPE_ORDER_VERSION, "qcom,sde-pipe-order-version", false,
 			PROP_TYPE_U32},
+	{DDR_TYPE, "qcom,sde-ddr-type", false, PROP_TYPE_U32_ARRAY},
 	{SEC_SID_MASK, "qcom,sde-secure-sid-mask", false, PROP_TYPE_U32_ARRAY},
 	{BASE_LAYER, "qcom,sde-mixer-stage-base-layer", false, PROP_TYPE_BOOL},
 	{TRUSTED_VM_ENV, "qcom,sde-trusted-vm-env", false, PROP_TYPE_BOOL},
@@ -3644,29 +3646,29 @@ static int _sde_vbif_populate_qos_parsing(struct sde_mdss_cfg *sde_cfg,
 {
 	int i, j, prop_index = VBIF_QOS_RT_REMAP;
 	u32 entries;
+	u32 ddr_list_index;
 
 	for (i = VBIF_RT_CLIENT; ((i < VBIF_MAX_CLIENT) && (prop_index < VBIF_PROP_MAX));
 						i++, prop_index++) {
-		vbif->qos_tbl[i].count = prop_count[prop_index];
-		SDE_DEBUG("qos_tbl[%d].count=%u\n", i, vbif->qos_tbl[i].count);
-
 		entries = 2 * sde_cfg->vbif_qos_nlvl;
-		if (vbif->qos_tbl[i].count == entries) {
-			vbif->qos_tbl[i].priority_lvl = kcalloc(entries, sizeof(u32), GFP_KERNEL);
-			if (!vbif->qos_tbl[i].priority_lvl) {
-				vbif->qos_tbl[i].count = 0;
-				return -ENOMEM;
-			}
-		} else if (vbif->qos_tbl[i].count) {
+		vbif->qos_tbl[i].count = prop_count[prop_index];
+
+		ddr_list_index = (vbif->qos_tbl[i].count == entries) ?
+					0 : sde_cfg->ddr_list_index;
+
+		SDE_DEBUG("qos_tbl[%d].count=%u, ddr_list_index=%u\n",
+				i, vbif->qos_tbl[i].count, ddr_list_index);
+
+		vbif->qos_tbl[i].priority_lvl = kcalloc(entries, sizeof(u32), GFP_KERNEL);
+		if (!vbif->qos_tbl[i].priority_lvl) {
 			vbif->qos_tbl[i].count = 0;
-			vbif->qos_tbl[i].priority_lvl = NULL;
-			SDE_ERROR("invalid qos table for client:%d, prop:%d\n", i, prop_index);
-			continue;
+			return -ENOMEM;
 		}
 
-		for (j = 0; j < vbif->qos_tbl[i].count; j++) {
+		for (j = 0; j < entries; j++) {
 			vbif->qos_tbl[i].priority_lvl[j] =
-					PROP_VALUE_ACCESS(prop_value, prop_index, j);
+					PROP_VALUE_ACCESS(prop_value, prop_index,
+					entries * ddr_list_index + j);
 			SDE_DEBUG("client:%d, prop:%d, lvl[%d]=%u\n", i, prop_index, j,
 					vbif->qos_tbl[i].priority_lvl[j]);
 		}
@@ -4020,6 +4022,16 @@ static void _sde_top_parse_dt_helper(struct sde_mdss_cfg *cfg,
 	cfg->ipcc_client_phys_id = PROP_VALUE_ACCESS(props->values, IPCC_CLIENT_DPU_PHYS_ID, 0);
 	if (!cfg->ipcc_protocol_id || !cfg->ipcc_client_phys_id)
 		cfg->hw_fence_rev = 0; /* disable hw fences*/
+
+	if (props->exists[DDR_TYPE]) {
+		for (i = 0; i < props->counts[DDR_TYPE]; i++) {
+			ddr_type = PROP_VALUE_ACCESS(props->values, DDR_TYPE, i);
+			if (ddr_type == of_fdt_get_ddrtype()) {
+				cfg->ddr_list_index = i;
+				break;
+			}
+		}
+	}
 
 	if (props->exists[SEC_SID_MASK]) {
 		cfg->sec_sid_mask_count = props->counts[SEC_SID_MASK];
@@ -5241,6 +5253,44 @@ static int _sde_hardware_pre_caps(struct sde_mdss_cfg *sde_cfg, uint32_t hw_rev)
 		sde_cfg->demura_supported[SSPP_DMA3][0] = 0;
 		sde_cfg->demura_supported[SSPP_DMA3][1] = 1;
 		sde_cfg->has_line_insertion = true;
+	} else if (IS_CROW_TARGET(hw_rev)) {
+		set_bit(SDE_FEATURE_DEDICATED_CWB, sde_cfg->features);
+		set_bit(SDE_FEATURE_CWB_DITHER, sde_cfg->features);
+		set_bit(SDE_FEATURE_WB_UBWC, sde_cfg->features);
+		set_bit(SDE_FEATURE_CWB_CROP, sde_cfg->features);
+		set_bit(SDE_FEATURE_QSYNC, sde_cfg->features);
+		set_bit(SDE_FEATURE_3D_MERGE_RESET, sde_cfg->features);
+		set_bit(SDE_FEATURE_HDR_PLUS, sde_cfg->features);
+		set_bit(SDE_FEATURE_INLINE_SKIP_THRESHOLD, sde_cfg->features);
+		set_bit(SDE_MDP_DHDR_MEMPOOL_4K, &sde_cfg->mdp[0].features);
+		set_bit(SDE_FEATURE_VIG_P010, sde_cfg->features);
+		set_bit(SDE_FEATURE_VBIF_DISABLE_SHAREABLE, sde_cfg->features);
+		set_bit(SDE_FEATURE_DITHER_LUMA_MODE, sde_cfg->features);
+		set_bit(SDE_FEATURE_MULTIRECT_ERROR, sde_cfg->features);
+		set_bit(SDE_FEATURE_FP16, sde_cfg->features);
+		set_bit(SDE_MDP_PERIPH_TOP_0_REMOVED, &sde_cfg->mdp[0].features);
+		set_bit(SDE_FEATURE_DEMURA, sde_cfg->features);
+		set_bit(SDE_FEATURE_UBWC_STATS, sde_cfg->features);
+		set_bit(SDE_FEATURE_HW_VSYNC_TS, sde_cfg->features);
+		set_bit(SDE_FEATURE_AVR_STEP, sde_cfg->features);
+		set_bit(SDE_FEATURE_VBIF_CLK_SPLIT, sde_cfg->features);
+		set_bit(SDE_FEATURE_CTL_DONE, sde_cfg->features);
+		set_bit(SDE_FEATURE_TRUSTED_VM, sde_cfg->features);
+		sde_cfg->allowed_dsc_reservation_switch = SDE_DP_DSC_RESERVATION_SWITCH;
+		sde_cfg->autorefresh_disable_seq = AUTOREFRESH_DISABLE_SEQ2;
+		sde_cfg->perf.min_prefill_lines = 40;
+		sde_cfg->vbif_qos_nlvl = 8;
+		sde_cfg->qos_target_time_ns = 11160;
+		sde_cfg->ts_prefill_rev = 2;
+		sde_cfg->ctl_rev = SDE_CTL_CFG_VERSION_1_0_0;
+		sde_cfg->true_inline_rot_rev = SDE_INLINE_ROT_VERSION_2_0_1;
+		sde_cfg->sid_rev = SDE_SID_VERSION_2_0_0;
+		sde_cfg->mdss_hw_block_size = 0x158;
+		sde_cfg->has_line_insertion = true;
+		sde_cfg->demura_supported[SSPP_DMA1][0] = 0;
+		sde_cfg->demura_supported[SSPP_DMA1][1] = 1;
+		sde_cfg->demura_supported[SSPP_DMA3][0] = 0;
+		sde_cfg->demura_supported[SSPP_DMA3][1] = 1;
 	} else {
 		SDE_ERROR("unsupported chipset id:%X\n", hw_rev);
 		sde_cfg->perf.min_prefill_lines = 0xffff;

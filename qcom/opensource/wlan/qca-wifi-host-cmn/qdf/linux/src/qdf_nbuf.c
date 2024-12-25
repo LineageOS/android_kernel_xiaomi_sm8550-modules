@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1230,6 +1230,7 @@ void qdf_nbuf_unmap_nbytes_single_paddr_debug(qdf_device_t osdev,
 					      const char *func, uint32_t line)
 {
 	qdf_nbuf_untrack_map(buf, func, line);
+	__qdf_record_nbuf_nbytes(__qdf_nbuf_get_end_offset(buf), dir, false);
 	__qdf_mem_unmap_nbytes_single(osdev, phy_addr, dir, nbytes);
 	qdf_net_buf_debug_update_unmap_node(buf, func, line);
 }
@@ -6317,24 +6318,6 @@ void __qdf_nbuf_add_rx_frag(__qdf_frag_t buf, __qdf_nbuf_t nbuf,
 }
 
 qdf_export_symbol(__qdf_nbuf_add_rx_frag);
-
-void __qdf_nbuf_ref_frag(__qdf_frag_t buf)
-{
-	struct page *page;
-	skb_frag_t frag = {0};
-
-	page = virt_to_head_page(buf);
-	__skb_frag_set_page(&frag, page);
-
-	/*
-	 * since __skb_frag_ref() just use page to increase ref
-	 * we just decode page alone
-	 */
-	qdf_frag_count_inc(QDF_NBUF_FRAG_DEBUG_COUNT_ONE);
-	__skb_frag_ref(&frag);
-}
-
-qdf_export_symbol(__qdf_nbuf_ref_frag);
 
 #ifdef NBUF_FRAG_MEMORY_DEBUG
 

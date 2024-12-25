@@ -144,6 +144,7 @@ struct sde_encoder_virt_ops {
  *                              count and underrun line count
  * @add_to_minidump:		Add this phys_enc data to minidumps
  * @disable_autorefresh:	Disable autorefresh
+ * @wait_for_vsync_on_autorefresh_busy:	Wait for vsync if autorefresh status busy
  */
 
 struct sde_encoder_phys_ops {
@@ -198,6 +199,7 @@ struct sde_encoder_phys_ops {
 	u32 (*get_underrun_line_count)(struct sde_encoder_phys *phys);
 	void (*add_to_minidump)(struct sde_encoder_phys *phys);
 	void (*disable_autorefresh)(struct sde_encoder_phys *phys);
+	void (*wait_for_vsync_on_autorefresh_busy)(struct sde_encoder_phys *phys_enc);
 };
 
 /**
@@ -285,7 +287,7 @@ struct sde_encoder_irq {
  * @intf_cfg_v1:        Interface hardware configuration to be used if control
  *                      path supports SDE_CTL_ACTIVE_CFG
  * @comp_type:      Type of compression supported
- * @comp_ratio:		Compression ratio
+ * @comp_ratio:		Compression ratio multiplied by 100
  * @dsc_extra_pclk_cycle_cnt: Extra pclk cycle count for DSC over DP
  * @dsc_extra_disp_width: Additional display width for DSC over DP
  * @poms_align_vsync:   poms with vsync aligned

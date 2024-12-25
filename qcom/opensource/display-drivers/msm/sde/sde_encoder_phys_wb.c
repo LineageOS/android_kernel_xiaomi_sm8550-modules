@@ -403,6 +403,8 @@ static void _sde_encoder_phys_wb_setup_roi(struct sde_encoder_phys *phys_enc,
 				wb_cfg->crop.x = wb_cfg->crop.x - pu_roi.x;
 				wb_cfg->crop.y = wb_cfg->crop.y - pu_roi.y;
 				hw_wb->ops.setup_crop(hw_wb, wb_cfg, true);
+			} else {
+				hw_wb->ops.setup_crop(hw_wb, wb_cfg, false);
 			}
 		} else if ((wb_cfg->roi.w != out_width) || (wb_cfg->roi.h != out_height)) {
 			hw_wb->ops.setup_crop(hw_wb, wb_cfg, true);
@@ -580,7 +582,7 @@ static void _sde_encoder_phys_wb_setup_cwb(struct sde_encoder_phys *phys_enc, bo
 	struct sde_crtc *crtc = to_sde_crtc(wb_enc->crtc);
 	struct sde_hw_pingpong *hw_pp = phys_enc->hw_pp;
 	struct sde_hw_dnsc_blur *hw_dnsc_blur = phys_enc->hw_dnsc_blur;
-	bool need_merge = (crtc->num_mixers > 1);
+	bool need_merge = false;
 	enum sde_dcwb;
 	int i = 0, num_mixers = crtc->num_mixers;
 	const int num_wb = 1;
@@ -597,6 +599,13 @@ static void _sde_encoder_phys_wb_setup_cwb(struct sde_encoder_phys *phys_enc, bo
 		return;
 	}
 
+	if (crtc->num_mixers > MAX_CWB_PER_CTL_V1) {
+		SDE_ERROR("[enc:%d wb:%d] %d LM %d CWB case not supported\n",
+				DRMID(phys_enc->parent), WBID(wb_enc),
+				crtc->num_mixers, MAX_CWB_PER_CTL_V1);
+		return;
+	}
+
 	/**
 	 * 3d_merge active or cwb active for cwb path has to be set based upon
 	 * LMs in a CTL path. On cwb disable commit both 3d_merge active and cwb
@@ -605,6 +614,9 @@ static void _sde_encoder_phys_wb_setup_cwb(struct sde_encoder_phys *phys_enc, bo
 	if (enable) {
 		need_merge = !(_sde_encoder_is_single_lm_partial_update(wb_enc));
 		num_mixers = (need_merge ? crtc->num_mixers : 1);
+	} else {
+		need_merge = (crtc->num_mixers > CRTC_SINGLE_MIXER_ONLY) ? true : false;
+		num_mixers = crtc->num_mixers;
 	}
 
 	SDE_EVT32(need_merge, num_mixers);
@@ -909,12 +921,18 @@ static int _sde_enc_phys_wb_validate_cwb(struct sde_encoder_phys *phys_enc,
 	struct sde_rect wb_roi = {0,}, pu_roi = {0,};
 	u32  out_width = 0, out_height = 0;
 	const struct sde_format *fmt;
-	int prog_line, ret = 0;
+	int num_lm, prog_line, ret = 0;
 
 	fb = sde_wb_connector_state_get_output_fb(conn_state);
 	if (!fb) {
 		SDE_DEBUG("no output framebuffer\n");
 		return 0;
+	}
+
+	num_lm = sde_crtc_get_num_datapath(crtc_state->crtc, conn_state->connector, crtc_state);
+	if (num_lm > MAX_CWB_PER_CTL_V1) {
+		SDE_ERROR("%d LM %d CWB case not supported\n", num_lm, MAX_CWB_PER_CTL_V1);
+		return -EINVAL;
 	}
 
 	fmt = sde_get_sde_format_ext(fb->format->format, fb->modifier);
@@ -1266,6 +1284,14 @@ static void _sde_encoder_phys_wb_update_cwb_flush_helper(
 		SDE_ERROR("[enc:%d wb:%d] HW resource not available for CWB\n",
 				DRMID(phys_enc->parent), WBID(wb_enc));
 		return;
+	}
+
+	if (enable) {
+		need_merge = !(_sde_encoder_is_single_lm_partial_update(wb_enc));
+		num_mixers = need_merge ? crtc->num_mixers : CRTC_SINGLE_MIXER_ONLY;
+	} else {
+		need_merge = (crtc->num_mixers > CRTC_SINGLE_MIXER_ONLY) ? true : false;
+		num_mixers = crtc->num_mixers;
 	}
 
 	crtc_state = to_sde_crtc_state(wb_enc->crtc->state);
@@ -1917,6 +1943,9 @@ static bool _sde_encoder_phys_wb_is_idle(struct sde_encoder_phys *phys_enc)
 static void _sde_encoder_phys_wb_reset_state(struct sde_encoder_phys *phys_enc)
 {
 	struct sde_encoder_phys_wb *wb_enc = to_sde_encoder_phys_wb(phys_enc);
+	struct sde_encoder_virt *sde_enc = to_sde_encoder_virt(phys_enc->parent);
+	struct sde_wb_device *wb_dev = wb_enc->wb_dev;
+	struct sde_crtc *sde_crtc;
 
 	phys_enc->enable_state = SDE_ENC_DISABLED;
 
@@ -1928,6 +1957,10 @@ static void _sde_encoder_phys_wb_reset_state(struct sde_encoder_phys *phys_enc)
 		wb_enc->wb_aspace = NULL;
 	}
 
+	sde_crtc = to_sde_crtc(sde_enc->crtc);
+	if (sde_crtc)
+		sde_crtc->cached_encoder_mask &= ~drm_encoder_mask(phys_enc->parent);
+
 	wb_enc->crtc = NULL;
 	phys_enc->hw_cdm = NULL;
 	phys_enc->hw_ctl = NULL;
@@ -1935,6 +1968,11 @@ static void _sde_encoder_phys_wb_reset_state(struct sde_encoder_phys *phys_enc)
 	atomic_set(&phys_enc->pending_kickoff_cnt, 0);
 	atomic_set(&phys_enc->pending_retire_fence_cnt, 0);
 	atomic_set(&phys_enc->pending_ctl_start_cnt, 0);
+	mutex_lock(&wb_dev->wb_lock);
+	kfree(wb_dev->modes);
+	wb_dev->modes = NULL;
+	wb_dev->count_modes = 0;
+	mutex_unlock(&wb_dev->wb_lock);
 }
 
 static int _sde_encoder_phys_wb_wait_for_idle(struct sde_encoder_phys *phys_enc, bool force_wait)

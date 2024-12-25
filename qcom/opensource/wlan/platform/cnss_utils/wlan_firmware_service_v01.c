@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2015-2021, The Linux Foundation. All rights reserved. */
-/* Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved. */
+/* Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved. */
+
 
 #include "wlan_firmware_service_v01.h"
 #include <linux/module.h>
@@ -573,7 +574,7 @@ static struct qmi_elem_info wlfw_dev_mem_info_s_v01_ei[] = {
 	},
 };
 
-static struct qmi_elem_info wlfw_host_mlo_chip_info_s_v01_ei[] = {
+static struct qmi_elem_info mlo_chip_info_s_v01_ei[] = {
 	{
 		.data_type      = QMI_UNSIGNED_1_BYTE,
 		.elem_len       = 1,
@@ -581,7 +582,7 @@ static struct qmi_elem_info wlfw_host_mlo_chip_info_s_v01_ei[] = {
 		.array_type       = NO_ARRAY,
 		.tlv_type       = 0,
 		.offset         = offsetof(struct
-					   wlfw_host_mlo_chip_info_s_v01,
+					   mlo_chip_info_s_v01,
 					   chip_id),
 	},
 	{
@@ -591,7 +592,7 @@ static struct qmi_elem_info wlfw_host_mlo_chip_info_s_v01_ei[] = {
 		.array_type       = NO_ARRAY,
 		.tlv_type       = 0,
 		.offset         = offsetof(struct
-					   wlfw_host_mlo_chip_info_s_v01,
+					   mlo_chip_info_s_v01,
 					   num_local_links),
 	},
 	{
@@ -601,7 +602,7 @@ static struct qmi_elem_info wlfw_host_mlo_chip_info_s_v01_ei[] = {
 		.array_type       = STATIC_ARRAY,
 		.tlv_type       = 0,
 		.offset         = offsetof(struct
-					   wlfw_host_mlo_chip_info_s_v01,
+					   mlo_chip_info_s_v01,
 					   hw_link_id),
 	},
 	{
@@ -611,7 +612,7 @@ static struct qmi_elem_info wlfw_host_mlo_chip_info_s_v01_ei[] = {
 		.array_type       = STATIC_ARRAY,
 		.tlv_type       = 0,
 		.offset         = offsetof(struct
-					   wlfw_host_mlo_chip_info_s_v01,
+					   mlo_chip_info_s_v01,
 					   valid_mlo_link_id),
 	},
 	{
@@ -621,17 +622,17 @@ static struct qmi_elem_info wlfw_host_mlo_chip_info_s_v01_ei[] = {
 	},
 };
 
-static struct qmi_elem_info wlfw_host_mlo_chip_v2_info_s_v01_ei[] = {
+static struct qmi_elem_info mlo_chip_v2_info_s_v01_ei[] = {
 	{
 		.data_type      = QMI_STRUCT,
 		.elem_len       = 1,
-		.elem_size      = sizeof(struct wlfw_host_mlo_chip_info_s_v01),
+		.elem_size      = sizeof(struct mlo_chip_info_s_v01),
 		.array_type       = NO_ARRAY,
 		.tlv_type       = 0,
 		.offset         = offsetof(struct
-					   wlfw_host_mlo_chip_v2_info_s_v01,
+					   mlo_chip_v2_info_s_v01,
 					   mlo_chip_info),
-		.ei_array      = wlfw_host_mlo_chip_info_s_v01_ei,
+		.ei_array      = mlo_chip_info_s_v01_ei,
 	},
 	{
 		.data_type      = QMI_UNSIGNED_1_BYTE,
@@ -640,19 +641,19 @@ static struct qmi_elem_info wlfw_host_mlo_chip_v2_info_s_v01_ei[] = {
 		.array_type       = NO_ARRAY,
 		.tlv_type       = 0,
 		.offset         = offsetof(struct
-					   wlfw_host_mlo_chip_v2_info_s_v01,
+					   mlo_chip_v2_info_s_v01,
 					   adj_mlo_num_chips),
 	},
 	{
 		.data_type      = QMI_STRUCT,
-		.elem_len       = QMI_WLFW_MAX_NUM_ADJ_MLO_CHIPS_V01,
-		.elem_size      = sizeof(struct wlfw_host_mlo_chip_info_s_v01),
+		.elem_len       = QMI_WLFW_MAX_ADJ_CHIP_V01,
+		.elem_size      = sizeof(struct mlo_chip_info_s_v01),
 		.array_type       = STATIC_ARRAY,
 		.tlv_type       = 0,
 		.offset         = offsetof(struct
-					   wlfw_host_mlo_chip_v2_info_s_v01,
+					   mlo_chip_v2_info_s_v01,
 					   adj_mlo_chip_info),
-		.ei_array      = wlfw_host_mlo_chip_info_s_v01_ei,
+		.ei_array      = mlo_chip_info_s_v01_ei,
 	},
 	{
 		.data_type      = QMI_EOTI,
@@ -824,6 +825,34 @@ static struct qmi_elem_info wlfw_host_pcie_link_info_s_v01_ei[] = {
 		.offset         = offsetof(struct
 					   wlfw_host_pcie_link_info_s_v01,
 					   pci_link_width),
+	},
+	{
+		.data_type      = QMI_EOTI,
+		.array_type       = NO_ARRAY,
+		.tlv_type       = QMI_COMMON_TLV_TYPE,
+	},
+};
+
+static struct qmi_elem_info wlchip_serial_id_v01_ei[] = {
+	{
+		.data_type      = QMI_UNSIGNED_4_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u32),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0,
+		.offset         = offsetof(struct
+					   wlchip_serial_id_v01,
+					   serial_id_msb),
+	},
+	{
+		.data_type      = QMI_UNSIGNED_4_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u32),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0,
+		.offset         = offsetof(struct
+					   wlchip_serial_id_v01,
+					   serial_id_lsb),
 	},
 	{
 		.data_type      = QMI_EOTI,
@@ -1252,6 +1281,26 @@ struct qmi_elem_info wlfw_ind_register_req_msg_v01_ei[] = {
 		.offset         = offsetof(struct
 					   wlfw_ind_register_req_msg_v01,
 					   fw_ssr_enable),
+	},
+	{
+		.data_type      = QMI_OPT_FLAG,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x25,
+		.offset         = offsetof(struct
+					   wlfw_ind_register_req_msg_v01,
+					   async_data_enable_valid),
+	},
+	{
+		.data_type      = QMI_UNSIGNED_1_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x25,
+		.offset         = offsetof(struct
+					   wlfw_ind_register_req_msg_v01,
+					   async_data_enable),
 	},
 	{
 		.data_type      = QMI_EOTI,
@@ -2289,6 +2338,27 @@ struct qmi_elem_info wlfw_cap_resp_msg_v01_ei[] = {
 		.offset         = offsetof(struct
 					   wlfw_cap_resp_msg_v01,
 					   phy_qam_cap),
+	},
+	{
+		.data_type      = QMI_OPT_FLAG,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x28,
+		.offset         = offsetof(struct
+					   wlfw_cap_resp_msg_v01,
+					   serial_id_valid),
+	},
+	{
+		.data_type      = QMI_STRUCT,
+		.elem_len       = 1,
+		.elem_size      = sizeof(struct wlchip_serial_id_v01),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x28,
+		.offset         = offsetof(struct
+					   wlfw_cap_resp_msg_v01,
+					   serial_id),
+		.ei_array      = wlchip_serial_id_v01_ei,
 	},
 	{
 		.data_type      = QMI_EOTI,
@@ -3910,14 +3980,14 @@ struct qmi_elem_info wlfw_host_cap_req_msg_v01_ei[] = {
 	},
 	{
 		.data_type      = QMI_STRUCT,
-		.elem_len       = QMI_WLFW_MAX_NUM_MLO_CHIPS_V01,
-		.elem_size      = sizeof(struct wlfw_host_mlo_chip_info_s_v01),
+		.elem_len       = QMI_WLFW_MAX_MLO_CHIP_V01,
+		.elem_size      = sizeof(struct mlo_chip_info_s_v01),
 		.array_type       = STATIC_ARRAY,
 		.tlv_type       = 0x26,
 		.offset         = offsetof(struct
 					   wlfw_host_cap_req_msg_v01,
 					   mlo_chip_info),
-		.ei_array      = wlfw_host_mlo_chip_info_s_v01_ei,
+		.ei_array      = mlo_chip_info_s_v01_ei,
 	},
 	{
 		.data_type      = QMI_OPT_FLAG,
@@ -4101,14 +4171,14 @@ struct qmi_elem_info wlfw_host_cap_req_msg_v01_ei[] = {
 	},
 	{
 		.data_type      = QMI_STRUCT,
-		.elem_len       = QMI_WLFW_MAX_NUM_MLO_V2_CHIPS_V01,
-		.elem_size      = sizeof(struct wlfw_host_mlo_chip_v2_info_s_v01),
+		.elem_len       = QMI_WLFW_MLO_V2_CHP_V01,
+		.elem_size      = sizeof(struct mlo_chip_v2_info_s_v01),
 		.array_type       = STATIC_ARRAY,
 		.tlv_type       = 0x2F,
 		.offset         = offsetof(struct
 					   wlfw_host_cap_req_msg_v01,
 					   mlo_chip_v2_info),
-		.ei_array      = wlfw_host_mlo_chip_v2_info_s_v01_ei,
+		.ei_array      = mlo_chip_v2_info_s_v01_ei,
 	},
 	{
 		.data_type      = QMI_OPT_FLAG,
@@ -4319,6 +4389,26 @@ struct qmi_elem_info wlfw_fw_init_done_ind_msg_v01_ei[] = {
 		.offset         = offsetof(struct
 					   wlfw_fw_init_done_ind_msg_v01,
 					   hang_data_length),
+	},
+	{
+		.data_type      = QMI_OPT_FLAG,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x12,
+		.offset         = offsetof(struct
+					   wlfw_fw_init_done_ind_msg_v01,
+					   soft_sku_features_valid),
+	},
+	{
+		.data_type      = QMI_UNSIGNED_8_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u64),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x12,
+		.offset         = offsetof(struct
+					   wlfw_fw_init_done_ind_msg_v01,
+					   soft_sku_features),
 	},
 	{
 		.data_type      = QMI_EOTI,
@@ -6435,6 +6525,26 @@ struct qmi_elem_info wlfw_phy_cap_resp_msg_v01_ei[] = {
 					   mlo_cap_v2_support),
 	},
 	{
+		.data_type      = QMI_OPT_FLAG,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x13,
+		.offset         = offsetof(struct
+					   wlfw_phy_cap_resp_msg_v01,
+					   single_chip_mlo_support_valid),
+	},
+	{
+		.data_type      = QMI_UNSIGNED_1_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x13,
+		.offset         = offsetof(struct
+					   wlfw_phy_cap_resp_msg_v01,
+					   single_chip_mlo_support),
+	},
+	{
 		.data_type      = QMI_EOTI,
 		.array_type       = NO_ARRAY,
 		.tlv_type       = QMI_COMMON_TLV_TYPE,
@@ -6638,7 +6748,66 @@ struct qmi_elem_info wlfw_tme_lite_info_resp_msg_v01_ei[] = {
 };
 EXPORT_SYMBOL(wlfw_tme_lite_info_resp_msg_v01_ei);
 
+struct qmi_elem_info wlfw_soft_sku_info_req_msg_v01_ei[] = {
+	{
+		.data_type      = QMI_UNSIGNED_8_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u64),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x01,
+		.offset         = offsetof(struct
+					   wlfw_soft_sku_info_req_msg_v01,
+					   addr),
+	},
+	{
+		.data_type      = QMI_UNSIGNED_4_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u32),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x02,
+		.offset         = offsetof(struct
+					   wlfw_soft_sku_info_req_msg_v01,
+					   size),
+	},
+	{
+		.data_type      = QMI_EOTI,
+		.array_type       = NO_ARRAY,
+		.tlv_type       = QMI_COMMON_TLV_TYPE,
+	},
+};
+EXPORT_SYMBOL(wlfw_soft_sku_info_req_msg_v01_ei);
+
+struct qmi_elem_info wlfw_soft_sku_info_resp_msg_v01_ei[] = {
+	{
+		.data_type      = QMI_STRUCT,
+		.elem_len       = 1,
+		.elem_size      = sizeof(struct qmi_response_type_v01),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x02,
+		.offset         = offsetof(struct
+					   wlfw_soft_sku_info_resp_msg_v01,
+					   resp),
+		.ei_array      = qmi_response_type_v01_ei,
+	},
+	{
+		.data_type      = QMI_EOTI,
+		.array_type       = NO_ARRAY,
+		.tlv_type       = QMI_COMMON_TLV_TYPE,
+	},
+};
+EXPORT_SYMBOL(wlfw_soft_sku_info_resp_msg_v01_ei);
+
 struct qmi_elem_info wlfw_fw_ssr_ind_msg_v01_ei[] = {
+	{
+		.data_type      = QMI_SIGNED_4_BYTE_ENUM,
+		.elem_len       = 1,
+		.elem_size      = sizeof(enum wlfw_fw_ssr_reason_v01),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x01,
+		.offset         = offsetof(struct
+					   wlfw_fw_ssr_ind_msg_v01,
+					   reason_code),
+	},
 	{
 		.data_type      = QMI_EOTI,
 		.array_type       = NO_ARRAY,
@@ -6686,6 +6855,255 @@ struct qmi_elem_info wlfw_bmps_ctrl_resp_msg_v01_ei[] = {
 };
 EXPORT_SYMBOL(wlfw_bmps_ctrl_resp_msg_v01_ei);
 
+struct qmi_elem_info wlfw_lpass_ssr_req_msg_v01_ei[] = {
+	{
+		.data_type      = QMI_SIGNED_4_BYTE_ENUM,
+		.elem_len       = 1,
+		.elem_size      = sizeof(enum wlfw_lpass_ssr_reason_v01),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x01,
+		.offset         = offsetof(struct
+					   wlfw_lpass_ssr_req_msg_v01,
+					   reason_code),
+	},
+	{
+		.data_type      = QMI_EOTI,
+		.array_type       = NO_ARRAY,
+		.tlv_type       = QMI_COMMON_TLV_TYPE,
+	},
+};
+EXPORT_SYMBOL(wlfw_lpass_ssr_req_msg_v01_ei);
+
+struct qmi_elem_info wlfw_lpass_ssr_resp_msg_v01_ei[] = {
+	{
+		.data_type      = QMI_STRUCT,
+		.elem_len       = 1,
+		.elem_size      = sizeof(struct qmi_response_type_v01),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x02,
+		.offset         = offsetof(struct
+					   wlfw_lpass_ssr_resp_msg_v01,
+					   resp),
+		.ei_array      = qmi_response_type_v01_ei,
+	},
+	{
+		.data_type      = QMI_EOTI,
+		.array_type       = NO_ARRAY,
+		.tlv_type       = QMI_COMMON_TLV_TYPE,
+	},
+};
+EXPORT_SYMBOL(wlfw_lpass_ssr_resp_msg_v01_ei);
+
+struct qmi_elem_info wlfw_mlo_reconfig_info_req_msg_v01_ei[] = {
+	{
+		.data_type      = QMI_OPT_FLAG,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x10,
+		.offset         = offsetof(struct
+					   wlfw_mlo_reconfig_info_req_msg_v01,
+					   mlo_capable_valid),
+	},
+	{
+		.data_type      = QMI_UNSIGNED_1_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x10,
+		.offset         = offsetof(struct
+					   wlfw_mlo_reconfig_info_req_msg_v01,
+					   mlo_capable),
+	},
+	{
+		.data_type      = QMI_OPT_FLAG,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x11,
+		.offset         = offsetof(struct
+					   wlfw_mlo_reconfig_info_req_msg_v01,
+					   mlo_chip_id_valid),
+	},
+	{
+		.data_type      = QMI_UNSIGNED_2_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u16),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x11,
+		.offset         = offsetof(struct
+					   wlfw_mlo_reconfig_info_req_msg_v01,
+					   mlo_chip_id),
+	},
+	{
+		.data_type      = QMI_OPT_FLAG,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x12,
+		.offset         = offsetof(struct
+					   wlfw_mlo_reconfig_info_req_msg_v01,
+					   mlo_group_id_valid),
+	},
+	{
+		.data_type      = QMI_UNSIGNED_1_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x12,
+		.offset         = offsetof(struct
+					   wlfw_mlo_reconfig_info_req_msg_v01,
+					   mlo_group_id),
+	},
+	{
+		.data_type      = QMI_OPT_FLAG,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x13,
+		.offset         = offsetof(struct
+					   wlfw_mlo_reconfig_info_req_msg_v01,
+					   max_mlo_peer_valid),
+	},
+	{
+		.data_type      = QMI_UNSIGNED_2_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u16),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x13,
+		.offset         = offsetof(struct
+					   wlfw_mlo_reconfig_info_req_msg_v01,
+					   max_mlo_peer),
+	},
+	{
+		.data_type      = QMI_OPT_FLAG,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x14,
+		.offset         = offsetof(struct
+					   wlfw_mlo_reconfig_info_req_msg_v01,
+					   mlo_num_chips_valid),
+	},
+	{
+		.data_type      = QMI_UNSIGNED_1_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x14,
+		.offset         = offsetof(struct
+					   wlfw_mlo_reconfig_info_req_msg_v01,
+					   mlo_num_chips),
+	},
+	{
+		.data_type      = QMI_OPT_FLAG,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x15,
+		.offset         = offsetof(struct
+					   wlfw_mlo_reconfig_info_req_msg_v01,
+					   mlo_chip_info_valid),
+	},
+	{
+		.data_type      = QMI_STRUCT,
+		.elem_len       = QMI_WLFW_MAX_MLO_CHIP_V01,
+		.elem_size      = sizeof(struct mlo_chip_info_s_v01),
+		.array_type       = STATIC_ARRAY,
+		.tlv_type       = 0x15,
+		.offset         = offsetof(struct
+					   wlfw_mlo_reconfig_info_req_msg_v01,
+					   mlo_chip_info),
+		.ei_array      = mlo_chip_info_s_v01_ei,
+	},
+	{
+		.data_type      = QMI_OPT_FLAG,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u8),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x16,
+		.offset         = offsetof(struct
+					   wlfw_mlo_reconfig_info_req_msg_v01,
+					   mlo_chip_v2_info_valid),
+	},
+	{
+		.data_type      = QMI_STRUCT,
+		.elem_len       = QMI_WLFW_MLO_V2_CHP_V01,
+		.elem_size      = sizeof(struct mlo_chip_v2_info_s_v01),
+		.array_type       = STATIC_ARRAY,
+		.tlv_type       = 0x16,
+		.offset         = offsetof(struct
+					   wlfw_mlo_reconfig_info_req_msg_v01,
+					   mlo_chip_v2_info),
+		.ei_array      = mlo_chip_v2_info_s_v01_ei,
+	},
+	{
+		.data_type      = QMI_EOTI,
+		.array_type       = NO_ARRAY,
+		.tlv_type       = QMI_COMMON_TLV_TYPE,
+	},
+};
+EXPORT_SYMBOL(wlfw_mlo_reconfig_info_req_msg_v01_ei);
+
+struct qmi_elem_info wlfw_mlo_reconfig_info_resp_msg_v01_ei[] = {
+	{
+		.data_type      = QMI_STRUCT,
+		.elem_len       = 1,
+		.elem_size      = sizeof(struct qmi_response_type_v01),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x02,
+		.offset         = offsetof(struct
+					   wlfw_mlo_reconfig_info_resp_msg_v01,
+					   resp),
+		.ei_array      = qmi_response_type_v01_ei,
+	},
+	{
+		.data_type      = QMI_EOTI,
+		.array_type       = NO_ARRAY,
+		.tlv_type       = QMI_COMMON_TLV_TYPE,
+	},
+};
+EXPORT_SYMBOL(wlfw_mlo_reconfig_info_resp_msg_v01_ei);
+
+struct qmi_elem_info wlfw_driver_async_data_ind_msg_v01_ei[] = {
+	{
+		.data_type      = QMI_DATA_LEN,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u16),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x01,
+		.offset         = offsetof(struct
+					   wlfw_driver_async_data_ind_msg_v01,
+					   data_len),
+	},
+	{
+		.data_type      = QMI_UNSIGNED_1_BYTE,
+		.elem_len       = QMI_WLFW_MAX_DATA_SIZE_V01,
+		.elem_size      = sizeof(u8),
+		.array_type       = VAR_LEN_ARRAY,
+		.tlv_type       = 0x01,
+		.offset         = offsetof(struct
+					   wlfw_driver_async_data_ind_msg_v01,
+					   data),
+	},
+	{
+		.data_type      = QMI_UNSIGNED_2_BYTE,
+		.elem_len       = 1,
+		.elem_size      = sizeof(u16),
+		.array_type       = NO_ARRAY,
+		.tlv_type       = 0x02,
+		.offset         = offsetof(struct
+					   wlfw_driver_async_data_ind_msg_v01,
+					   type),
+	},
+	{
+		.data_type      = QMI_EOTI,
+		.array_type       = NO_ARRAY,
+		.tlv_type       = QMI_COMMON_TLV_TYPE,
+	},
+};
+EXPORT_SYMBOL(wlfw_driver_async_data_ind_msg_v01_ei);
+
 /**
  * wlfw_is_valid_dt_node_found - Check if valid device tree node present
  *
@@ -6718,6 +7136,5 @@ static int __init wlfw_init(void)
 }
 
 module_init(wlfw_init);
-
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("WLAN FW QMI service");

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -1208,6 +1208,7 @@ void sde_connector_helper_bridge_enable(struct drm_connector *connector)
 	struct sde_connector *c_conn = NULL;
 	struct dsi_display *display;
 	struct sde_kms *sde_kms;
+	struct drm_crtc *crtc;
 
 	sde_kms = sde_connector_get_kms(connector);
 	if (!sde_kms) {
@@ -1219,15 +1220,17 @@ void sde_connector_helper_bridge_enable(struct drm_connector *connector)
 
 	c_conn = to_sde_connector(connector);
 	display = (struct dsi_display *) c_conn->display;
+	crtc = connector->state->crtc;
 
 	/*
 	 * Special handling for some panels which need atleast
 	 * one frame to be transferred to GRAM before enabling backlight.
 	 * So delay backlight update to these panels until the
-	 * first frame commit is received from the HW.
+	 * first frame commit is received from the HW only during power on.
 	 */
-	if (display->panel->bl_config.bl_update ==
-				BL_UPDATE_DELAY_UNTIL_FIRST_FRAME) {
+	if ((display->panel->bl_config.bl_update ==
+		BL_UPDATE_DELAY_UNTIL_FIRST_FRAME) &&
+		crtc && crtc->state->active_changed) {
 		if (!c_conn->allow_bl_update)
 			sde_encoder_wait_for_event(c_conn->encoder,
 					MSM_ENC_TX_COMPLETE);
@@ -1820,6 +1823,20 @@ static int _sde_connector_set_prop_dyn_transfer_time(struct sde_connector *c_con
 	return rc;
 }
 
+static void _sde_connector_handle_dpms_off(struct sde_connector *c_conn, uint64_t val)
+{
+	/* suspend case: clear stale MISR */
+	if (val == SDE_MODE_DPMS_OFF) {
+		memset(&c_conn->previous_misr_sign, 0, sizeof(struct sde_misr_sign));
+
+		/* reset backlight scale of LTM */
+		if (c_conn->bl_scale_sv != MAX_SV_BL_SCALE_LEVEL) {
+			c_conn->bl_scale_sv = MAX_SV_BL_SCALE_LEVEL;
+			c_conn->bl_scale_dirty = true;
+		}
+	}
+}
+
 static int sde_connector_atomic_set_property(struct drm_connector *connector,
 		struct drm_connector_state *state,
 		struct drm_property *property,
@@ -1915,9 +1932,7 @@ static int sde_connector_atomic_set_property(struct drm_connector *connector,
 		_sde_connector_set_prop_dyn_transfer_time(c_conn, val);
 		break;
 	case CONNECTOR_PROP_LP:
-		/* suspend case: clear stale MISR */
-		if (val == SDE_MODE_DPMS_OFF)
-			memset(&c_conn->previous_misr_sign, 0, sizeof(struct sde_misr_sign));
+		_sde_connector_handle_dpms_off(c_conn, val);
 		break;
 	case CONNECTOR_PROP_QSYNC_MIN_FPS_INDEX:
 		msm_property_set_dirty(&c_conn->property_info,

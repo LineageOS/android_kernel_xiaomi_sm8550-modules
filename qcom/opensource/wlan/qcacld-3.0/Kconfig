@@ -119,6 +119,10 @@ config WLAN_FEATURE_11AX
 	bool "Enable 11AX(High Efficiency) feature"
 	default n
 
+config QCA_TARGET_IF_MLME
+	bool "Enable TARGET_IF MLME"
+	default n
+
 config ICMP_DISABLE_PS
 	bool "Enable ICMP packet disable powersave feature"
 	default n
@@ -147,4 +151,7 @@ config WLAN_FEATURE_SARV1_TO_SARV2
 	bool "Enable conversion of SAR v1 to v2 feature"
 	default n
 
+config WLAN_SYSFS_RF_TEST_MODE
+	bool "enable CONFIG_WLAN_SYSFS_RF_TEST_MODE"
+	default n
 endif # QCA_CLD_WLAN

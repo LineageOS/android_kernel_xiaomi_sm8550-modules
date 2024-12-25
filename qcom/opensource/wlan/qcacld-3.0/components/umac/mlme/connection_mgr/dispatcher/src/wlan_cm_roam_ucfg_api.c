@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -73,9 +73,8 @@ ucfg_user_space_enable_disable_rso(struct wlan_objmgr_pdev *pdev,
 	wlan_mlme_set_usr_disabled_roaming(psoc, !is_fast_roam_enabled);
 
 	/*
-	 * Supplicant_disabled_roaming flag is the global flag to control
-	 * roam offload from supplicant. Driver cannot enable roaming if
-	 * supplicant disabled roaming is set.
+	 * Supplicant_disabled_roaming flag is only effective for current
+	 * connection, it will be cleared during new connection.
 	 * is_fast_roam_enabled: true - enable RSO if not disabled by driver
 	 *                       false - Disable RSO. Send RSO stop if false
 	 *                       is set.
@@ -107,6 +106,14 @@ ucfg_user_space_enable_disable_rso(struct wlan_objmgr_pdev *pdev,
 				      NULL, false);
 
 	return status;
+}
+
+void
+ucfg_clear_user_disabled_roaming(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id)
+{
+	wlan_mlme_set_usr_disabled_roaming(psoc, false);
+	mlme_set_supplicant_disabled_roaming(psoc, vdev_id, false);
 }
 
 QDF_STATUS ucfg_cm_abort_roam_scan(struct wlan_objmgr_pdev *pdev,
@@ -564,8 +571,7 @@ ucfg_cm_get_neighbor_lookup_rssi_threshold(struct wlan_objmgr_psoc *psoc,
 {
 	struct cm_roam_values_copy temp;
 
-	wlan_cm_roam_cfg_get_value(psoc, vdev_id,
-				   NEIGHBOUR_LOOKUP_THRESHOLD, &temp);
+	wlan_cm_roam_cfg_get_value(psoc, vdev_id, NEXT_RSSI_THRESHOLD, &temp);
 	*lookup_threshold = temp.uint_value;
 
 	return QDF_STATUS_SUCCESS;
