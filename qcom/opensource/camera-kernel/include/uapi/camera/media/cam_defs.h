@@ -91,6 +91,7 @@ struct cam_control {
 	__u32        handle_type;
 	__u32        reserved;
 	__u64        handle;
+	__u32        crc_error_divisor;
 };
 
 /* camera IOCTL */
@@ -574,6 +575,7 @@ struct cam_acquire_dev_cmd {
 	__s32        dev_handle;
 	__u32        handle_type;
 	__u32        num_resources;
+	__u32        crc_error_divisor;
 	__u64        resource_hdl;
 };
 
@@ -620,6 +622,7 @@ struct cam_acquire_hw_cmd_v1 {
 	__s32        dev_handle;
 	__u32        handle_type;
 	__u32        data_size;
+	__u32        crc_error_divisor;
 	__u64        resource_hdl;
 };
 
@@ -664,6 +667,7 @@ struct cam_acquire_hw_cmd_v2 {
 	__s32                    dev_handle;
 	__u32                    handle_type;
 	__u32                    data_size;
+	__u32                    crc_error_divisor;
 	__u64                    resource_hdl;
 	struct cam_acquired_hw_info hw_info;
 };
