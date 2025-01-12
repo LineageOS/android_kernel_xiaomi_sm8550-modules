@@ -999,6 +999,16 @@ int cam_sensor_match_id(struct cam_sensor_ctrl_t *s_ctrl)
 		return -EINVAL;
 	}
 
+	#ifdef CONFIG_TARGET_REQUIRE_XIAOMI_DRIVER
+	/* xiaomi modified start */
+	rc = camera_io_dev_read(
+		&(s_ctrl->io_master_info),
+		slave_info->sensor_id_reg_addr,
+		&chipid, s_ctrl->sensor_probe_addr_type,
+		s_ctrl->sensor_probe_data_type, true);
+	/* xiaomi modified end */
+	#endif
+
 	if (s_ctrl->hw_no_ops)
 		return rc;
 

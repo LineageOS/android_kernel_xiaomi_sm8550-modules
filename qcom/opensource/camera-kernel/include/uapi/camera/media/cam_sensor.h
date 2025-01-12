@@ -361,6 +361,11 @@ struct cam_ois_opcode {
 	__u32 coeff;
 	__u32 pheripheral;
 	__u32 memory;
+#ifdef CONFIG_TARGET_REQUIRE_XIAOMI_DRIVER
+	__u8 fw_addr_type;
+	__u8 is_addr_increase;
+	__u8 customized_ois_flag;
+#endif
 } __attribute__((packed));
 
 /**
