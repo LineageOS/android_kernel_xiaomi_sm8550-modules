@@ -153,7 +153,7 @@ ssize_t mi_disp_read(struct file *filp, char __user *buffer,
 				get_disp_event_type_name(e->event.base.type));
 			DISP_DEBUG("%s display event length: %d\n",
 				get_disp_id_name(e->event.base.disp_id), length);
-			DISP_INFO("%s display event copy length: %d\n",
+			DISP_DEBUG("%s display event copy length: %d\n",
 				get_disp_id_name(e->event.base.disp_id), copy_length);
 
 			if (copy_to_user(buffer + ret, ((__u8*)&e->event) +
@@ -167,7 +167,7 @@ ssize_t mi_disp_read(struct file *filp, char __user *buffer,
 			if (partial_read) {
 				e->offset += count;
 put_back_event:
-				DISP_INFO("putting event back!");
+				DISP_DEBUG("putting event back!");
 				spin_lock_irq(&df->client_spinlock);
 				client->event_space -= length;
 				list_add(&e->link, &client->event_list);
