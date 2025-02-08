@@ -1596,6 +1596,8 @@ struct pt_core_data {
 	bool quick_boot;
 	bool drv_debug_suspend;
 	bool touch_offload;
+	bool vdd_is_enabled;
+	bool vcc_i2c_is_enabled;
 };
 
 struct gd_sensor {

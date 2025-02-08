@@ -21,6 +21,11 @@ ifeq ($(CONFIG_ARCH_PINEAPPLE), y)
 	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_pineappletouchconf.h
 endif
 
+ifeq ($(CONFIG_ARCH_VOLCANO), y)
+	include $(TOUCH_ROOT)/config/gki_pineappletouch.conf
+	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_pineappletouchconf.h
+endif
+
 ifeq ($(CONFIG_ARCH_MONACO), y)
 	include $(TOUCH_ROOT)/config/gki_monacotouch.conf
 	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_monacotouchconf.h
@@ -92,6 +97,15 @@ ifeq ($(CONFIG_TOUCHSCREEN_SYNAPTICS_DSX), y)
 	obj-$(CONFIG_MSM_TOUCH) += synaptics_dsx.o
 endif
 
+ifeq ($(CONFIG_QTS_ENABLE), y)
+	LINUX_INC += -include $(TOUCH_ROOT)/qts/qts_core.h
+	LINUX_INC += -include $(TOUCH_ROOT)/qts/qts_core_common.h
+
+	qts-y := ./qts/qts_core.o
+
+	obj-$(CONFIG_MSM_TOUCH) += qts.o
+endif
+
 ifeq ($(CONFIG_TOUCH_FOCALTECH), y)
 	LINUX_INC += -include $(TOUCH_ROOT)/focaltech_touch/focaltech_common.h
 	LINUX_INC += -include $(TOUCH_ROOT)/focaltech_touch/focaltech_config.h
@@ -128,8 +142,6 @@ endif
 
 ifeq ($(CONFIG_TOUCHSCREEN_GOODIX_BRL), y)
 	LINUX_INC += -include $(TOUCH_ROOT)/goodix_berlin_driver/goodix_ts_core.h
-	LINUX_INC += -include $(TOUCH_ROOT)/qts/qts_core.h
-	LINUX_INC += -include $(TOUCH_ROOT)/qts/qts_core_common.h
 
 	goodix_ts-y := \
 		 ./goodix_berlin_driver/goodix_ts_core.o \
@@ -141,8 +153,7 @@ ifeq ($(CONFIG_TOUCHSCREEN_GOODIX_BRL), y)
 		 ./goodix_berlin_driver/goodix_ts_gesture.o \
 		 ./goodix_berlin_driver/goodix_ts_inspect.o \
 		 ./goodix_berlin_driver/goodix_brl_spi.o \
-		 ./goodix_berlin_driver/goodix_brl_i2c.o \
-		 ./qts/qts_core.o
+		 ./goodix_berlin_driver/goodix_brl_i2c.o
 
 	obj-$(CONFIG_MSM_TOUCH) += goodix_ts.o
 endif

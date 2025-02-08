@@ -10624,6 +10624,8 @@ static int pt_enable_regulator(struct pt_core_data *cd, bool en)
 				"Regulator vdd enable failed rc=%d\n", rc);
 			goto exit;
 		}
+
+		cd->vdd_is_enabled = true;
 		dev_info(cd->dev, "%s: VDD regulator enabled:\n", __func__);
 	}
 
@@ -10644,29 +10646,32 @@ static int pt_enable_regulator(struct pt_core_data *cd, bool en)
 				"Regulator vcc_i2c enable failed rc=%d\n", rc);
 			goto disable_vdd_reg;
 		}
+
+		cd->vcc_i2c_is_enabled = true;
 		dev_info(cd->dev, "%s: VCC I2C regulator enabled:\n", __func__);
 	}
 
 	return 0;
 
 disable_vcc_i2c_reg:
-	if (cd->vcc_i2c) {
+	if (cd->vcc_i2c && cd->vcc_i2c_is_enabled) {
 		if (regulator_count_voltages(cd->vcc_i2c) > 0)
 			regulator_set_voltage(cd->vcc_i2c, FT_I2C_VTG_MIN_UV,
 						FT_I2C_VTG_MAX_UV);
 
 		regulator_disable(cd->vcc_i2c);
+		cd->vcc_i2c_is_enabled = false;
 		dev_info(cd->dev, "%s: VCC I2C regulator disabled:\n", __func__);
-
 	}
 
 disable_vdd_reg:
-	if (cd->vdd) {
+	if (cd->vdd && cd->vdd_is_enabled) {
 		if (regulator_count_voltages(cd->vdd) > 0)
 			regulator_set_voltage(cd->vdd, FT_VTG_MIN_UV,
 						FT_VTG_MAX_UV);
 
 		regulator_disable(cd->vdd);
+		cd->vdd_is_enabled = false;
 		dev_info(cd->dev, "%s: VDD regulator disabled:\n", __func__);
 	}
 
@@ -17889,6 +17894,8 @@ int pt_probe(const struct pt_bus_ops *ops, struct device *dev,
 	cd->quick_boot			= false;
 	cd->drv_debug_suspend          = false;
 	cd->touch_offload = false;
+	cd->vdd_is_enabled = false;
+	cd->vcc_i2c_is_enabled = false;
 
 	if (cd->cpdata->config_dut_generation == CONFIG_DUT_PIP2_CAPABLE) {
 		cd->set_dut_generation = true;

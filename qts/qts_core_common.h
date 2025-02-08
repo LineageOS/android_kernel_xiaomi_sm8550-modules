@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 enum qts_client {
 	QTS_CLIENT_PRIMARY_TOUCH,
@@ -22,6 +22,7 @@ struct qts_vendor_callback_ops {
 	int (*enable_touch_irq)(void *data, bool en);
 	irqreturn_t (*irq_handler)(int irq, void *data);
 	int (*get_irq_num)(void *data);
+	int (*set_irq_num)(void *data, int irq);
 	int (*pre_la_tui_enable)(void *data);
 	int (*post_la_tui_enable)(void *data);
 	int (*pre_la_tui_disable)(void *data);
@@ -36,11 +37,14 @@ struct qts_vendor_data {
 	struct i2c_client *client;
 	struct spi_device *spi;
 	void *vendor_data;
+	void *notifier_cookie;
 	struct qts_vendor_callback_ops qts_vendor_ops;
 	u32 client_type;
 	u32 bus_type;
 	bool schedule_suspend;
 	bool schedule_resume;
+	u32 irq_gpio_flags;
 };
 
 int qts_client_register(struct qts_vendor_data qts_vendor_data);
+void qts_client_unregister(void);

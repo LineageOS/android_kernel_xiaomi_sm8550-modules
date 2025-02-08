@@ -12,7 +12,8 @@ def define_pineapple(t,v):
             "atmel_mxt_ts",
             "dummy_ts",
             "goodix_ts",
-            "focaltech_fts"
+            "focaltech_fts",
+	    "qts"
         ],
         config_options = [
             "TOUCH_DLKM_ENABLE",
@@ -22,7 +23,8 @@ def define_pineapple(t,v):
             "CONFIG_TOUCHSCREEN_NT36XXX_I2C",
             "CONFIG_TOUCHSCREEN_ATMEL_MXT",
             "CONFIG_TOUCHSCREEN_DUMMY",
-            "CONFIG_TOUCH_FOCALTECH"
+            "CONFIG_TOUCH_FOCALTECH",
+	    "CONFIG_QTS_ENABLE"
         ],
 )
 
@@ -35,7 +37,8 @@ def define_blair(t,v):
             "nt36xxx-i2c",
             "goodix_ts",
             "focaltech_fts",
-            "synaptics_tcm_ts"
+            "synaptics_tcm_ts",
+            "qts"
         ],
         config_options = [
             "TOUCH_DLKM_ENABLE",
@@ -44,7 +47,8 @@ def define_blair(t,v):
             "CONFIG_TOUCHSCREEN_NT36XXX_I2C",
             "CONFIG_TOUCHSCREEN_GOODIX_BRL",
             "CONFIG_TOUCH_FOCALTECH",
-            "CONFIG_TOUCHSCREEN_SYNAPTICS_TCM"
+            "CONFIG_TOUCHSCREEN_SYNAPTICS_TCM",
+            "CONFIG_QTS_ENABLE"
         ],
 )
 
@@ -55,14 +59,16 @@ def define_pitti(t,v):
         registry = touch_driver_modules,
         modules = [
             "focaltech_fts",
-            "goodix_ts"
+            "goodix_ts",
+            "qts"
         ],
         config_options = [
             "TOUCH_DLKM_ENABLE",
             "CONFIG_ARCH_PITTI",
             "CONFIG_MSM_TOUCH",
             "CONFIG_TOUCH_FOCALTECH",
-            "CONFIG_TOUCHSCREEN_GOODIX_BRL"
+            "CONFIG_TOUCHSCREEN_GOODIX_BRL",
+            "CONFIG_QTS_ENABLE"
         ],
 )
 
@@ -101,13 +107,17 @@ def define_volcano(t,v):
         variant = v,
         registry = touch_driver_modules,
         modules = [
-            "goodix_ts"
+            "goodix_ts",
+            "focaltech_fts",
+	    "qts"
         ],
         config_options = [
             "TOUCH_DLKM_ENABLE",
             "CONFIG_ARCH_VOLCANO",
             "CONFIG_MSM_TOUCH",
-            "CONFIG_TOUCHSCREEN_GOODIX_BRL"
+            "CONFIG_TOUCHSCREEN_GOODIX_BRL",
+            "CONFIG_TOUCH_FOCALTECH",
+	    "CONFIG_QTS_ENABLE"
         ],
 )
 

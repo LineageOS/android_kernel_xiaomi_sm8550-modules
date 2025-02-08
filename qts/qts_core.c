@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt)	"%s: " fmt, __func__
@@ -103,7 +103,7 @@ static int qts_populate_vm_info_iomem(struct qts_data *qts_data)
 		return -EINVAL;
 	}
 
-	num_gpios = of_gpio_named_count(np, "qts,trusted-touch-vm-gpio-list");
+	num_gpios = of_count_phandle_with_args(np, "qts,trusted-touch-vm-gpio-list", "#gpio-cells");
 	if (num_gpios < 0) {
 		pr_warn("Ignoring invalid trusted gpio list: %d\n", num_gpios);
 		num_gpios = 0;
@@ -261,7 +261,6 @@ static int qts_irq_registration(struct qts_data *qts_data)
 {
 	int ret = 0;
 
-	qts_data->irq_gpio_flags = IRQF_TRIGGER_RISING;
 	pr_debug("irq:%d, flag:%x\n", qts_data->irq, qts_data->irq_gpio_flags);
 	ret = request_threaded_irq(qts_data->irq, NULL, qts_irq_handler,
 				qts_data->irq_gpio_flags | IRQF_ONESHOT,
@@ -303,11 +302,19 @@ static void qts_trusted_touch_intr_gpio_toggle(struct qts_data *qts_data,
 	void __iomem *base;
 	u32 val;
 
-	if (qts_data->bus_type != QTS_BUS_TYPE_I2C)
-		return;
+	/*
+	 * Currently reset/irq gpios address is hardcoded in SVM. But reset/irq gpios
+	 * can be different based on target. This leads to NOC issues.
+	 * TODO: Add support to parse reset/irq gpio address from dtsi
+	 */
+	return;
 
 	base = ioremap(TOUCH_INTR_GPIO_BASE, TOUCH_INTR_GPIO_SIZE);
-	val = readl_relaxed(base + TOUCH_RESET_GPIO_OFFSET);
+	if (!base) {
+		pr_err("Failed to get intr base!\n");
+		return;
+	}
+	val = readl_relaxed(base + TOUCH_INTR_GPIO_OFFSET);
 	if (enable) {
 		val |= BIT(0);
 		writel_relaxed(val, base + TOUCH_INTR_GPIO_OFFSET);
@@ -437,7 +444,7 @@ static void qts_trusted_touch_tvm_vm_mode_enable(struct qts_data *qts_data)
 	kfree(acl_desc);
 	kfree(sgl_desc);
 
-	irq = gh_irq_accept(qts_data->vm_info->irq_label, -1, IRQ_TYPE_EDGE_RISING);
+	irq = gh_irq_accept(qts_data->vm_info->irq_label, -1, qts_data->irq_accept_flags);
 	qts_trusted_touch_intr_gpio_toggle(qts_data, false);
 	if (irq < 0) {
 		pr_err("failed to accept irq\n");
@@ -462,6 +469,9 @@ static void qts_trusted_touch_tvm_vm_mode_enable(struct qts_data *qts_data)
 
 	pr_debug("irq:returned from accept:%d\n", irq);
 	qts_data->irq = irq;
+
+	if (qts_data->vendor_ops.set_irq_num)
+		qts_data->vendor_ops.set_irq_num(qts_data->vendor_data, qts_data->irq);
 
 	rc = qts_vm_handle_vm_hardware(qts_data);
 	if (rc) {
@@ -1312,6 +1322,7 @@ static void qts_trusted_touch_init(struct qts_data *qts_data)
 static bool qts_ts_is_primary(struct kobject *kobj)
 {
 	char *path = NULL;
+	bool is_primary;
 
 	if (!kobj)
 		return true;
@@ -1319,9 +1330,27 @@ static bool qts_ts_is_primary(struct kobject *kobj)
 	path = kobject_get_path(kobj, GFP_KERNEL);
 
 	if (strstr(path, "primary"))
-		return true;
+		is_primary = true;
 	else
-		return false;
+		is_primary = false;
+
+	kfree(path);
+
+	return is_primary;
+}
+
+static void qts_adjust_irq_flags(u32 in_irq_flag, u32 *out_irq_flag,
+	u32 *out_irq_accept_flag)
+{
+	if ((in_irq_flag == IRQF_TRIGGER_LOW) ||
+		(in_irq_flag == IRQF_TRIGGER_HIGH)) {
+		*out_irq_flag = IRQF_TRIGGER_HIGH;
+		*out_irq_accept_flag = IRQ_TYPE_LEVEL_HIGH;
+	} else {
+		/* Use rising as default irq flag */
+		*out_irq_flag = IRQF_TRIGGER_RISING;
+		*out_irq_accept_flag = IRQ_TYPE_EDGE_RISING;
+	}
 }
 
 static ssize_t trusted_touch_enable_show(struct kobject *kobj, struct kobj_attribute *attr,
@@ -1676,12 +1705,18 @@ static void qts_panel_notifier_callback(enum panel_event_notifier_tag tag,
 		break;
 	case DRM_PANEL_EVENT_BLANK:
 		if (notification->notif_data.early_trigger) {
+#ifdef CONFIG_ARCH_QTI_VM
+			if ((qts_trusted_touch_get_vm_state(qts_data) != TRUSTED_TOUCH_TVM_INIT) &&
+				qts_handle_trusted_touch_tvm(qts_data, 0))
+				pr_err("Failed to handle trusted touch in tvm\n");
+#else
 			if (qts_data->schedule_resume)
 				cancel_work_sync(&qts_data->resume_work);
 			if (qts_data->schedule_suspend)
 				queue_work(qts_data->ts_workqueue, &qts_data->suspend_work);
 			else
 				qts_ts_suspend(qts_data);
+#endif
 		} else {
 			pr_debug("suspend notification post commit\n");
 		}
@@ -1776,6 +1811,10 @@ int qts_client_register(struct qts_vendor_data qts_vendor_data)
 	qts_data->vendor_ops = qts_vendor_data.qts_vendor_ops;
 	qts_data->schedule_suspend = qts_vendor_data.schedule_suspend;
 	qts_data->schedule_resume = qts_vendor_data.schedule_resume;
+	qts_data->suspended = true;
+
+	qts_adjust_irq_flags(qts_vendor_data.irq_gpio_flags,
+		&qts_data->irq_gpio_flags, &qts_data->irq_accept_flags);
 
 	qts_trusted_touch_init(qts_data);
 
@@ -1784,6 +1823,8 @@ int qts_client_register(struct qts_vendor_data qts_vendor_data)
 		qts_create_sysfs(qts_data);
 
 	mutex_init(&qts_data->transition_lock);
+	qts_ts_register_for_panel_events(qts_data);
+	qts_vendor_data.notifier_cookie = qts_data->notifier_cookie;
 
 #ifdef CONFIG_ARCH_QTI_VM
 	atomic_set(&qts_data->delayed_tvm_probe_pending, 1);
@@ -1804,11 +1845,39 @@ int qts_client_register(struct qts_vendor_data qts_vendor_data)
 	if (qts_data->ts_workqueue && qts_data->schedule_suspend)
 		INIT_WORK(&qts_data->suspend_work, qts_suspend_work);
 
-	qts_ts_register_for_panel_events(qts_data);
-
 qts_register_end:
 	pr_debug("client register end\n");
 	mutex_unlock(&qts_data_entries->qts_data_entries_lock);
 	return rc;
 }
 EXPORT_SYMBOL(qts_client_register);
+
+void qts_client_unregister(void)
+{
+	struct qts_data *qts_data;
+	int i;
+
+	pr_debug("QTS client unregister\n");
+	if (!qts_data_entries)
+		return;
+
+	if (qts_data_entries->qts_kset) {
+		kset_unregister(qts_data_entries->qts_kset);
+		qts_data_entries->qts_kset = NULL;
+	}
+
+	for (i = QTS_CLIENT_PRIMARY_TOUCH; i < QTS_CLIENT_MAX; i++) {
+		qts_data = &qts_data_entries->info[i];
+		if (!IS_ERR_OR_NULL(qts_data->notifier_cookie))
+			panel_event_notifier_unregister(qts_data->notifier_cookie);
+		if (qts_data->vm_info) {
+			qts_vm_deinit(qts_data);
+			qts_data->vm_info = NULL;
+		}
+	}
+	kfree(qts_data_entries);
+}
+EXPORT_SYMBOL_GPL(qts_client_unregister);
+
+MODULE_DESCRIPTION("Qualcomm Technologies, Inc. Touchscreen driver");
+MODULE_LICENSE("GPL");
