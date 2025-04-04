@@ -1518,7 +1518,42 @@ err_gpio_config_failed:
 	NVT_ERR("ret = %d\n", ret);
 	return ret;
 }
+#ifdef CONFIG_TOUCHSCREEN_NT36XXX_LATE_EN
+/*******************************************************
+ * Description:
+ *     Novatek touchscreen late init thread function.
+ *
+ * return:
+ *     Executive outcomes. 0---succeed.
+ *******************************************************/
+static int nvt_ts_late_init_thread(void *data)
+{
+        NVT_LOG("nvt_ts_late thread init\n");
+        nvt_ts_late_probe(ts->client, ts->id);
+        NVT_LOG("nvt_ts_late thread exit\n");
 
+	return 0;
+}
+/*******************************************************
+ * Description:
+ *     Novatek touchscreen driver late init function.
+ *
+ * return:
+ *     Executive outcomes. 0---succeed. negative---failed
+ *******************************************************/
+static int nvt_ts_late_init(void)
+{
+        struct task_struct *init_thrd;
+        /* create and run update thread */
+        init_thrd = kthread_run(nvt_ts_late_init_thread,
+                                NULL, "nvt_ts_late_init_thread");
+        if (IS_ERR_OR_NULL(init_thrd)) {
+                NVT_LOG("Failed to create late init thread\n");
+                return -EFAULT;
+        }
+        return 0;
+}
+#endif
 /*******************************************************
  * Description:
  *     Novatek touchscreen driver probe function.
@@ -1533,7 +1568,6 @@ static int32_t nvt_ts_probe(struct i2c_client *client,
 #if defined(CONFIG_DRM)
 	struct device_node *dp = client->dev.of_node;
 #endif
-
 	NVT_LOG("start\n");
 
 #if defined(CONFIG_DRM)
@@ -1588,6 +1622,9 @@ static int32_t nvt_ts_probe(struct i2c_client *client,
 	}
 #endif
 	NVT_LOG("end\n");
+#ifdef CONFIG_TOUCHSCREEN_NT36XXX_LATE_EN
+	nvt_ts_late_init();
+#endif
 	return 0;
 #if defined(CONFIG_DRM)
 

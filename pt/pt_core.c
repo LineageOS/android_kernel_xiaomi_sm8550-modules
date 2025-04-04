@@ -18532,7 +18532,11 @@ int pt_release(struct pt_core_data *cd)
 	cancel_work_sync(&cd->suspend_offload_work);
 	cancel_work_sync(&cd->resume_work);
 	cancel_work_sync(&cd->suspend_work);
-	destroy_workqueue(cd->pt_workqueue);
+
+	if (cd->pt_workqueue) {
+		destroy_workqueue(cd->pt_workqueue);
+		cd->pt_workqueue = NULL;
+	}
 
 	pt_stop_wd_timer(cd);
 

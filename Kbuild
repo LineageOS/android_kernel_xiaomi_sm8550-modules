@@ -16,6 +16,11 @@ ifeq ($(CONFIG_ARCH_KHAJE), y)
 	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_khajetouchconf.h
 endif
 
+ifeq ($(CONFIG_ARCH_BENGAL), y)
+	include $(TOUCH_ROOT)/config/gki_bengaltouch.conf
+	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_bengaltouchconf.h
+endif
+
 ifeq ($(CONFIG_ARCH_PINEAPPLE), y)
 	include $(TOUCH_ROOT)/config/gki_pineappletouch.conf
 	LINUX_INC += -include $(TOUCH_ROOT)/config/gki_pineappletouchconf.h
