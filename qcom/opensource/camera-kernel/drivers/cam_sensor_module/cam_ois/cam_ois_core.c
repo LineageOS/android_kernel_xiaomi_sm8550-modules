@@ -811,6 +811,26 @@ static int cam_ois_pkt_parse(struct cam_ois_ctrl_t *o_ctrl, void *arg)
 					break;
 				}
 			}
+#if defined(CONFIG_TARGET_PRODUCT_NUWA)
+			else if (o_ctrl->i2c_postinit_data.is_settings_valid == 0)
+			{
+				CAM_DBG(CAM_OIS, "received postinit settings");
+				i2c_reg_settings =
+					&(o_ctrl->i2c_postinit_data);
+				i2c_reg_settings->is_settings_valid = 1;
+				i2c_reg_settings->request_id = 0;
+				rc = cam_sensor_i2c_command_parser(
+					&o_ctrl->io_master_info,
+					i2c_reg_settings,
+					&cmd_desc[i], 1, NULL);
+				if (rc < 0)
+				{
+					CAM_ERR(CAM_OIS,
+							"post init parsing failed: %d", rc);
+					return rc;
+				}
+			}
+#endif
 			break;
 			}
 			cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
@@ -892,7 +912,23 @@ static int cam_ois_pkt_parse(struct cam_ois_ctrl_t *o_ctrl, void *arg)
 				CAM_DBG(CAM_OIS, "apply calib data settings success");
 			}
 		}
-
+#if defined(CONFIG_TARGET_PRODUCT_NUWA)
+		if (o_ctrl->i2c_postinit_data.is_settings_valid == 1) {
+			rc = cam_ois_apply_settings(o_ctrl, &o_ctrl->i2c_postinit_data);
+			if ((rc == -EAGAIN) && (o_ctrl->io_master_info.master_type == CCI_MASTER)) {
+				CAM_WARN(CAM_OIS, "CCI HW is restting: Reapplying postinit settings");
+				usleep_range(1000, 1010);
+				rc = cam_ois_apply_settings(o_ctrl, &o_ctrl->i2c_postinit_data);
+			}
+			if (rc) {
+				CAM_ERR(CAM_OIS, "Cannot apply postinit data %d", rc);
+				goto pwr_dwn;
+			}
+			else {
+				CAM_DBG(CAM_OIS, "OIS postinit settings success");
+			}
+		}
+#endif
 		o_ctrl->cam_ois_state = CAM_OIS_CONFIG;
 
 		rc = delete_request(&o_ctrl->i2c_fwinit_data);
@@ -914,6 +950,14 @@ static int cam_ois_pkt_parse(struct cam_ois_ctrl_t *o_ctrl, void *arg)
 				"Fail deleting Calibration data: rc: %d", rc);
 			rc = 0;
 		}
+#if defined(CONFIG_TARGET_PRODUCT_NUWA)
+		rc = delete_request(&o_ctrl->i2c_postinit_data);
+		if (rc < 0) {
+			CAM_WARN(CAM_OIS,
+					 "Fail deleting postinit data: rc: %d", rc);
+			rc = 0;
+		}
+#endif
 		break;
 	case CAM_OIS_PACKET_OPCODE_OIS_CONTROL:
 		if (o_ctrl->cam_ois_state < CAM_OIS_CONFIG) {
@@ -1127,7 +1171,10 @@ void cam_ois_shutdown(struct cam_ois_ctrl_t *o_ctrl)
 
 	if (o_ctrl->i2c_init_data.is_settings_valid == 1)
 		delete_request(&o_ctrl->i2c_init_data);
-
+#if defined(CONFIG_TARGET_PRODUCT_NUWA)
+	if (o_ctrl->i2c_postinit_data.is_settings_valid == 1)
+		delete_request(&o_ctrl->i2c_postinit_data);
+#endif		
 	kfree(power_info->power_setting);
 	kfree(power_info->power_down_setting);
 	power_info->power_setting = NULL;
@@ -1257,7 +1304,10 @@ int cam_ois_driver_cmd(struct cam_ois_ctrl_t *o_ctrl, void *arg)
 
 		if (o_ctrl->i2c_fwinit_data.is_settings_valid == 1)
 			delete_request(&o_ctrl->i2c_fwinit_data);
-
+#if defined(CONFIG_TARGET_PRODUCT_NUWA)
+		if (o_ctrl->i2c_postinit_data.is_settings_valid == 1)
+			delete_request(&o_ctrl->i2c_postinit_data);
+#endif
 		break;
 	case CAM_STOP_DEV:
 		if (o_ctrl->cam_ois_state != CAM_OIS_START) {
