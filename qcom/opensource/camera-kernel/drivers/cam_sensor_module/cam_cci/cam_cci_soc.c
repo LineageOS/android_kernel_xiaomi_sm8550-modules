@@ -245,6 +245,9 @@ static void cam_cci_init_cci_params(struct cci_device *new_cci_dev)
 		new_cci_dev->cci_master_info[i].freq_ref_cnt = 0;
 		new_cci_dev->cci_master_info[i].is_initilized = false;
 		mutex_init(&new_cci_dev->cci_master_info[i].mutex);
+#if defined(CONFIG_TARGET_PRODUCT_NUWA)
+		mutex_init(&new_cci_dev->cci_master_info[i].master_mutex);
+#endif
 		sema_init(&new_cci_dev->cci_master_info[i].master_sem, 1);
 		mutex_init(&new_cci_dev->cci_master_info[i].freq_cnt_lock);
 		init_completion(
