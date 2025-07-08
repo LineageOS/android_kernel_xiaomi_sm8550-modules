@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "04c483b9_975d0c60",
+        "filename": "qcom/opensource/camera-kernel/drivers/cam_sensor_module/cam_ois/cam_ois_core.c",
+        "patchSetId": 1
+      },
+      "lineNbr": 1177,
+      "author": {
+        "id": 22465
+      },
+      "writtenOn": "2025-07-08T15:54:04Z",
+      "side": 1,
+      "message": "Remove the trailing tabs here",
+      "revId": "4fbc2bf99e3704ea3ab61cf007bf99088168059c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
