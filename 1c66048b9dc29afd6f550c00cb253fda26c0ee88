@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "2a29e370_eee881c0",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2025-07-08T16:31:50Z",
+      "side": 1,
+      "message": "Don\u0027t add me as reviewer for xiaomi 8550, please. I don\u0027t have any device of this family. If it\u0027s just for merging, then add me to the top of the chain and I\u0027ll check once you confirm everything is verified.",
+      "revId": "1c66048b9dc29afd6f550c00cb253fda26c0ee88",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
