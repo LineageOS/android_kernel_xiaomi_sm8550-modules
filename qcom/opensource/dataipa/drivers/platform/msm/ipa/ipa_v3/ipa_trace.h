@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #undef TRACE_SYSTEM
@@ -395,7 +395,9 @@ TRACE_EVENT(
 #undef TRACE_INCLUDE_PATH
 #ifdef CONFIG_IPA_VENDOR_DLKM
 #define TRACE_INCLUDE_PATH ../../../../sm8550-modules/qcom/opensource/dataipa/drivers/platform/msm/ipa/ipa_v3
-#elif CONFIG_KALAMA_IPA_LE
+#elif defined(CONFIG_KALAMA_IPA_LE)
+#define TRACE_INCLUDE_PATH ../ipa/ipa_v3
+#elif defined(CONFIG_SCUBA_IPA_LE)
 #define TRACE_INCLUDE_PATH ../ipa/ipa_v3
 #else
 #define TRACE_INCLUDE_PATH ../../techpack/dataipa/drivers/platform/msm/ipa/ipa_v3

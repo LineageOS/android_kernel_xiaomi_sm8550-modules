@@ -2239,6 +2239,8 @@ static const char *cnss_recovery_reason_to_str(enum cnss_recovery_reason reason)
 		return "RDDM";
 	case CNSS_REASON_TIMEOUT:
 		return "TIMEOUT";
+	case CNSS_REASON_FW_ASSERTION_FAIL:
+		return "FW_ASSERTION_FAIL";
 	}
 
 	return "UNKNOWN";
@@ -3180,6 +3182,26 @@ static void cnss_destroy_ramdump_device(struct cnss_plat_data *plat_priv,
 }
 #endif
 
+#if IS_ENABLED(CONFIG_CNSS2_DISABLE_SSR_RAMDUMP)
+static bool cnss_dump_enabled(void)
+{
+	return false;
+}
+#else
+#if IS_ENABLED(CONFIG_QCOM_RAMDUMP)
+static bool cnss_dump_enabled(void)
+{
+	return dump_enabled();
+}
+#else
+/* Saving dump to file system is always needed in this case. */
+static bool cnss_dump_enabled(void)
+{
+	return true;
+}
+#endif /* IS_ENABLED(CONFIG_QCOM_RAMDUMP) */
+#endif /* IS_ENABLED(CONFIG_CNSS2_DISABLE_SSR_RAMDUMP) */
+
 #if IS_ENABLED(CONFIG_QCOM_RAMDUMP)
 int cnss_do_ramdump(struct cnss_plat_data *plat_priv)
 {
@@ -3187,7 +3209,7 @@ int cnss_do_ramdump(struct cnss_plat_data *plat_priv)
 	struct qcom_dump_segment segment;
 	struct list_head head;
 
-	if (!dump_enabled()) {
+	if (!cnss_dump_enabled()) {
 		cnss_pr_info("Dump collection is not enabled\n");
 		return 0;
 	}
@@ -3243,7 +3265,6 @@ do {									\
  */
 #define qcom_dump_segment cnss_qcom_dump_segment
 #define qcom_elf_dump cnss_qcom_elf_dump
-#define dump_enabled cnss_dump_enabled
 
 struct cnss_qcom_dump_segment {
 	struct list_head node;
@@ -3384,12 +3405,6 @@ static int cnss_qcom_elf_dump(struct list_head *segs, struct device *dev,
 
 	return cnss_qcom_devcd_dump(dev, data, data_size, GFP_KERNEL);
 }
-
-/* Saving dump to file system is always needed in this case. */
-static bool cnss_dump_enabled(void)
-{
-	return true;
-}
 #endif /* CONFIG_QCOM_RAMDUMP */
 
 int cnss_do_elf_ramdump(struct cnss_plat_data *plat_priv)
@@ -3402,7 +3417,7 @@ int cnss_do_elf_ramdump(struct cnss_plat_data *plat_priv)
 	struct list_head head;
 	int i, ret = 0;
 
-	if (!dump_enabled()) {
+	if (!cnss_dump_enabled()) {
 		cnss_pr_info("Dump collection is not enabled\n");
 		return ret;
 	}
@@ -3603,7 +3618,7 @@ int cnss_do_host_ramdump(struct cnss_plat_data *plat_priv,
 	int ret = 0;
 	enum cnss_host_dump_type j;
 
-	if (!dump_enabled()) {
+	if (!cnss_dump_enabled()) {
 		cnss_pr_info("Dump collection is not enabled\n");
 		return ret;
 	}
@@ -5711,7 +5726,11 @@ out:
 	return ret;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0))
 static int cnss_remove(struct platform_device *plat_dev)
+#else
+static void cnss_remove(struct platform_device *plat_dev)
+#endif
 {
 	struct cnss_plat_data *plat_priv = platform_get_drvdata(plat_dev);
 
@@ -5735,7 +5754,9 @@ static int cnss_remove(struct platform_device *plat_dev)
 	platform_set_drvdata(plat_dev, NULL);
 	cnss_clear_plat_priv(plat_priv);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0))
 	return 0;
+#endif
 }
 
 static struct platform_driver cnss_platform_driver = {

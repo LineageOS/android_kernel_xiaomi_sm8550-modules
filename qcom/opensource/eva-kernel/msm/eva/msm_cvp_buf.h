@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _MSM_CVP_BUF_H_
@@ -206,12 +207,12 @@ int msm_cvp_proc_oob(struct msm_cvp_inst* inst,
 			struct eva_kmd_hfi_packet* in_pkt);
 void msm_cvp_cache_operations(struct msm_cvp_smem *smem,
 			u32 type, u32 offset, u32 size);
-int msm_cvp_mark_user_persist(struct msm_cvp_inst *inst,
+int msm_cvp_unmap_user_persist(struct msm_cvp_inst *inst,
 			struct eva_kmd_hfi_packet *in_pkt,
 			unsigned int offset, unsigned int buf_num);
 int msm_cvp_map_user_persist(struct msm_cvp_inst *inst,
 			struct eva_kmd_hfi_packet *in_pkt,
-			unsigned int offset, unsigned int buf_num);
+			unsigned int offset, unsigned int buf_num, uint32_t *fd_arr);
 int msm_cvp_map_frame(struct msm_cvp_inst *inst,
 		struct eva_kmd_hfi_packet *in_pkt,
 		unsigned int offset, unsigned int buf_num);

@@ -20,7 +20,7 @@ ifeq ($(TARGET_DATARMNET_ENABLE), true)
 	DATA_DLKM_BOARD_PLATFORMS_LIST += trinket
 
 	ifneq ($(TARGET_BOARD_AUTO),true)
-		ifeq ($(call is-board-platform-in-list,$(DATA_DLKM_BOARD_PLATFORMS_LIST)),true)
+		ifneq ( ,$(call is-board-platform-in-list2,$(DATA_DLKM_BOARD_PLATFORMS_LIST)))
 			BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/rmnet_core.ko
 			BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/rmnet_ctl.ko
 		endif

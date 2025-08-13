@@ -1677,7 +1677,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_waip
 		msm_vidc_set_constant_quality},
 
 	{GOP_SIZE, ENC, CODECS_ALL,
-		{ENH_LAYER_COUNT},
+		{ENH_LAYER_COUNT, VBV_DELAY},
 		{ALL_INTRA},
 		msm_vidc_adjust_gop_size,
 		msm_vidc_set_gop_size},
@@ -1800,8 +1800,8 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_waip
 
 	{VBV_DELAY, ENC, H264|HEVC,
 		{BITRATE_MODE},
-		{0},
-		NULL,
+		{GOP_SIZE, ENH_LAYER_COUNT},
+		msm_vidc_adjust_vbv_delay,
 		msm_vidc_set_cbr_related_properties},
 
 	{PEAK_BITRATE, ENC, H264|HEVC,
@@ -1879,7 +1879,7 @@ static struct msm_platform_inst_cap_dependency instance_cap_dependency_data_waip
 		{CONTENT_ADAPTIVE_CODING}},
 
 	{ENH_LAYER_COUNT, ENC, H264|HEVC,
-		{BITRATE_MODE, META_EVA_STATS},
+		{BITRATE_MODE, META_EVA_STATS, VBV_DELAY}},
 		{GOP_SIZE, B_FRAME, BIT_RATE, MIN_QUALITY, SLICE_MODE},
 		msm_vidc_adjust_layer_count,
 		msm_vidc_set_layer_count_and_type},

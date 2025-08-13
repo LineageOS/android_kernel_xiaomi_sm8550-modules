@@ -39,12 +39,14 @@ endif
 endif
 
 ifeq ($(filter $(CONFIG_ARCH_KHAJE) $(CONFIG_ARCH_MONACO) $(CONFIG_ARCH_TRINKET) $(CONFIG_ARCH_SCUBA), y), y)
+ifneq ($(CONFIG_SCUBA_IPA_LE), y)
 DATAIPADRVTOP = $(srctree)/../sm8550-modules/qcom/opensource/dataipa/drivers/platform/msm
 LINUXINCLUDE    += -include $(srctree)/../sm8550-modules/qcom/opensource/dataipa/config/dataipa_vendor_ipav4.h
 include $(srctree)/../sm8550-modules/qcom/opensource/dataipa/config/dataipa_GKI_ipav4.conf
 ifeq ($(CONFIG_LOCALVERSION), "-gki-consolidate")
 include $(srctree)/../sm8550-modules/qcom/opensource/dataipa/config/dataipa_GKI_consolidate.conf
 LINUXINCLUDE    += -include $(srctree)/../sm8550-modules/qcom/opensource/dataipa/config/dataipa_debug.h
+endif
 endif
 endif
 
@@ -54,6 +56,18 @@ ifeq ($(CONFIG_KALAMA_IPA_LE),y)
 DATAIPADRVTOP = $(srctree)/../../../dataipa/drivers/platform/msm
 LINUXINCLUDE    += -include $(srctree)/../../../dataipa/config/dataipa_le.h
 include $(srctree)/../../../dataipa/config/dataipa_GKI.conf
+ifeq ($(CONFIG_LOCALVERSION), "-gki-consolidate")
+include $(srctree)/../../../dataipa/config/dataipa_GKI_consolidate.conf
+LINUXINCLUDE    += -include $(srctree)/../../../dataipa/config/dataipa_debug.h
+endif
+endif
+endif
+
+ifeq ($(CONFIG_ARCH_SCUBA),y)
+ifeq ($(CONFIG_SCUBA_IPA_LE),y)
+DATAIPADRVTOP = $(srctree)/../../../dataipa/drivers/platform/msm
+LINUXINCLUDE    += -include $(srctree)/../../../dataipa/config/dataipa_le_ipav4.h
+include $(srctree)/../../../dataipa/config/dataipa_GKI_le_ipav4.conf
 ifeq ($(CONFIG_LOCALVERSION), "-gki-consolidate")
 include $(srctree)/../../../dataipa/config/dataipa_GKI_consolidate.conf
 LINUXINCLUDE    += -include $(srctree)/../../../dataipa/config/dataipa_debug.h

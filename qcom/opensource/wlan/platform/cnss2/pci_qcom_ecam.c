@@ -86,6 +86,34 @@ void cnss_pci_update_drv_supported(struct cnss_pci_data *pci_priv)
 	pci_priv->drv_supported = false;
 }
 
+int cnss_pci_dsp_link_control(struct cnss_pci_data *pci_priv,
+			      bool link_enable)
+{
+	return -EOPNOTSUPP;
+}
+
+int cnss_pci_set_dsp_link_status(struct cnss_pci_data *pci_priv,
+				 bool link_enable)
+{
+	return -EOPNOTSUPP;
+}
+
+int cnss_pci_get_dsp_link_status(struct cnss_pci_data *pci_priv)
+{
+	return -EOPNOTSUPP;
+}
+
+int cnss_pci_dsp_link_enable(struct cnss_pci_data *pci_priv)
+{
+	return -EOPNOTSUPP;
+}
+
+int cnss_pci_dsp_link_retrain(struct cnss_pci_data *pci_priv,
+			      u16 target_link_speed)
+{
+	return -EOPNOTSUPP;
+}
+
 int cnss_pci_get_msi_assignment(struct cnss_pci_data *pci_priv)
 {
 	pci_priv->msi_config = &msi_config;

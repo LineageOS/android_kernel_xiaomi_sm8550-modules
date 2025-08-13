@@ -5406,6 +5406,7 @@ int sde_kms_vm_trusted_resource_init(struct sde_kms *sde_kms,
 	if (sde_kms->splash_data.num_splash_displays != 1) {
 		SDE_ERROR("no. of displays not supported:%d\n",
 				sde_kms->splash_data.num_splash_displays);
+		ret = -EINVAL;
 		goto error;
 	}
 

@@ -340,6 +340,7 @@ enum cnss_recovery_reason {
 	CNSS_REASON_LINK_DOWN,
 	CNSS_REASON_RDDM,
 	CNSS_REASON_TIMEOUT,
+	CNSS_REASON_FW_ASSERTION_FAIL,
 };
 
 enum cnss_fw_caps {

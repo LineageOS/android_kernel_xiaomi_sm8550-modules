@@ -3219,7 +3219,7 @@ void sde_crtc_complete_commit(struct drm_crtc *crtc,
 
 	for (i = 0; i < MAX_DSI_DISPLAYS; i++) {
 		splash_display = &sde_kms->splash_data.splash_display[i];
-		if (splash_display->cont_splash_enabled &&
+		if (splash_display->cont_splash_enabled && splash_display->encoder &&
 				crtc == splash_display->encoder->crtc)
 			cont_splash_enabled = true;
 	}

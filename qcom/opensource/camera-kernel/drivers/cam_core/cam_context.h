@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_CONTEXT_H_
@@ -67,6 +67,7 @@ enum cam_context_state {
  * @flushed:               Request is flushed
  * @ctx:                   The context to which this request belongs
  * @pf_data                page fault debug data
+ * @packet                 pointer to packet
  *
  */
 struct cam_ctx_request {
@@ -86,6 +87,7 @@ struct cam_ctx_request {
 	int                               flushed;
 	struct cam_context               *ctx;
 	struct cam_hw_mgr_pf_request_info pf_data;
+	void                           *packet;
 };
 
 /**

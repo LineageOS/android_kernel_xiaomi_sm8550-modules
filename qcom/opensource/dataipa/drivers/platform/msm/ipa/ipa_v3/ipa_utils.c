@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <net/ip.h>
@@ -10466,7 +10466,7 @@ int ipa3_id_alloc(void *ptr)
 
 	idr_preload(GFP_KERNEL);
 	spin_lock(&ipa3_ctx->idr_lock);
-	id = idr_alloc(&ipa3_ctx->ipa_idr, ptr, 0, 0, GFP_NOWAIT);
+	id = idr_alloc(&ipa3_ctx->ipa_idr, ptr, 1, INT_MAX, GFP_NOWAIT);
 	spin_unlock(&ipa3_ctx->idr_lock);
 	idr_preload_end();
 

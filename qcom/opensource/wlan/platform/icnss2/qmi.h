@@ -23,6 +23,7 @@ struct icnss_mem_seg {
 struct icnss_qmi_event_qdss_trace_save_data {
 	u32 total_size;
 	u32 mem_seg_len;
+	enum wlfw_mem_type_enum_v01 mem_type;
 	struct icnss_mem_seg mem_seg[QDSS_TRACE_SEG_LEN_MAX];
 	char file_name[QDSS_TRACE_FILE_NAME_MAX + 1];
 };

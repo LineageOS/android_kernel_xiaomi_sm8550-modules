@@ -1,5 +1,6 @@
 /* Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -175,7 +176,11 @@ if(na){if(nla_memcpy(&DATARMNET7f0ce2d6ad,na,sizeof(DATARMNET7f0ce2d6ad))>
 "\x68\x61\x73\x68\x5f\x74\x6f\x5f\x6d\x6f\x76\x65\x20\x3d\x20\x30\x78\x25\x78\x20\x73\x75\x67\x67\x5f\x74\x79\x70\x65\x20\x3d\x20\x25\x75"
 ,DATARMNET7f0ce2d6ad.DATARMNETc790ff30fc,DATARMNET7f0ce2d6ad.DATARMNET208ea67e1d
 ,DATARMNET7f0ce2d6ad.DATARMNET4da4612f1e,DATARMNET7f0ce2d6ad.DATARMNETa3f89581b5
-);if(DATARMNET7f0ce2d6ad.DATARMNETa3f89581b5==DATARMNET5898b2a84b){
+);if(DATARMNET7f0ce2d6ad.DATARMNET208ea67e1d>=DATARMNETc6782fed88||
+DATARMNET7f0ce2d6ad.DATARMNETc790ff30fc>=DATARMNETc6782fed88){
+DATARMNET930a441406[DATARMNET465c0e5e6d]++;DATARMNET5d4ca1da1c(
+DATARMNET54338da2ff,DATARMNET96de786762);return-(0xd26+209-0xdf6);}if(
+DATARMNET7f0ce2d6ad.DATARMNETa3f89581b5==DATARMNET5898b2a84b){
 DATARMNET3874292c18=DATARMNET7f0ce2d6ad.DATARMNET208ea67e1d;
 trace_rmnet_shs_wq_high(DATARMNETa0ecb9daac,DATARMNETd7f7ade458,
 DATARMNET7f0ce2d6ad.DATARMNETc790ff30fc,DATARMNET7f0ce2d6ad.DATARMNET208ea67e1d,

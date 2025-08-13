@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only
  *
  * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kthread.h>
@@ -78,10 +79,10 @@ static int cvp_msgq_receiver(void *data)
 				size = (4 + msgq_drv->pending_local_cmd.len)<<2;
 
 				/* sanity check on size information */
-				if (size > GH_MSGQ_MAX_MSG_SIZE_BYTES) {
+				if (size > sizeof(*msg_ptr)) {
 					dprintk(CVP_ERR,
 						"%s: msg size %d exceed max size supported %d \n",
-						__func__, size, GH_MSGQ_MAX_MSG_SIZE_BYTES);
+						__func__, size, sizeof(*msg_ptr));
 					rc = -E2BIG;
 					msgq_drv->pending_local_cmd.type = 0;
 					continue;
@@ -111,9 +112,9 @@ static int cvp_msgq_receiver(void *data)
 			"%s: gh_msgq_recv respond type from remote VM\n",
 			__func__);
 
-			if ((msg_ptr->type & CVP_IPC_MSG_TYPE_ACT_CHECK) !=
-				msgq_drv->pending_remote_rsp.type) {
-
+			if (((msg_ptr->type & CVP_IPC_MSG_TYPE_ACT_CHECK) !=
+				msgq_drv->pending_remote_rsp.type) ||
+				(msgq_drv->pending_remote_rsp.type > CVP_MAX_IPC_CMD + 1)) {
 				dprintk(CVP_ERR,
 				"%s: Msg disgard,recv type %d, pend local %d\n",
 				__func__, msg_ptr->type,

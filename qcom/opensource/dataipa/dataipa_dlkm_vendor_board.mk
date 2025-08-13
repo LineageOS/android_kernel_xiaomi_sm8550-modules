@@ -11,7 +11,7 @@ endif
 ifeq ($(TARGET_DATAIPA_DLKM_ENABLE), true)
 DATA_DLKM_BOARD_PLATFORMS_LIST := taro kalama bengal monaco crow $(TRINKET)
 ifneq ($(TARGET_BOARD_AUTO),true)
-ifeq ($(call is-board-platform-in-list,$(DATA_DLKM_BOARD_PLATFORMS_LIST)),true)
+ifneq (, $(call is-board-platform-in-list2,$(DATA_DLKM_BOARD_PLATFORMS_LIST)))
 BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/gsim.ko
 BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/ipam.ko
 BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/ipanetm.ko

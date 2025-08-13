@@ -86,6 +86,16 @@ ifeq ($(CONFIG_FEATURE_SMEM_MAILBOX), y)
 KBUILD_CPPFLAGS += -DCONFIG_FEATURE_SMEM_MAILBOX
 endif
 
+ifeq ($(CONFIG_CNSS2_DISABLE_SSR_RAMDUMP), y)
+KBUILD_CPPFLAGS += -DCONFIG_CNSS2_DISABLE_SSR_RAMDUMP
+endif
+
+ifdef CONFIG_MHI_BUF_LEN
+KBUILD_CPPFLAGS += -DCONFIG_MHI_BUF_LEN=$(CONFIG_MHI_BUF_LEN)
+else
+KBUILD_CPPFLAGS += -DCONFIG_MHI_BUF_LEN=0x8000
+endif
+
 found = $(shell if grep -qF "int msm_pcie_dsp_link_control" $(srctree)/include/linux/msm_pcie.h; then echo "yes" ;else echo "no" ;fi;)
 ifeq ($(findstring yes, $(found)), yes)
 KBUILD_CPPFLAGS += -DCONFIG_PCIE_SWITCH_SUPPORT

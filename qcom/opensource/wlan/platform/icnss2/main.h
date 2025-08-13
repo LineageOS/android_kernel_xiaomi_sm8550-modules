@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2020, 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __MAIN_H__
@@ -35,7 +35,7 @@
 #define QCA6750_PATH_PREFIX    "qca6750/"
 #define ADRASTEA_PATH_PREFIX   "adrastea/"
 #define WCN6450_PATH_PREFIX    "wcn6450/"
-#define ICNSS_MAX_FILE_NAME      35
+#define ICNSS_MAX_FILE_NAME      50
 #define ICNSS_PCI_EP_WAKE_OFFSET 4
 #define ICNSS_DISABLE_M3_SSR 0
 #define ICNSS_ENABLE_M3_SSR 1
@@ -529,6 +529,7 @@ struct icnss_priv {
 	struct kobject *icnss_kobject;
 	struct rproc *rproc;
 	atomic_t is_shutdown;
+	atomic_t is_idle_shutdown;
 	u32 qdss_mem_seg_len;
 	struct icnss_fw_mem qdss_mem[QMI_WLFW_MAX_NUM_MEM_SEG_V01];
 	void *get_info_cb_ctx;
@@ -591,6 +592,7 @@ struct icnss_priv {
 	enum icnss_phy_qam_cap phy_qam_cap;
 	bool rproc_fw_download;
 	struct wlchip_serial_id_v01 serial_id;
+	u64 fw_caps;
 };
 
 struct icnss_reg_info {
