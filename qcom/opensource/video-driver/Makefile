@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
 KBUILD_OPTIONS += VIDEO_ROOT=$(KERNEL_SRC)/$(M)
-KBUILD_OPTIONS += BOARD_PLATFORM=kalama
+KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 
 KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS=$(OUT_DIR)/../sm8550-modules/qcom/opensource/mmrm-driver/Module.symvers
 

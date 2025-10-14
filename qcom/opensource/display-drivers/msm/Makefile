@@ -8,7 +8,7 @@ KBUILD_EXTRA_SYMBOLS := \
     $(OUT_DIR)/../sm8550-modules/qcom/opensource/securemsm-kernel/Module.symvers
 
 KBUILD_OPTIONS += DISPLAY_ROOT=$(KERNEL_SRC)/$(M)/../
-KBUILD_OPTIONS += BOARD_PLATFORM=kalama
+KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 
 all: modules
 
