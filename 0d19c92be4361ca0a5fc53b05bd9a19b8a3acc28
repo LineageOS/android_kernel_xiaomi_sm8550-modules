@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "006982b1_3fcfb035",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 35315
+      },
+      "writtenOn": "2025-10-16T13:50:08Z",
+      "side": 1,
+      "message": "Minus and Lolipuru have tested the merge commit",
+      "revId": "0d19c92be4361ca0a5fc53b05bd9a19b8a3acc28",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
