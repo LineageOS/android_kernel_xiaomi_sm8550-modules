@@ -441,6 +441,9 @@ struct wcd_mbhc_config {
 	u32 enable_usbc_analog;
 	bool moisture_duty_cycle_en;
 	bool usbss_hsj_connect_enable;
+	int uart_audio_switch_gpio;
+	struct device_node *uart_audio_switch_gpio_p; /* used by pinctrl API */
+	bool flip_switch;
 };
 
 struct wcd_mbhc_intr {

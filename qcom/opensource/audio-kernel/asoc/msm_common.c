@@ -9,6 +9,9 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/of_device.h>
+#include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/arch_topology.h>
 #include <sound/control.h>
 #include <sound/core.h>
@@ -92,6 +95,22 @@ static int cluster_first_cpu[MAX_CPU_CLUSTER] = {-1, };
 static struct dev_pm_qos_request *msm_audio_req = NULL;
 static bool kregister_pm_qos_latency_controls = false;
 #define MSM_LL_QOS_VALUE	300 /* time in us to ensure LPM doesn't go in C3/C4 */
+
+#ifdef AUDIO_SILENT_OBSERVER
+extern ssize_t xlogchar_kwrite(const char __user *buf, size_t count);
+static int report_audio_silent_to_onetrack(int level, const char* scenario, const char* location,
+								const char* silent_reason, int silent_type, const char* source_sink,
+								const char* audio_device, const char* extra_info)
+{
+	char msg[512];
+	const char* format = "{\"name\":\"audio_silent_observer\",\"audio_event\":{\"scenario\":\"%s\", \"location\":\"%s\", \"silent_reason\":\"%s\", \"level\":\"%d\",\"silent_type\":\"%d\", \"source_sink\":\"%s\", \"audio_device\":\"%s\", \"extra_info\":\"%s\"},\"dgt\":\"null\",\"audio_ext\":\"null\" }";
+	snprintf(msg, sizeof(msg) - 1, format, scenario, location, silent_reason, level, silent_type,
+			 source_sink, audio_device, extra_info);
+	xlogchar_kwrite(msg, sizeof(msg));
+	pr_info("%s: send msg %s", __func__, msg);
+	return 0;
+}
+#endif
 
 static ssize_t aud_dev_sysfs_store(struct kobject *kobj,
 		struct attribute *attr,

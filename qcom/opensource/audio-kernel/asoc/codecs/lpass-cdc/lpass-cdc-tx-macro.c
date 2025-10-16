@@ -44,9 +44,11 @@
 #define LPASS_CDC_TX_MACRO_ADC_MODE_CFG0_SHIFT 1
 
 #define LPASS_CDC_TX_MACRO_DMIC_UNMUTE_DELAY_MS	40
-#define LPASS_CDC_TX_MACRO_AMIC_UNMUTE_DELAY_MS	100
+#define LPASS_CDC_TX_MACRO_AMIC_UNMUTE_DELAY_MS	130
 #define LPASS_CDC_TX_MACRO_DMIC_HPF_DELAY_MS	300
 #define LPASS_CDC_TX_MACRO_AMIC_HPF_DELAY_MS	300
+
+struct lpass_cdc_tx_macro_priv *g_lpass_cdc_tx_priv;
 
 static int tx_unmute_delay = LPASS_CDC_TX_MACRO_DMIC_UNMUTE_DELAY_MS;
 module_param(tx_unmute_delay, int, 0664);
@@ -63,6 +65,19 @@ static int lpass_cdc_tx_macro_get_channel_map(struct snd_soc_dai *dai,
 
 #define LPASS_CDC_TX_MACRO_SWR_STRING_LEN 80
 #define LPASS_CDC_TX_MACRO_CHILD_DEVICES_MAX 3
+
+#define TX_UNMUTE_DELAY 1200
+#define LPASS_CDC_TX_TX_VOL_CTL_CNT 8
+int LPASS_CDC_TX_TX_VOL_CTL[LPASS_CDC_TX_TX_VOL_CTL_CNT] = {
+	LPASS_CDC_TX0_TX_VOL_CTL,
+	LPASS_CDC_TX1_TX_VOL_CTL,
+	LPASS_CDC_TX2_TX_VOL_CTL,
+	LPASS_CDC_TX3_TX_VOL_CTL,
+	LPASS_CDC_TX4_TX_VOL_CTL,
+	LPASS_CDC_TX5_TX_VOL_CTL,
+	LPASS_CDC_TX6_TX_VOL_CTL,
+	LPASS_CDC_TX7_TX_VOL_CTL
+};
 
 enum {
 	LPASS_CDC_TX_MACRO_AIF_INVALID = 0,
@@ -133,7 +148,9 @@ struct lpass_cdc_tx_macro_priv {
 	struct snd_soc_component *component;
 	struct hpf_work tx_hpf_work[NUM_DECIMATORS];
 	struct tx_mute_work tx_mute_dwork[NUM_DECIMATORS];
+	struct delayed_work tx_hs_unmute_dwork;
 	u16 dmic_clk_div;
+	u16 reg_before_mute[LPASS_CDC_TX_TX_VOL_CTL_CNT];
 	u32 version;
 	unsigned long active_ch_mask[LPASS_CDC_TX_MACRO_MAX_DAIS];
 	unsigned long active_ch_cnt[LPASS_CDC_TX_MACRO_MAX_DAIS];
@@ -672,6 +689,59 @@ err:
 	return ret;
 }
 
+static void tx_macro_hs_unmute_dwork(struct work_struct *work)
+{
+	struct snd_soc_component *component = NULL;
+	struct lpass_cdc_tx_macro_priv *lpass_cdc_tx_priv = NULL;
+	struct delayed_work *delayed_work = NULL;
+	u16 reg_val = 0;
+	int i = 0;
+
+	delayed_work = to_delayed_work(work);
+	lpass_cdc_tx_priv = container_of(delayed_work, struct lpass_cdc_tx_macro_priv,
+        		tx_hs_unmute_dwork);
+	component = lpass_cdc_tx_priv->component;
+	for (i = 0; i < LPASS_CDC_TX_TX_VOL_CTL_CNT; i++) {
+		snd_soc_component_update_bits(component, LPASS_CDC_TX_TX_VOL_CTL[i],
+				0xff, lpass_cdc_tx_priv->reg_before_mute[i]);
+		reg_val = snd_soc_component_read(component, LPASS_CDC_TX_TX_VOL_CTL[i]);
+		dev_info(lpass_cdc_tx_priv->dev, "%s: the reg value of TX%d after unmute is: %#x \n",
+				__func__, i, reg_val);
+	}
+}
+
+void lpass_cdc_tx_macro_mute_hs(void)
+{
+	struct snd_soc_component *component = NULL;
+	u16 reg_val = 0;
+	int i = 0;
+	if (!g_lpass_cdc_tx_priv)
+		return;
+
+	component = g_lpass_cdc_tx_priv->component;
+
+	if (delayed_work_pending(&g_lpass_cdc_tx_priv->tx_hs_unmute_dwork)) {
+		dev_err(component->dev, "%s: there is already a work, give up unmute\n",
+				__func__);
+		return;
+	}
+
+	for (i = 0; i < LPASS_CDC_TX_TX_VOL_CTL_CNT; i++) {
+		g_lpass_cdc_tx_priv->reg_before_mute[i] = snd_soc_component_read(component,
+				LPASS_CDC_TX_TX_VOL_CTL[i]);
+		dev_info(component->dev, "%s: the reg value of TX%d before mute is: %#x \n",
+				__func__, i, g_lpass_cdc_tx_priv->reg_before_mute[i]);
+		snd_soc_component_update_bits(component, LPASS_CDC_TX_TX_VOL_CTL[i], 0xff, 0xac);
+		reg_val = snd_soc_component_read(component, LPASS_CDC_TX_TX_VOL_CTL[i]);
+		dev_info(component->dev, "%s: the reg value of TX%d after mute is: %#x \n",
+				__func__, i, reg_val);
+	}
+	schedule_delayed_work(&g_lpass_cdc_tx_priv->tx_hs_unmute_dwork,
+			msecs_to_jiffies(TX_UNMUTE_DELAY));
+	return;
+}
+EXPORT_SYMBOL(lpass_cdc_tx_macro_mute_hs);
+
 static int lpass_cdc_tx_macro_dec_mode_get(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
@@ -1072,6 +1142,8 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 			dec_cfg_reg, 0x06, 0x00);
 		snd_soc_component_update_bits(component, tx_vol_ctl_reg,
 						0x10, 0x00);
+		snd_soc_component_update_bits(component, tx_vol_ctl_reg,
+						0x0F, 0x04);
 		if (tx_priv->bcs_enable) {
 			snd_soc_component_update_bits(component, dec_cfg_reg,
 					0x01, 0x00);
@@ -2008,6 +2080,7 @@ static int lpass_cdc_tx_macro_init(struct snd_soc_component *component)
 		INIT_DELAYED_WORK(&tx_priv->tx_mute_dwork[i].dwork,
 			  lpass_cdc_tx_macro_mute_update_callback);
 	}
+	INIT_DELAYED_WORK(&tx_priv->tx_hs_unmute_dwork, tx_macro_hs_unmute_dwork);
 	tx_priv->component = component;
 
 	for (i = 0; i < ARRAY_SIZE(lpass_cdc_tx_macro_reg_init); i++)
@@ -2066,6 +2139,7 @@ static int lpass_cdc_tx_macro_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	platform_set_drvdata(pdev, tx_priv);
 
+	g_lpass_cdc_tx_priv = tx_priv;
 	tx_priv->dev = &pdev->dev;
 	ret = of_property_read_u32(pdev->dev.of_node, "reg",
 				   &tx_base_addr);
