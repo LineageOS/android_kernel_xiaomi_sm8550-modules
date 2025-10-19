@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "9bfcb7ce_6deb441f",
+        "filename": "qcom/opensource/audio-kernel/Android.mk",
+        "patchSetId": 5
+      },
+      "lineNbr": 468,
+      "author": {
+        "id": 34682
+      },
+      "writtenOn": "2025-10-19T10:07:08Z",
+      "side": 1,
+      "message": "this part is unnecessary, as kernel module should be handle via KBuild already",
+      "range": {
+        "startLine": 459,
+        "startChar": 0,
+        "endLine": 468,
+        "endChar": 0
+      },
+      "revId": "b2e7c8c4c2f8898a2f93a6a814f65f211b0fba22",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
