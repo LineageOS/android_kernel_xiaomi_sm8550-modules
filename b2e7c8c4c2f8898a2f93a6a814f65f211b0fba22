@@ -46,6 +46,30 @@
       },
       "revId": "b2e7c8c4c2f8898a2f93a6a814f65f211b0fba22",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "9533d8d1_9cbdabd2",
+        "filename": "qcom/opensource/audio-kernel/Android.mk",
+        "patchSetId": 5
+      },
+      "lineNbr": 468,
+      "author": {
+        "id": 34682
+      },
+      "writtenOn": "2025-10-20T15:03:44Z",
+      "side": 1,
+      "message": "Acknowledged",
+      "parentUuid": "c949b31a_7117d5dd",
+      "range": {
+        "startLine": 459,
+        "startChar": 0,
+        "endLine": 468,
+        "endChar": 0
+      },
+      "revId": "b2e7c8c4c2f8898a2f93a6a814f65f211b0fba22",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
