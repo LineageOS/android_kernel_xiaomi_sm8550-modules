@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2011-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/bitfield.h>
@@ -359,6 +359,8 @@ static size_t _iopgtbl_map_sg(struct kgsl_iommu_pt *pt, u64 gpuaddr,
 
 static void kgsl_iommu_send_tlb_hint(struct kgsl_mmu *mmu, bool hint)
 {
+	struct kgsl_device *device = KGSL_MMU_DEVICE(mmu);
+
 #if (KERNEL_VERSION(5, 15, 0) <= LINUX_VERSION_CODE)
 	struct kgsl_iommu *iommu = &mmu->iommu;
 
@@ -378,6 +380,9 @@ static void kgsl_iommu_send_tlb_hint(struct kgsl_mmu *mmu, bool hint)
 	 */
 	if (!hint)
 		kgsl_iommu_flush_tlb(mmu);
+
+	/* TLB hint for GMU domain */
+	gmu_core_send_tlb_hint(device, hint);
 }
 
 static int
@@ -571,7 +576,7 @@ static size_t _iommu_map_page_to_range(struct iommu_domain *domain,
 	return mapped;
 }
 
-static size_t _iommu_map_sg(struct iommu_domain *domain, u64 gpuaddr,
+static ssize_t _iommu_map_sg(struct iommu_domain *domain, u64 gpuaddr,
 		struct sg_table *sgt, int prot)
 {
 	/* Sign extend TTBR1 addresses all the way to avoid warning */
@@ -586,7 +591,8 @@ _kgsl_iommu_map(struct kgsl_mmu *mmu, struct iommu_domain *domain,
 		struct kgsl_memdesc *memdesc)
 {
 	int prot = _iommu_get_protection_flags(mmu, memdesc);
-	size_t mapped, padding;
+	ssize_t mapped;
+	size_t padding;
 	int ret = 0;
 
 	/*
@@ -609,8 +615,9 @@ _kgsl_iommu_map(struct kgsl_mmu *mmu, struct iommu_domain *domain,
 		sg_free_table(&sgt);
 	}
 
-	if (!mapped)
-		return -ENOMEM;
+	/* Check for errors or no pages mapped */
+	if (mapped <= 0)
+		return mapped ? mapped : -ENOMEM;
 
 	padding = kgsl_memdesc_footprint(memdesc) - mapped;
 

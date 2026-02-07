@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023,2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * RMNET WLAN handler framework
  *
@@ -24,7 +24,8 @@ __be32 DATARMNETdfe430c2d6;struct in6_addr DATARMNET815cbb4bf5;};union{__be32
 DATARMNET2cb607d686;struct in6_addr DATARMNETc3f31215b7;};__be16 
 DATARMNET08e913477e;__be16 DATARMNETda7f7fa492;u8 DATARMNET0d956cc77a;};enum{
 DATARMNET356f2a237e,DATARMNET45ee632553,DATARMNET9bfbc31cd6,DATARMNETdcafdec32a,
-};void DATARMNET7ca470d54b(struct sk_buff*DATARMNET543491eb0f,u32 
+};rx_handler_result_t DATARMNET37a92021f9(struct sk_buff**DATARMNET89946cec52);
+void DATARMNET7ca470d54b(struct sk_buff*DATARMNET543491eb0f,u32 
 DATARMNET1464100e7a);int DATARMNET4899053671(struct sk_buff*DATARMNET543491eb0f,
 struct DATARMNET8d3c2559ca*DATARMNET2d4b4cfc9e);bool DATARMNET4eafcdee07(struct 
 DATARMNETb89ecedefc*DATARMNET3396919a68);int DATARMNET53f12a0f7d(struct 

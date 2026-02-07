@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/dma-direction.h>
@@ -414,7 +415,7 @@ int msm_cvp_destroy(struct msm_cvp_inst *inst)
 	pr_info(
 		CVP_DBG_TAG
 		"closed cvp instance: %pK session_id = %d type %d %d\n",
-		inst->proc_name, inst, hash32_ptr(inst->session),
+		inst->proc_name, inst, inst->sess_id,
 		inst->session_type, core->smem_leak_count);
 	inst->session = (void *)0xdeadbeef;
 	if (atomic_read(&inst->smem_count) > 0) {

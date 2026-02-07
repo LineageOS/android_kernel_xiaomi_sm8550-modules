@@ -340,12 +340,29 @@ static int rmnet_config_notify_cb(struct notifier_block *nb,
 				  unsigned long event, void *data)
 {
 	struct net_device *dev = netdev_notifier_info_to_dev(data);
+	int rc;
 
 	if (!dev)
 		return NOTIFY_DONE;
 
 	switch (event) {
+	case NETDEV_REGISTER:
+		if (dev->rtnl_link_ops == &rmnet_link_ops) {
+			rc = netdev_rx_handler_register(dev,
+							rmnet_rx_priv_handler,
+							NULL);
+
+			if (rc)
+				return NOTIFY_BAD;
+		}
+
+		break;
 	case NETDEV_UNREGISTER:
+		if (dev->rtnl_link_ops == &rmnet_link_ops) {
+			netdev_rx_handler_unregister(dev);
+			break;
+		}
+
 		netdev_dbg(dev, "Kernel unregister\n");
 		rmnet_force_unassociate_device(dev);
 		break;

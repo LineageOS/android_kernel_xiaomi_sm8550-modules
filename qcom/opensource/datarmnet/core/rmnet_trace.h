@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/version.h>
 #undef TRACE_SYSTEM
@@ -14,11 +14,23 @@
 		#define TRACE_INCLUDE_PATH ../../../../../../../src/datarmnet/core
 	#endif /* CONFIG_ARCH_SDXNIGHTJAR */
 #else
-	#if defined(__arch_um__)
+	#ifdef CONFIG_ARCH_SCUBA
+            #if defined(RMNET_LA_PLATFORM)
+                #define TRACE_INCLUDE_PATH ../../../../vendor/qcom/opensource/datarmnet/core
+            #else
+		#define TRACE_INCLUDE_PATH ../../../../../../../src/datarmnet/core
+            #endif
+        #elif defined(CONFIG_ARCH_KHAJE)
+            #if defined(RMNET_LA_PLATFORM)
+                #define TRACE_INCLUDE_PATH ../../../../vendor/qcom/opensource/datarmnet/core
+            #else
+                #define TRACE_INCLUDE_PATH ../../../../../../../src/datarmnet/core
+            #endif
+	#elif defined(__arch_um__)
 		#define TRACE_INCLUDE_PATH ../../../../datarmnet/core
 	#else
 		#define TRACE_INCLUDE_PATH ../../../../sm8550-modules/qcom/opensource/datarmnet/core
-	#endif /* defined(__arch_um__) */
+	#endif /* CONFIG_ARCH_KHAJE */
 #endif /* endif LINUX_VERSION_CODE < KERNEL_VERSION(5,5,0) */
 
 #define TRACE_INCLUDE_FILE rmnet_trace

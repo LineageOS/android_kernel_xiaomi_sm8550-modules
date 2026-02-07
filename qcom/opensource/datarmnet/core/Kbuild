@@ -1,5 +1,11 @@
-ifneq (, $(filter y, $(CONFIG_ARCH_LAHAINA) $(CONFIG_ARCH_WAIPIO) $(CONFIG_ARCH_KALAMA) $(CONFIG_ARCH_CROW) $(CONFIG_ARCH_KHAJE) $(CONFIG_ARCH_MONACO) $(CONFIG_ARCH_TRINKET)))
+ifneq (, $(filter y, $(CONFIG_ARCH_LAHAINA) $(CONFIG_ARCH_WAIPIO) $(CONFIG_ARCH_KALAMA) $(CONFIG_ARCH_CROW) $(CONFIG_ARCH_MONACO) $(CONFIG_ARCH_TRINKET)))
 ccflags-y	+= -DRMNET_LA_PLATFORM
+endif
+
+ifeq ($(CONFIG_ARCH_KHAJE), y)
+  ifeq ($(MSM_ARCH), bengal)
+    ccflags-y       += -DRMNET_LA_PLATFORM
+  endif
 endif
 
 ifeq ($(CONFIG_ARCH_SDXNIGHTJAR), y)
@@ -32,9 +38,18 @@ rmnet_core-y += \
 	rmnet_qmap.o \
 	rmnet_ll_qmap.o
 
-ifneq (, $(filter y, $(CONFIG_ARCH_LAHAINA) $(CONFIG_ARCH_WAIPIO) $(CONFIG_ARCH_KALAMA) $(CONFIG_ARCH_CROW)  $(CONFIG_ARCH_KHAJE) $(CONFIG_ARCH_MONACO) $(CONFIG_ARCH_TRINKET)))
+ifneq (, $(filter y, $(CONFIG_ARCH_LAHAINA) $(CONFIG_ARCH_WAIPIO) $(CONFIG_ARCH_KALAMA) $(CONFIG_ARCH_CROW) $(CONFIG_ARCH_MONACO) $(CONFIG_ARCH_TRINKET)))
 obj-m += rmnet_ctl.o
 rmnet_ctl-y := \
 	rmnet_ctl_client.o \
 	rmnet_ctl_ipa.o
+endif
+
+ifeq ($(CONFIG_ARCH_KHAJE), y)
+  ifeq ($(MSM_ARCH), bengal)
+    obj-m += rmnet_ctl.o
+    rmnet_ctl-y := \
+        rmnet_ctl_client.o \
+        rmnet_ctl_ipa.o
+  endif
 endif

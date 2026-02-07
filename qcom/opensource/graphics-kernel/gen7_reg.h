@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _GEN7_REG_H
@@ -868,6 +868,7 @@
 
 /* SP registers */
 #define GEN7_SP_NC_MODE_CNTL                0xae02
+#define GEN7_SP_CHICKEN_BITS_2              0xae09
 #define GEN7_SP_PERFCTR_HLSQ_SEL_0          0xae60
 #define GEN7_SP_PERFCTR_HLSQ_SEL_1          0xae61
 #define GEN7_SP_PERFCTR_HLSQ_SEL_2          0xae62
@@ -910,6 +911,7 @@
 #define GEN7_SP_PERFCTR_SP_SEL_33           0xaea1
 #define GEN7_SP_PERFCTR_SP_SEL_34           0xaea2
 #define GEN7_SP_PERFCTR_SP_SEL_35           0xaea3
+#define GEN7_SP_LPAC_CHICKEN_BITS_2         0xaf84
 
 /* TP registers */
 #define GEN7_TPL1_DBG_ECO_CNTL1             0xb602

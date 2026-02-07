@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/pid.h>
@@ -20,7 +21,7 @@
 	do { \
 		clear_bit(idx, &inst->dma_cache.usage_bitmap); \
 		dprintk(CVP_MEM, "clear %x bit %d dma_cache bitmap 0x%llx\n", \
-			hash32_ptr(inst->session), smem->bitmap_index, \
+			inst->sess_id, smem->bitmap_index, \
 			inst->dma_cache.usage_bitmap); \
 	} while (0)
 
@@ -28,7 +29,7 @@
 	do { \
 		set_bit(idx, &inst->dma_cache.usage_bitmap); \
 		dprintk(CVP_MEM, "Set %x bit %d dma_cache bitmap 0x%llx\n", \
-			hash32_ptr(inst->session), idx, \
+			inst->sess_id, idx, \
 			inst->dma_cache.usage_bitmap); \
 	} while (0)
 
@@ -67,7 +68,7 @@ int print_smem(u32 tag, const char *str, struct msm_cvp_inst *inst,
 		else
 			dprintk(tag,
 				"%s: %x : 0x%llx %s size %d flags %#x iova %#x idx %d ref %d pkt_type %s buf_idx %#x fd %d",
-				str, hash32_ptr(inst->session), smem->dma_buf, smem->dma_buf->name,
+				str, inst->sess_id, smem->dma_buf, smem->dma_buf->name,
 				smem->size, smem->flags, smem->device_addr,
 				smem->bitmap_index, atomic_read(&smem->refcount),
 				name, smem->buf_idx, smem->fd);
@@ -84,13 +85,13 @@ static void print_internal_buffer(u32 tag, const char *str,
 	if (cbuf->smem->dma_buf) {
 		dprintk(tag,
 		"%s: %x : fd %d off %d 0x%llx %s size %d iova %#x",
-		str, hash32_ptr(inst->session), cbuf->fd,
+		str, inst->sess_id, cbuf->fd,
 		cbuf->offset, cbuf->smem->dma_buf, cbuf->smem->dma_buf->name,
 		cbuf->size, cbuf->smem->device_addr);
 	} else {
 		dprintk(tag,
 		"%s: %x : idx %2d fd %d off %d size %d iova %#x",
-		str, hash32_ptr(inst->session), cbuf->fd,
+		str, inst->sess_id, cbuf->fd,
 		cbuf->offset, cbuf->size, cbuf->smem->device_addr);
 	}
 }
@@ -165,7 +166,7 @@ void print_client_buffer(u32 tag, const char *str,
 	dprintk(tag,
 		"%s: %x : idx %2d fd %d off %d size %d type %d flags 0x%x"
                 " reserved[0] %u\n",
-		str, hash32_ptr(inst->session), cbuf->index, cbuf->fd,
+		str, inst->sess_id, cbuf->index, cbuf->fd,
 		cbuf->offset, cbuf->size, cbuf->type, cbuf->flags,
 		cbuf->reserved[0]);
 }
@@ -1569,7 +1570,7 @@ void msm_cvp_unmap_frame(struct msm_cvp_inst *inst, u64 ktid)
 
 	ktid &= (FENCE_BIT - 1);
 	dprintk(CVP_MEM, "%s: (%#x) unmap frame %llu\n",
-			__func__, hash32_ptr(inst->session), ktid);
+			__func__, inst->sess_id, ktid);
 
 	found = false;
 	mutex_lock(&inst->frames.lock);
@@ -1760,7 +1761,7 @@ int msm_cvp_session_deinit_buffers(struct msm_cvp_inst *inst)
 		if (cbuf->ownership != DRIVER) {
 			dprintk(CVP_MEM,
 			"%s: %x : fd %d %pK size %d",
-			"free user persistent", hash32_ptr(inst->session), cbuf->fd,
+			"free user persistent", inst->sess_id, cbuf->fd,
 			smem->dma_buf, cbuf->size);
 			list_del(&cbuf->list);
 			if (smem->bitmap_index >= MAX_DMABUF_NUMS) {
@@ -2035,7 +2036,7 @@ int cvp_release_arp_buffers(struct msm_cvp_inst *inst)
 		if (buf->ownership == DRIVER) {
 			dprintk(CVP_MEM,
 			"%s: %x : fd %d %pK size %d",
-			"free arp", hash32_ptr(inst->session), buf->fd,
+			"free arp", inst->sess_id, buf->fd,
 			smem->dma_buf, buf->size);
 			list_del(&buf->list);
 			atomic_dec(&smem->refcount);
@@ -2139,7 +2140,7 @@ int cvp_release_dsp_buffers(struct msm_cvp_inst *inst,
 	if (buf->ownership == DSP) {
 		dprintk(CVP_MEM,
 			"%s: %x : fd %x %s size %d",
-			__func__, hash32_ptr(inst->session), buf->fd,
+			__func__, inst->sess_id, buf->fd,
 			smem->dma_buf->name, buf->size);
 		atomic_dec(&smem->refcount);
 		msm_cvp_smem_free(smem);
@@ -2147,7 +2148,7 @@ int cvp_release_dsp_buffers(struct msm_cvp_inst *inst,
 	} else {
 		dprintk(CVP_ERR,
 			"%s: wrong owner %d %x : fd %x %s size %d",
-			__func__, buf->ownership, hash32_ptr(inst->session),
+			__func__, buf->ownership, inst->sess_id,
 			buf->fd, smem->dma_buf->name, buf->size);
 	}
 
