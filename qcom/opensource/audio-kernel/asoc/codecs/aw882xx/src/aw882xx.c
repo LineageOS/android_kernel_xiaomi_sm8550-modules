@@ -2440,12 +2440,18 @@ static int aw882xx_i2c_remove(struct i2c_client *i2c)
 
 static void aw882xx_i2c_shutdown(struct i2c_client *i2c)
 {
-	struct aw882xx *aw882xx = i2c_get_clientdata(i2c);
+	struct aw882xx *aw882xx;
 
-	aw_dev_info(aw882xx->dev, "enter");
-	mutex_lock(&aw882xx->lock);
-	aw882xx_device_stop(aw882xx->aw_pa);
-	mutex_unlock(&aw882xx->lock);
+	if (g_aw882xx_dev_cnt == 0)
+		return;
+
+	aw882xx = i2c_get_clientdata(i2c);
+	if (aw882xx != NULL) {
+		aw_dev_info(aw882xx->dev, "enter");
+		mutex_lock(&aw882xx->lock);
+		aw882xx_device_stop(aw882xx->aw_pa);
+		mutex_unlock(&aw882xx->lock);
+	}
 }
 
 static const struct i2c_device_id aw882xx_i2c_id[] = {
