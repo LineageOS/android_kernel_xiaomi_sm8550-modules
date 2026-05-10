@@ -303,12 +303,24 @@ static void msm_cvp_cleanup_instance(struct msm_cvp_inst *inst)
 	struct msm_cvp_frame *frame;
 	struct cvp_session_queue *sq, *sqf;
 	struct cvp_hfi_device *hdev;
+	struct msm_cvp_core *core = NULL;
 
 	if (!inst) {
 		dprintk(CVP_ERR, "%s: invalid params\n", __func__);
 		return;
 	}
 
+	core = list_first_entry(&cvp_driver->cores, struct msm_cvp_core, list);
+	if (!core) {
+		dprintk(CVP_ERR, "%s: core is NULL", __func__);
+		return;
+	}
+	inst = cvp_get_inst_validate(core, inst);
+	if (!inst) {
+		dprintk(CVP_ERR, "%s has a invalid session %llx\n",
+			__func__, inst);
+		return;
+	}
 	sqf = &inst->session_queue_fence;
 	sq = &inst->session_queue;
 
@@ -372,6 +384,7 @@ wait_frame:
 		hdev = inst->core->device;
 		call_hfi_op(hdev, pm_qos_update, hdev->hfi_device_data);
 	}
+	cvp_put_inst(inst);
 }
 
 int msm_cvp_destroy(struct msm_cvp_inst *inst)

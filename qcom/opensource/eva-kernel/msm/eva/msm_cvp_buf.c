@@ -2161,14 +2161,21 @@ int msm_cvp_register_buffer(struct msm_cvp_inst *inst,
 	struct cvp_hfi_device *hdev;
 	struct cvp_hal_session *session;
 	struct msm_cvp_inst *s;
+	struct msm_cvp_core *core = NULL;
 	int rc = 0;
 
-	if (!inst || !inst->core || !buf) {
+	if (!inst || !buf) {
 		dprintk(CVP_ERR, "%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	s = cvp_get_inst_validate(inst->core, inst);
+	core = list_first_entry(&cvp_driver->cores, struct msm_cvp_core, list);
+	if (!core) {
+		dprintk(CVP_ERR, "%s: core is NULL", __func__);
+		return -EINVAL;
+	}
+
+	s = cvp_get_inst_validate(core, inst);
 	if (!s)
 		return -ECONNRESET;
 
@@ -2196,14 +2203,21 @@ int msm_cvp_unregister_buffer(struct msm_cvp_inst *inst,
 		struct eva_kmd_buffer *buf)
 {
 	struct msm_cvp_inst *s;
+	struct msm_cvp_core *core = NULL;
 	int rc = 0;
 
-	if (!inst || !inst->core || !buf) {
+	if (!inst || !buf) {
 		dprintk(CVP_ERR, "%s: invalid params\n", __func__);
 		return -EINVAL;
 	}
 
-	s = cvp_get_inst_validate(inst->core, inst);
+	core = list_first_entry(&cvp_driver->cores, struct msm_cvp_core, list);
+	if (!core) {
+		dprintk(CVP_ERR, "%s: core is NULL", __func__);
+		return -EINVAL;
+	}
+
+	s = cvp_get_inst_validate(core, inst);
 	if (!s)
 		return -ECONNRESET;
 
