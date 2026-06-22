@@ -1410,7 +1410,7 @@ int dsi_display_set_power(struct drm_connector *connector,
 		int power_mode, void *disp)
 {
 	struct dsi_display *display = disp;
-	struct mi_disp_notifier *notify_data;
+	struct mi_disp_notifier *notify_data = NULL;
 	unsigned long notify_event = 0;
 	int mi_power_mode;
 	int rc = 0;
