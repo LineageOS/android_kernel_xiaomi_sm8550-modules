@@ -6,14 +6,12 @@
 
 #include <dt-bindings/regulator/qcom,rpmh-regulator-levels.h>
 #include <linux/clk.h>
-#include <linux/clk/qcom.h>
 #include <linux/component.h>
 #include <linux/delay.h>
 #include <linux/dma-map-ops.h>
 #include <linux/firmware.h>
 #include <linux/interconnect.h>
 #include <linux/io.h>
-#include <linux/iopoll.h>
 #include <linux/kobject.h>
 #include <linux/of_platform.h>
 #include <linux/qcom-iommu-util.h>
@@ -260,40 +258,6 @@ static void gmu_ao_sync_event(struct adreno_device *adreno_dev)
 	trace_gmu_ao_sync(ticks);
 
 	local_irq_restore(flags);
-}
-
-int gen7_gmu_enable_gdsc(struct adreno_device *adreno_dev)
-{
-	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
-	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
-	int ret;
-
-	ret = wait_for_completion_timeout(&gmu->gdsc_gate, msecs_to_jiffies(5000));
-	if (!ret) {
-		dev_err(device->dev, "GPU CX wait timeout. Dumping CX votes:\n");
-		/* Dump the cx regulator consumer list */
-		qcom_clk_dump(NULL, gmu->cx_gdsc, false);
-	}
-
-	ret = regulator_enable(gmu->cx_gdsc);
-	if (ret)
-		dev_err(&gmu->pdev->dev,
-			"Failed to enable GMU CX gdsc, error %d\n", ret);
-
-	kgsl_mmu_send_tlb_hint(&device->mmu, false);
-	clear_bit(GMU_PRIV_CX_GDSC_WAIT, &gmu->flags);
-	return ret;
-}
-
-void gen7_gmu_disable_gdsc(struct adreno_device *adreno_dev)
-{
-	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
-	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
-
-	kgsl_mmu_send_tlb_hint(&device->mmu, true);
-	reinit_completion(&gmu->gdsc_gate);
-	set_bit(GMU_PRIV_CX_GDSC_WAIT, &gmu->flags);
-	regulator_disable(gmu->cx_gdsc);
 }
 
 int gen7_gmu_device_start(struct adreno_device *adreno_dev)
@@ -1399,6 +1363,7 @@ static void gen7_gmu_pwrctrl_suspend(struct adreno_device *adreno_dev)
 	int ret = 0;
 	struct gen7_gmu_device *gmu = to_gen7_gmu(adreno_dev);
 	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
+	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
 
 	/* Disconnect GPU from BUS is not needed if CX GDSC goes off later */
 
@@ -1436,19 +1401,19 @@ static void gen7_gmu_pwrctrl_suspend(struct adreno_device *adreno_dev)
 	 * the GX HS. This code path is the only client voting for GX through
 	 * the regulator interface.
 	 */
-	if (gmu->gx_gdsc) {
+	if (pwr->gx_gdsc) {
 		if (gen7_gmu_gx_is_on(adreno_dev)) {
 			/* Switch gx gdsc control from GMU to CPU
 			 * force non-zero reference count in clk driver
 			 * so next disable call will turn
 			 * off the GDSC
 			 */
-			ret = regulator_enable(gmu->gx_gdsc);
+			ret = regulator_enable(pwr->gx_gdsc);
 			if (ret)
 				dev_err(&gmu->pdev->dev,
 					"suspend fail: gx enable %d\n", ret);
 
-			ret = regulator_disable(gmu->gx_gdsc);
+			ret = regulator_disable(pwr->gx_gdsc);
 			if (ret)
 				dev_err(&gmu->pdev->dev,
 					"suspend fail: gx disable %d\n", ret);
@@ -1501,7 +1466,7 @@ void gen7_gmu_suspend(struct adreno_device *adreno_dev)
 
 	clk_bulk_disable_unprepare(gmu->num_clks, gmu->clks);
 
-	gen7_gmu_disable_gdsc(adreno_dev);
+	kgsl_pwrctrl_disable_cx_gdsc(device);
 
 	gen7_rdpm_cx_freq_update(gmu, 0);
 
@@ -1835,7 +1800,7 @@ static void gen7_gmu_force_first_boot(struct kgsl_device *device)
 	u32 val = 0;
 
 	if (gmu->pdc_cfg_base) {
-		gen7_gmu_enable_gdsc(adreno_dev);
+		kgsl_pwrctrl_enable_cx_gdsc(device);
 		gen7_gmu_enable_clks(adreno_dev, 0);
 
 		val = __raw_readl(gmu->pdc_cfg_base + (GEN7_PDC_GPU_ENABLE_PDC << 2));
@@ -1844,7 +1809,7 @@ static void gen7_gmu_force_first_boot(struct kgsl_device *device)
 		mb();
 
 		clk_bulk_disable_unprepare(gmu->num_clks, gmu->clks);
-		gen7_gmu_disable_gdsc(adreno_dev);
+		kgsl_pwrctrl_disable_cx_gdsc(device);
 		gen7_rdpm_cx_freq_update(gmu, 0);
 	}
 
@@ -1866,7 +1831,7 @@ static int gen7_gmu_first_boot(struct adreno_device *adreno_dev)
 
 	gen7_gmu_aop_send_acd_state(gmu, adreno_dev->acd_enabled);
 
-	ret = gen7_gmu_enable_gdsc(adreno_dev);
+	ret = kgsl_pwrctrl_enable_cx_gdsc(device);
 	if (ret)
 		return ret;
 
@@ -1938,7 +1903,7 @@ clks_gdsc_off:
 	clk_bulk_disable_unprepare(gmu->num_clks, gmu->clks);
 
 gdsc_off:
-	gen7_gmu_disable_gdsc(adreno_dev);
+	kgsl_pwrctrl_disable_cx_gdsc(device);
 
 	gen7_rdpm_cx_freq_update(gmu, 0);
 
@@ -1953,7 +1918,7 @@ static int gen7_gmu_boot(struct adreno_device *adreno_dev)
 
 	kgsl_pwrctrl_request_state(device, KGSL_STATE_AWARE);
 
-	ret = gen7_gmu_enable_gdsc(adreno_dev);
+	ret = kgsl_pwrctrl_enable_cx_gdsc(device);
 	if (ret)
 		return ret;
 
@@ -2006,7 +1971,7 @@ clks_gdsc_off:
 	clk_bulk_disable_unprepare(gmu->num_clks, gmu->clks);
 
 gdsc_off:
-	gen7_gmu_disable_gdsc(adreno_dev);
+	kgsl_pwrctrl_disable_cx_gdsc(device);
 
 	gen7_rdpm_cx_freq_update(gmu, 0);
 
@@ -2335,61 +2300,6 @@ static void gen7_gmu_rdpm_probe(struct gen7_gmu_device *gmu,
 				res->start, resource_size(res));
 }
 
-static int gmu_cx_gdsc_event(struct notifier_block *nb,
-	unsigned long event, void *data)
-{
-	struct gen7_gmu_device *gmu = container_of(nb, struct gen7_gmu_device, gdsc_nb);
-	struct adreno_device *adreno_dev = gen7_gmu_to_adreno(gmu);
-	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
-	u32 val;
-
-	if (!(event & REGULATOR_EVENT_DISABLE) ||
-		!test_bit(GMU_PRIV_CX_GDSC_WAIT, &gmu->flags))
-		return 0;
-
-	if (kgsl_regmap_read_poll_timeout(&device->regmap, GEN7_GPU_CC_CX_GDSCR,
-		val, !(val & BIT(31)), 100, 100 * 1000))
-		dev_err(device->dev, "GPU CX wait timeout.\n");
-
-	clear_bit(GMU_PRIV_CX_GDSC_WAIT, &gmu->flags);
-	complete_all(&gmu->gdsc_gate);
-
-	return 0;
-}
-
-static int gen7_gmu_regulators_probe(struct gen7_gmu_device *gmu,
-		struct platform_device *pdev)
-{
-	int ret;
-
-	gmu->cx_gdsc = devm_regulator_get(&pdev->dev, "vddcx");
-	if (IS_ERR(gmu->cx_gdsc)) {
-		if (PTR_ERR(gmu->cx_gdsc) != -EPROBE_DEFER)
-			dev_err(&pdev->dev, "Couldn't get the vddcx gdsc\n");
-		return PTR_ERR(gmu->cx_gdsc);
-	}
-
-	gmu->gx_gdsc = devm_regulator_get(&pdev->dev, "vdd");
-	if (IS_ERR(gmu->gx_gdsc)) {
-		if (PTR_ERR(gmu->gx_gdsc) != -EPROBE_DEFER)
-			dev_err(&pdev->dev, "Couldn't get the vdd gdsc\n");
-		return PTR_ERR(gmu->gx_gdsc);
-	}
-
-	init_completion(&gmu->gdsc_gate);
-	complete_all(&gmu->gdsc_gate);
-
-	gmu->gdsc_nb.notifier_call = gmu_cx_gdsc_event;
-	ret = devm_regulator_register_notifier(gmu->cx_gdsc, &gmu->gdsc_nb);
-
-	if (ret) {
-		dev_err(&pdev->dev, "Failed to register gmu cx gdsc notifier: %d\n", ret);
-		return ret;
-	}
-
-	return 0;
-}
-
 void gen7_gmu_remove(struct kgsl_device *device)
 {
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
@@ -2493,7 +2403,7 @@ int gen7_gmu_probe(struct kgsl_device *device,
 	gen7_gmu_rdpm_probe(gmu, device);
 
 	/* Set up GMU regulators */
-	ret = gen7_gmu_regulators_probe(gmu, pdev);
+	ret = kgsl_pwrctrl_probe_regulators(device, pdev);
 	if (ret)
 		return ret;
 
@@ -2648,7 +2558,7 @@ static int gen7_gmu_power_off(struct adreno_device *adreno_dev)
 
 	clk_bulk_disable_unprepare(gmu->num_clks, gmu->clks);
 
-	gen7_gmu_disable_gdsc(adreno_dev);
+	kgsl_pwrctrl_disable_cx_gdsc(device);
 
 	gen7_rdpm_cx_freq_update(gmu, 0);
 

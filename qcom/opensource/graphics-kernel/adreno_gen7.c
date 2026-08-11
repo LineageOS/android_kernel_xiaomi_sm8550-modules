@@ -1446,6 +1446,7 @@ int gen7_probe_common(struct platform_device *pdev,
 	adreno_dev->uche_client_pf = 1;
 
 	kgsl_pwrscale_fast_bus_hint(gen7_core->fast_bus_hint);
+	device->pwrctrl.cx_gdsc_offset = GEN7_GPU_CC_CX_GDSCR;
 
 	if (ADRENO_FEATURE(adreno_dev, ADRENO_PREEMPTION)) {
 		const struct adreno_gen7_core *gen7_core = to_gen7_core(adreno_dev);

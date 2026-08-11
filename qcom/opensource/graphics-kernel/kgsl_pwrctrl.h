@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2010-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #ifndef __KGSL_PWRCTRL_H
 #define __KGSL_PWRCTRL_H
@@ -112,6 +112,14 @@ struct kgsl_pwrctrl {
 	struct regulator *gx_gdsc_parent;
 	/** @gx_gdsc_parent_min_corner: Minimum supply voltage for GX parent */
 	u32 gx_gdsc_parent_min_corner;
+	/** @cx_gdsc_nb: Notifier block for cx gdsc regulator */
+	struct notifier_block cx_gdsc_nb;
+	/** @cx_gdsc_gate: Completion to signal cx gdsc collapse status */
+	struct completion cx_gdsc_gate;
+	/** @cx_gdsc_wait: Whether to wait for cx gdsc to turn off */
+	bool cx_gdsc_wait;
+	/** @cx_gdsc_offset: Offset of CX GDSC register */
+	u32 cx_gdsc_offset;
 	int isense_clk_indx;
 	int isense_clk_on_level;
 	unsigned long power_flags;
@@ -267,4 +275,28 @@ void kgsl_pwrctrl_irq(struct kgsl_device *device, bool state);
  * Clear the l3 vote when going into slumber
  */
 void kgsl_pwrctrl_clear_l3_vote(struct kgsl_device *device);
+
+/**
+ * kgsl_pwrctrl_enable_cx_gdsc - Enable cx gdsc
+ * @device: Pointer to the kgsl device
+ *
+ * Return: 0 on success or negative error on failure
+ */
+int kgsl_pwrctrl_enable_cx_gdsc(struct kgsl_device *device);
+
+/**
+ * kgsl_pwrctrl_disable_cx_gdsc - Disable cx gdsc
+ * @device: Pointer to the kgsl device
+ */
+void kgsl_pwrctrl_disable_cx_gdsc(struct kgsl_device *device);
+
+/**
+ * kgsl_pwrctrl_probe_regulators - Probe regulators
+ * @device: Pointer to the kgsl device
+ * @pdev: Pointer to the platform device
+ *
+ * Return: 0 on success or negative error on failure
+ */
+int kgsl_pwrctrl_probe_regulators(struct kgsl_device *device,
+		struct platform_device *pdev);
 #endif /* __KGSL_PWRCTRL_H */

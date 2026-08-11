@@ -1874,6 +1874,7 @@ int a6xx_probe_common(struct platform_device *pdev,
 	struct	adreno_device *adreno_dev, u32 chipid,
 	const struct adreno_gpu_core *gpucore)
 {
+	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
 	const struct adreno_gpudev *gpudev = gpucore->gpudev;
 	int ret;
 
@@ -1881,6 +1882,11 @@ int a6xx_probe_common(struct platform_device *pdev,
 	adreno_dev->chipid = chipid;
 
 	adreno_reg_offset_init(gpudev->reg_offsets);
+
+	if (gmu_core_isenabled(device) && (gpudev != &adreno_a6xx_rgmu_gpudev))
+		device->pwrctrl.cx_gdsc_offset = (adreno_is_a662(adreno_dev) ||
+			adreno_is_a621(adreno_dev)) ? A662_GPU_CC_CX_GDSCR :
+			A6XX_GPU_CC_CX_GDSCR;
 
 	adreno_dev->hwcg_enabled = true;
 	adreno_dev->uche_client_pf = 1;

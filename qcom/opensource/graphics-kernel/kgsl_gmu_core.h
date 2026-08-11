@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #ifndef __KGSL_GMU_CORE_H
 #define __KGSL_GMU_CORE_H
@@ -218,7 +218,6 @@ enum {
 	GMU_PRIV_RSCC_SLEEP_DONE,
 	GMU_PRIV_PM_SUSPEND,
 	GMU_PRIV_PDC_RSC_LOADED,
-	GMU_PRIV_CX_GDSC_WAIT,
 };
 
 struct device_node;

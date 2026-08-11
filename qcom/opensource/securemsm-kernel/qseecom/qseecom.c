@@ -132,27 +132,35 @@
 #define TZ_BUSY_TIMEOUT_MSECS (30*1000)
 
 #define K_COPY_FROM_USER(err, dst, src, size) \
-	do {\
-		if (!(is_compat_task()))\
-			err = copy_from_user((dst),\
-			(void const __user *)(src),\
-			(size));\
-		else {\
-			memmove((dst), (src), (size));\
-			err = 0;\
-		}\
-	} while (0)
+    do {\
+        if (access_ok((void __user *)(src), (size))) {\
+	    if (!(is_compat_task()))\
+                err = copy_from_user((dst),\
+                (void const __user *)(src),\
+                (size));\
+            else {\
+                memmove((dst), (src), (size));\
+                err = 0;\
+            }\
+	} else {\
+            err = -EFAULT;\
+        }\
+    } while (0)
 
 #define K_COPY_TO_USER(err, dst, src, size) \
-	do {\
-		if(!(is_compat_task()))\
-			err = copy_to_user((void __user *)(dst),\
-			(src), (size));\
-		else {\
-			memmove((dst), (src), (size));\
-			err = 0;\
-		}\
-	} while (0)
+    do {\
+        if (access_ok((void __user *)(dst), (size))) {\
+            if (!(is_compat_task()))\
+                err = copy_to_user((void __user *)(dst),\
+                (src), (size));\
+            else {\
+                memmove((dst), (src), (size));\
+                err = 0;\
+            }\
+        } else {\
+            err = -EFAULT;\
+        }\
+    } while (0)
 
 #define DS_ENTERED 0x1
 #define DS_EXITED  0x0
