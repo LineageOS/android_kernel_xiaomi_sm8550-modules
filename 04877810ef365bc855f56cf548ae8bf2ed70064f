@@ -50,6 +50,23 @@
       "message": "Also, why do you need this for? Is there any driver from here that you\u0027re missing on your devices?",
       "revId": "04877810ef365bc855f56cf548ae8bf2ed70064f",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "7077e987_39cc20e3",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2026-09-05T23:17:11Z",
+      "side": 1,
+      "message": "You can now merge qcom sm8550-modules, reusing this change-id.",
+      "revId": "04877810ef365bc855f56cf548ae8bf2ed70064f",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ],
   "submitRequirementResults": [
