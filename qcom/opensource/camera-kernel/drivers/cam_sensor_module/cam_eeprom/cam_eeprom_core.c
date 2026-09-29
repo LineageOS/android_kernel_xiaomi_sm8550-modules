@@ -1351,17 +1351,22 @@ static int32_t cam_eeprom_pkt_parse(struct cam_eeprom_ctrl_t *e_ctrl, void *arg)
 			if (rc) {
 				CAM_ERR(CAM_EEPROM,
 					"read_eeprom_memory failed at times %d", i);
+				if (cam_eeprom_power_down(e_ctrl))
+					goto memdata_free;
 				usleep_range(10*1000, 11*1000);
 				continue;
 			} else {
 				rc = cam_eeprom_get_cal_data(e_ctrl, csl_packet);
-				rc = cam_eeprom_power_down(e_ctrl);
+				if (rc)
+					cam_eeprom_power_down(e_ctrl);
+				else
+					rc = cam_eeprom_power_down(e_ctrl);
 				break;
 			}
 		}
 
 		if (i == MAX_RETRY_TIMES)
-			goto power_down;
+			goto memdata_free;
 
 		e_ctrl->cam_eeprom_state = CAM_EEPROM_ACQUIRE;
 		vfree(e_ctrl->cal_data.mapdata);
@@ -1436,8 +1441,6 @@ end:
 put_ref:
 	cam_mem_put_cpu_buf(dev_config.packet_handle);
 	return rc;
-power_down:
-	cam_eeprom_power_down(e_ctrl);
 memdata_free:
 	vfree(e_ctrl->cal_data.mapdata);
 error:
